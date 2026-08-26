@@ -1,0 +1,733 @@
+{
+  "communities": {
+    "0": [
+      "frontend_app_error",
+      "frontend_app_error_errorboundary",
+      "frontend_app_loading",
+      "frontend_app_loading_loading",
+      "frontend_app_not_found",
+      "frontend_app_not_found_notfound",
+      "frontend_app_page",
+      "frontend_app_page_homepage",
+      "frontend_components_layout_shell",
+      "frontend_components_layout_shell_shell",
+      "frontend_components_layout_shell_shellprops",
+      "frontend_components_ui_badge",
+      "frontend_components_ui_badge_badge",
+      "frontend_components_ui_badge_badgeprops",
+      "frontend_components_ui_button",
+      "frontend_components_ui_button_button",
+      "frontend_components_ui_button_buttonprops",
+      "frontend_components_ui_card",
+      "frontend_components_ui_card_card",
+      "frontend_components_ui_card_cardcontent",
+      "frontend_components_ui_card_carddescription",
+      "frontend_components_ui_card_cardfooter",
+      "frontend_components_ui_card_cardheader",
+      "frontend_components_ui_card_cardtitle",
+      "frontend_components_ui_empty_state",
+      "frontend_components_ui_empty_state_emptystate",
+      "frontend_components_ui_empty_state_emptystateprops",
+      "frontend_components_ui_error_state",
+      "frontend_components_ui_error_state_errorstate",
+      "frontend_components_ui_error_state_errorstateprops",
+      "frontend_components_ui_input",
+      "frontend_components_ui_input_input",
+      "frontend_components_ui_input_inputprops",
+      "frontend_components_ui_loading_state",
+      "frontend_components_ui_loading_state_loadingstate",
+      "frontend_components_ui_loading_state_loadingstateprops",
+      "frontend_components_ui_modal",
+      "frontend_components_ui_modal_modal",
+      "frontend_components_ui_modal_modalprops",
+      "frontend_components_ui_page_header",
+      "frontend_components_ui_page_header_pageheader",
+      "frontend_components_ui_page_header_pageheaderprops",
+      "frontend_components_ui_page_header_sectionheader",
+      "frontend_components_ui_page_header_sectionheaderprops",
+      "frontend_components_ui_select",
+      "frontend_components_ui_select_select",
+      "frontend_components_ui_select_selectprops",
+      "frontend_components_ui_status_badge",
+      "frontend_components_ui_status_badge_statusbadge",
+      "frontend_components_ui_status_badge_statusbadgeprops",
+      "frontend_components_ui_textarea",
+      "frontend_components_ui_textarea_textarea",
+      "frontend_components_ui_textarea_textareaprops",
+      "frontend_lib_utils",
+      "frontend_lib_utils_cn",
+      "frontend_types_ui",
+      "frontend_types_ui_badgevariant",
+      "frontend_types_ui_buttonsize",
+      "frontend_types_ui_buttonvariant",
+      "frontend_types_ui_navitem",
+      "frontend_types_ui_statustype"
+    ],
+    "1": [
+      "backend_tsconfig",
+      "backend_tsconfig_compileroptions_paths",
+      "backend_tsconfig_exclude",
+      "backend_tsconfig_include",
+      "backend_tsconfig_json_ref_node_modules",
+      "backend_tsconfig_paths_shared",
+      "frontend_tsconfig",
+      "frontend_tsconfig_compileroptions",
+      "frontend_tsconfig_compileroptions_allowjs",
+      "frontend_tsconfig_compileroptions_esmoduleinterop",
+      "frontend_tsconfig_compileroptions_incremental",
+      "frontend_tsconfig_compileroptions_isolatedmodules",
+      "frontend_tsconfig_compileroptions_jsx",
+      "frontend_tsconfig_compileroptions_lib",
+      "frontend_tsconfig_compileroptions_module",
+      "frontend_tsconfig_compileroptions_moduleresolution",
+      "frontend_tsconfig_compileroptions_noemit",
+      "frontend_tsconfig_compileroptions_paths",
+      "frontend_tsconfig_compileroptions_plugins",
+      "frontend_tsconfig_compileroptions_resolvejsonmodule",
+      "frontend_tsconfig_compileroptions_skiplibcheck",
+      "frontend_tsconfig_compileroptions_strict",
+      "frontend_tsconfig_compileroptions_target",
+      "frontend_tsconfig_exclude",
+      "frontend_tsconfig_include",
+      "frontend_tsconfig_paths_shared",
+      "package_json_ref_shared",
+      "ref_dist",
+      "ref_dom",
+      "ref_dom_iterable",
+      "ref_esnext",
+      "ref_next_dev_types_ts",
+      "ref_next_env_d_ts",
+      "ref_next_types_ts",
+      "ref_src",
+      "ref_tests",
+      "ref_ts",
+      "ref_tsx"
+    ],
+    "2": [
+      "backend_package",
+      "backend_package_description",
+      "backend_package_devdependencies",
+      "backend_package_devdependencies_pino_pretty",
+      "backend_package_devdependencies_tsx",
+      "backend_package_devdependencies_types_node",
+      "backend_package_devdependencies_typescript",
+      "backend_package_devdependencies_vitest",
+      "backend_package_json_types_node",
+      "backend_package_json_typescript",
+      "backend_package_main",
+      "backend_package_name",
+      "backend_package_private",
+      "backend_package_scripts",
+      "backend_package_scripts_build",
+      "backend_package_scripts_dev",
+      "backend_package_scripts_start",
+      "backend_package_scripts_test",
+      "backend_package_scripts_test_watch",
+      "backend_package_version",
+      "frontend_package_devdependencies",
+      "frontend_package_devdependencies_postcss",
+      "frontend_package_devdependencies_tailwindcss",
+      "frontend_package_devdependencies_tailwindcss_postcss",
+      "frontend_package_devdependencies_types_node",
+      "frontend_package_devdependencies_types_react",
+      "frontend_package_devdependencies_types_react_dom",
+      "frontend_package_devdependencies_typescript",
+      "pino_pretty",
+      "postcss",
+      "tailwindcss",
+      "tailwindcss_postcss",
+      "tsx",
+      "types_react",
+      "types_react_dom",
+      "vitest"
+    ],
+    "3": [
+      "backend_src_app",
+      "backend_src_app_buildapp",
+      "backend_src_config_constants",
+      "backend_src_config_constants_app_name",
+      "backend_src_config_constants_app_version",
+      "backend_src_config_constants_correlation_id_header",
+      "backend_src_config_constants_http_status",
+      "backend_src_config_constants_request_id_header",
+      "backend_src_config_env",
+      "backend_src_config_env_env",
+      "backend_src_config_env_envconfig",
+      "backend_src_config_env_envschema",
+      "backend_src_config_env_parseenv",
+      "backend_src_plugins_auth",
+      "backend_src_plugins_auth_authplugin",
+      "backend_src_plugins_auth_fastify",
+      "backend_src_plugins_auth_fastifyrequest",
+      "backend_src_plugins_correlation",
+      "backend_src_plugins_correlation_correlationplugin",
+      "backend_src_plugins_correlation_fastify",
+      "backend_src_plugins_correlation_fastifyrequest",
+      "backend_src_plugins_cors",
+      "backend_src_plugins_cors_corsplugin",
+      "backend_src_plugins_errors",
+      "backend_src_plugins_errors_errorsplugin",
+      "backend_src_plugins_firebase",
+      "backend_src_plugins_firebase_fastify",
+      "backend_src_plugins_firebase_fastifyinstance",
+      "backend_src_plugins_firebase_firebaseplugin",
+      "backend_src_routes_health",
+      "backend_src_routes_health_healthroutes",
+      "backend_src_routes_index",
+      "backend_src_routes_index_apiroutes",
+      "backend_src_server",
+      "backend_src_server_startserver",
+      "shared_types_api_errordetail"
+    ],
+    "4": [
+      "backend_src_services_eligibility_eligibility_service",
+      "backend_src_services_eligibility_eligibility_service_eligibilityservice",
+      "backend_src_services_eligibility_eligibility_service_eligibilityservice_evaluatehousehold",
+      "backend_src_services_eligibility_eligibility_service_ieligibilityservice",
+      "backend_src_services_eligibility_eligibility_service_ieligibilityservice_evaluatehousehold",
+      "backend_src_services_gaps_gap_service",
+      "backend_src_services_gaps_gap_service_gapservice",
+      "backend_src_services_gaps_gap_service_gapservice_detectgaps",
+      "backend_src_services_gaps_gap_service_igapservice",
+      "backend_src_services_gaps_gap_service_igapservice_detectgaps",
+      "shared_types_api_js_shared_types_api",
+      "shared_types_common_js_shared_types_common",
+      "shared_types_eligibility_eligibilityresult",
+      "shared_types_eligibility_js_shared_types_eligibility",
+      "shared_types_eligibility_scheme",
+      "shared_types_eligibility_schemerule",
+      "shared_types_eligibility_ts_shared_types_eligibility",
+      "shared_types_gaps_gapseverity",
+      "shared_types_gaps_gapstatus",
+      "shared_types_gaps_healthcaregap",
+      "shared_types_gaps_js_shared_types_gaps",
+      "shared_types_gaps_ts_shared_types_gaps",
+      "shared_types_household_household",
+      "shared_types_household_js_shared_types_household",
+      "shared_types_household_member",
+      "shared_types_household_ts_shared_types_household",
+      "shared_types_index"
+    ],
+    "5": [
+      "clsx",
+      "firebase",
+      "frontend_package",
+      "frontend_package_dependencies",
+      "frontend_package_dependencies_clsx",
+      "frontend_package_dependencies_firebase",
+      "frontend_package_dependencies_lucide_react",
+      "frontend_package_dependencies_next",
+      "frontend_package_dependencies_react",
+      "frontend_package_dependencies_react_dom",
+      "frontend_package_dependencies_tailwind_merge",
+      "frontend_package_dependencies_zod",
+      "frontend_package_json_zod",
+      "frontend_package_name",
+      "frontend_package_private",
+      "frontend_package_scripts",
+      "frontend_package_scripts_build",
+      "frontend_package_scripts_dev",
+      "frontend_package_scripts_lint",
+      "frontend_package_scripts_start",
+      "frontend_package_version",
+      "lucide_react",
+      "next",
+      "react",
+      "react_dom",
+      "tailwind_merge"
+    ],
+    "6": [
+      "backend_tests_health_test",
+      "frontend_components_dev_dev_status_bar",
+      "frontend_components_dev_dev_status_bar_devstatusbar",
+      "frontend_config_env",
+      "frontend_config_env_env",
+      "frontend_hooks_use_health_check",
+      "frontend_hooks_use_health_check_healthstate",
+      "frontend_hooks_use_health_check_usehealthcheck",
+      "frontend_lib_firebase_client",
+      "frontend_lib_firebase_client_getclientauth",
+      "frontend_lib_firebase_client_isclientfirebaseready",
+      "frontend_lib_firebase_client_isfirebaseconfigured",
+      "frontend_services_api_client",
+      "frontend_services_api_client_apiclient",
+      "frontend_services_api_client_apiclient_checkhealth",
+      "frontend_services_api_client_apiclient_constructor",
+      "frontend_services_api_client_apiclient_generatecorrelationid",
+      "frontend_services_api_client_apiclient_get",
+      "frontend_services_api_client_apiclient_post",
+      "frontend_services_api_client_apiclient_request",
+      "shared_types_api_apierrorresponse",
+      "shared_types_api_apiresult",
+      "shared_types_api_healthcheckresponse",
+      "shared_types_api_ts_shared_types_api"
+    ],
+    "7": [
+      "backend_package_dependencies",
+      "backend_package_dependencies_dotenv",
+      "backend_package_dependencies_fastify",
+      "backend_package_dependencies_fastify_cors",
+      "backend_package_dependencies_fastify_plugin",
+      "backend_package_dependencies_fastify_sensible",
+      "backend_package_dependencies_firebase_admin",
+      "backend_package_dependencies_pino",
+      "backend_package_dependencies_zod",
+      "backend_package_json_zod",
+      "dotenv",
+      "fastify",
+      "fastify_cors",
+      "fastify_plugin",
+      "fastify_sensible",
+      "firebase_admin",
+      "pino"
+    ],
+    "8": [
+      "backend_tsconfig_compileroptions",
+      "backend_tsconfig_compileroptions_declaration",
+      "backend_tsconfig_compileroptions_esmoduleinterop",
+      "backend_tsconfig_compileroptions_forceconsistentcasinginfilenames",
+      "backend_tsconfig_compileroptions_lib",
+      "backend_tsconfig_compileroptions_module",
+      "backend_tsconfig_compileroptions_moduleresolution",
+      "backend_tsconfig_compileroptions_outdir",
+      "backend_tsconfig_compileroptions_resolvejsonmodule",
+      "backend_tsconfig_compileroptions_rootdir",
+      "backend_tsconfig_compileroptions_skiplibcheck",
+      "backend_tsconfig_compileroptions_strict",
+      "backend_tsconfig_compileroptions_target",
+      "ref_es2022"
+    ],
+    "9": [
+      "frontend_app_layout",
+      "frontend_app_layout_metadata",
+      "frontend_app_layout_rootlayout",
+      "frontend_app_layout_viewport",
+      "frontend_components_layout_footer",
+      "frontend_components_layout_footer_footer",
+      "frontend_components_layout_header",
+      "frontend_components_layout_header_header",
+      "frontend_components_layout_mobile_nav",
+      "frontend_components_layout_mobile_nav_mobilenav",
+      "frontend_components_layout_mobile_nav_mobilenavprops",
+      "frontend_config_site",
+      "frontend_config_site_siteconfig"
+    ],
+    "10": [
+      "backend_src_repositories_firebase_base_repository",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_constructor",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_create",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_delete",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_getbyid",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_getcollection",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_list",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_setfirestore",
+      "backend_src_repositories_firebase_base_repository_basefirestorerepository_update",
+      "backend_src_repositories_firebase_base_repository_filtercondition",
+      "backend_src_repositories_firebase_base_repository_listoptions"
+    ],
+    "11": [
+      "backend_src_services_evidence_evidence_service",
+      "backend_src_services_evidence_evidence_service_evidenceservice",
+      "backend_src_services_evidence_evidence_service_evidenceservice_verifyevidence",
+      "backend_src_services_evidence_evidence_service_ievidenceservice",
+      "backend_src_services_evidence_evidence_service_ievidenceservice_verifyevidence",
+      "shared_types_actions_actionresolution",
+      "shared_types_actions_evidencerecord",
+      "shared_types_actions_followup",
+      "shared_types_actions_js_shared_types_actions",
+      "shared_types_actions_ts_shared_types_actions"
+    ],
+    "12": [
+      "shared_package",
+      "shared_package_dependencies",
+      "shared_package_dependencies_zod",
+      "shared_package_json_zod",
+      "shared_package_main",
+      "shared_package_name",
+      "shared_package_private",
+      "shared_package_type",
+      "shared_package_version"
+    ],
+    "13": [
+      "package",
+      "package_name",
+      "package_private",
+      "package_type",
+      "package_version",
+      "package_workspaces",
+      "ref_backend",
+      "ref_frontend"
+    ],
+    "14": [
+      "backend_src_services_ai_ai_service",
+      "backend_src_services_ai_ai_service_aiservice",
+      "backend_src_services_ai_ai_service_aiservice_explaingap",
+      "backend_src_services_ai_ai_service_iaiservice",
+      "backend_src_services_ai_ai_service_iaiservice_explaingap"
+    ],
+    "15": [
+      "backend_src_services_automation_automation_service",
+      "backend_src_services_automation_automation_service_automationservice",
+      "backend_src_services_automation_automation_service_automationservice_triggerfollowupworkflow",
+      "backend_src_services_automation_automation_service_iautomationservice",
+      "backend_src_services_automation_automation_service_iautomationservice_triggerfollowupworkflow"
+    ],
+    "16": [
+      "backend_src_services_notifications_notification_service",
+      "backend_src_services_notifications_notification_service_inotificationservice",
+      "backend_src_services_notifications_notification_service_inotificationservice_sendsmsnotification",
+      "backend_src_services_notifications_notification_service_notificationservice",
+      "backend_src_services_notifications_notification_service_notificationservice_sendsmsnotification"
+    ],
+    "17": [
+      "backend_src_services_telephony_telephony_service",
+      "backend_src_services_telephony_telephony_service_itelephonyservice",
+      "backend_src_services_telephony_telephony_service_itelephonyservice_initiatevoiceassistcall",
+      "backend_src_services_telephony_telephony_service_telephonyservice",
+      "backend_src_services_telephony_telephony_service_telephonyservice_initiatevoiceassistcall"
+    ],
+    "18": [
+      "shared_schemas_common_schema_js_shared_schemas_common_schema",
+      "shared_schemas_common_schema_zod_1",
+      "shared_schemas_health_schema_js_shared_schemas_health_schema",
+      "shared_schemas_health_schema_zod_1",
+      "shared_schemas_index"
+    ],
+    "19": [
+      "shared_types_api_d",
+      "shared_types_api_d_apierrorresponse",
+      "shared_types_api_d_apiresult",
+      "shared_types_api_d_errordetail",
+      "shared_types_api_d_healthcheckresponse"
+    ],
+    "20": [
+      "backend_src_services_firebase_firebase_service",
+      "backend_src_services_firebase_firebase_service_firebaseservice",
+      "backend_src_services_firebase_firebase_service_firebaseservice_constructor",
+      "backend_src_services_firebase_firebase_service_firebaseservice_getstatus"
+    ],
+    "21": [
+      "frontend_types_api",
+      "frontend_types_api_apierrorresponse",
+      "frontend_types_api_apiresult",
+      "frontend_types_api_healthcheckresponse"
+    ],
+    "22": [
+      "shared_schemas_common_schema_apierrorresponsedto",
+      "shared_schemas_common_schema_apierrorresponseschema",
+      "shared_schemas_common_schema_errordetailschema",
+      "shared_schemas_common_schema_ts_shared_schemas_common_schema"
+    ],
+    "23": [
+      "shared_types_actions_d",
+      "shared_types_actions_d_actionresolution",
+      "shared_types_actions_d_evidencerecord",
+      "shared_types_actions_d_followup"
+    ],
+    "24": [
+      "shared_types_common_auditlogentry",
+      "shared_types_common_paginationparams",
+      "shared_types_common_statustype",
+      "shared_types_common_ts_shared_types_common"
+    ],
+    "25": [
+      "shared_types_common_d",
+      "shared_types_common_d_auditlogentry",
+      "shared_types_common_d_paginationparams",
+      "shared_types_common_d_statustype"
+    ],
+    "26": [
+      "shared_types_eligibility_d",
+      "shared_types_eligibility_d_eligibilityresult",
+      "shared_types_eligibility_d_scheme",
+      "shared_types_eligibility_d_schemerule"
+    ],
+    "27": [
+      "shared_types_gaps_d",
+      "shared_types_gaps_d_gapseverity",
+      "shared_types_gaps_d_gapstatus",
+      "shared_types_gaps_d_healthcaregap"
+    ],
+    "28": [
+      "frontend_hooks_use_media_query",
+      "frontend_hooks_use_media_query_useismobile",
+      "frontend_hooks_use_media_query_usemediaquery"
+    ],
+    "29": [
+      "shared_schemas_health_schema_healthcheckresponsedto",
+      "shared_schemas_health_schema_healthcheckresponseschema",
+      "shared_schemas_health_schema_ts_shared_schemas_health_schema"
+    ],
+    "30": [
+      "shared_types_household_d",
+      "shared_types_household_d_household",
+      "shared_types_household_d_member"
+    ],
+    "31": [
+      "frontend_next_config",
+      "frontend_next_config_nextconfig"
+    ],
+    "32": [
+      "shared_schemas_common_schema_d",
+      "shared_schemas_common_schema_d_apierrorresponsedto"
+    ],
+    "33": [
+      "shared_schemas_health_schema_d",
+      "shared_schemas_health_schema_d_healthcheckresponsedto"
+    ],
+    "34": [
+      "asyncclient"
+    ],
+    "35": [
+      "asyncio"
+    ],
+    "36": [
+      "backend_app_api_v1_health_py_request"
+    ],
+    "37": [
+      "backend_app_core_cors_py_fastapi"
+    ],
+    "38": [
+      "backend_app_core_errors_py_fastapi"
+    ],
+    "39": [
+      "backend_app_core_middleware_py_request"
+    ],
+    "40": [
+      "backend_app_main_py_fastapi"
+    ],
+    "41": [
+      "backend_app_schemas_common_py_basemodel"
+    ],
+    "42": [
+      "backend_app_schemas_health_py_basemodel"
+    ],
+    "43": [
+      "backend_app_services_firebase_admin_py_any"
+    ],
+    "44": [
+      "backend_app_services_firebase_admin_py_firestoreclient"
+    ],
+    "45": [
+      "backend_app_services_firebase_repository_py_any"
+    ],
+    "46": [
+      "backend_app_services_firebase_repository_py_firestoreclient"
+    ],
+    "47": [
+      "backend_tests_setup"
+    ],
+    "48": [
+      "backend_vitest_config"
+    ],
+    "49": [
+      "basehttpmiddleware"
+    ],
+    "50": [
+      "basesettings"
+    ],
+    "51": [
+      "fixture"
+    ],
+    "52": [
+      "frontend_postcss_config"
+    ],
+    "53": [
+      "get"
+    ],
+    "54": [
+      "healthcheckresponse"
+    ],
+    "55": [
+      "logger"
+    ],
+    "56": [
+      "logrecord"
+    ],
+    "57": [
+      "requestresponseendpoint"
+    ],
+    "58": [
+      "response"
+    ],
+    "59": [
+      "t"
+    ]
+  },
+  "cohesion": {
+    "0": 0.07540983606557378,
+    "1": 0.05547652916073969,
+    "2": 0.05714285714285714,
+    "3": 0.09841269841269841,
+    "4": 0.08831908831908832,
+    "5": 0.07692307692307693,
+    "6": 0.16666666666666666,
+    "7": 0.11764705882352941,
+    "8": 0.14285714285714285,
+    "9": 0.28205128205128205,
+    "10": 0.24242424242424243,
+    "11": 0.2222222222222222,
+    "12": 0.2222222222222222,
+    "13": 0.25,
+    "14": 0.5,
+    "15": 0.5,
+    "16": 0.5,
+    "17": 0.5,
+    "18": 0.4,
+    "19": 0.4,
+    "20": 0.5,
+    "21": 0.5,
+    "22": 0.5,
+    "23": 0.5,
+    "24": 0.5,
+    "25": 0.5,
+    "26": 0.5,
+    "27": 0.5,
+    "28": 1.0,
+    "29": 0.6666666666666666,
+    "30": 0.6666666666666666,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0
+  },
+  "gods": [
+    {
+      "id": "frontend_lib_utils_cn",
+      "label": "cn()",
+      "degree": 31
+    },
+    {
+      "id": "frontend_tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 16
+    },
+    {
+      "id": "backend_tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 14
+    },
+    {
+      "id": "backend_src_app_buildapp",
+      "label": "buildApp()",
+      "degree": 10
+    },
+    {
+      "id": "backend_src_repositories_firebase_base_repository_basefirestorerepository",
+      "label": "BaseFirestoreRepository",
+      "degree": 9
+    },
+    {
+      "id": "frontend_services_api_client_apiclient",
+      "label": "ApiClient",
+      "degree": 8
+    },
+    {
+      "id": "frontend_components_ui_button_button",
+      "label": "Button",
+      "degree": 8
+    },
+    {
+      "id": "shared_types_api_healthcheckresponse",
+      "label": "HealthCheckResponse",
+      "degree": 7
+    },
+    {
+      "id": "frontend_tsconfig_include",
+      "label": "include",
+      "degree": 7
+    },
+    {
+      "id": "shared_types_api_apiresult",
+      "label": "ApiResult",
+      "degree": 6
+    }
+  ],
+  "surprises": [
+    {
+      "source": "HealthState",
+      "target": "HealthCheckResponse",
+      "source_files": [
+        "frontend/hooks/use-health-check.ts",
+        "shared/types/api.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `HealthState` unexpectedly reaches hub `HealthCheckResponse`"
+    },
+    {
+      "source": "@shared/*",
+      "target": "shared",
+      "source_files": [
+        "backend/tsconfig.json",
+        "package.json"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "extends",
+      "why": "connects across different repos/directories; peripheral node `@shared/*` unexpectedly reaches hub `shared`"
+    },
+    {
+      "source": "@shared/*",
+      "target": "shared",
+      "source_files": [
+        "frontend/tsconfig.json",
+        "package.json"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "extends",
+      "why": "connects across different repos/directories; peripheral node `@shared/*` unexpectedly reaches hub `shared`"
+    },
+    {
+      "source": "buildApp()",
+      "target": "authPlugin()",
+      "source_files": [
+        "backend/src/app.ts",
+        "backend/src/plugins/auth.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `authPlugin()` unexpectedly reaches hub `buildApp()`"
+    },
+    {
+      "source": "buildApp()",
+      "target": "correlationPlugin()",
+      "source_files": [
+        "backend/src/app.ts",
+        "backend/src/plugins/correlation.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `correlationPlugin()` unexpectedly reaches hub `buildApp()`"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}
