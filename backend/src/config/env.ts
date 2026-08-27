@@ -23,6 +23,14 @@ const envSchema = z.object({
   EVIDENCE_CACHE_TTL_HOURS: z.coerce.number().default(72),
   EVIDENCE_MAX_SEARCH_RESULTS: z.coerce.number().default(3),
   EVIDENCE_REQUEST_TIMEOUT_MS: z.coerce.number().default(10000),
+
+  // Phase 7 Lyzr AI Intelligence Layer (Server-Side Only)
+  LYZR_API_KEY: z.string().optional(),
+  LYZR_API_URL: z.string().default("https://agent-prod.studio.lyzr.ai/v3/inference/chat/"),
+  LYZR_AGENT_ID: z.string().default("swasthyasetu-intelligence-agent"),
+  LYZR_TIMEOUT_MS: z.coerce.number().default(15000),
+  LYZR_ANONYMIZATION_SECRET: z.string().default("swasthyasetu-default-anon-secret-key-2026"),
+  AI_CACHE_TTL_HOURS: z.coerce.number().default(24),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

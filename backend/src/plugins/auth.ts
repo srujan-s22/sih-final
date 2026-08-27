@@ -12,6 +12,10 @@ import { EligibilityService } from "../services/eligibility/eligibility.service.
 import { GuidanceService } from "../services/guidance/guidance.service.js";
 import { EvidenceRepository } from "../repositories/evidence.repository.js";
 import { EvidenceService } from "../services/evidence/evidence.service.js";
+import { AICacheRepository } from "../repositories/ai-cache.repository.js";
+import { AIContextBuilder } from "../services/ai/ai-context-builder.js";
+import { LyzrService } from "../services/ai/lyzr.service.js";
+import { IntelligenceService } from "../services/ai/intelligence.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -26,6 +30,10 @@ declare module "fastify" {
     guidanceService: GuidanceService;
     evidenceRepository: EvidenceRepository;
     evidenceService: EvidenceService;
+    aiCacheRepository: AICacheRepository;
+    aiContextBuilder: AIContextBuilder;
+    lyzrService: LyzrService;
+    intelligenceService: IntelligenceService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -55,6 +63,19 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   );
   const evidenceRepository = new EvidenceRepository(fastify.firestore);
   const evidenceService = new EvidenceService(evidenceRepository, schemeRepository);
+  const aiCacheRepository = new AICacheRepository(fastify.firestore);
+  const aiContextBuilder = new AIContextBuilder();
+  const lyzrService = new LyzrService();
+  const intelligenceService = new IntelligenceService(
+    householdRepository,
+    eligibilityService,
+    guidanceService,
+    schemeRepository,
+    evidenceRepository,
+    aiCacheRepository,
+    aiContextBuilder,
+    lyzrService
+  );
 
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
@@ -66,6 +87,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("guidanceService", guidanceService);
   fastify.decorate("evidenceRepository", evidenceRepository);
   fastify.decorate("evidenceService", evidenceService);
+  fastify.decorate("aiCacheRepository", aiCacheRepository);
+  fastify.decorate("aiContextBuilder", aiContextBuilder);
+  fastify.decorate("lyzrService", lyzrService);
+  fastify.decorate("intelligenceService", intelligenceService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 
