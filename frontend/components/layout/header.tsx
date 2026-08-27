@@ -35,7 +35,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand / Logo */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-md">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-teal-700 text-white font-bold text-base shadow-xs group-hover:bg-teal-800 transition-colors">
               SS
             </div>
@@ -44,7 +44,7 @@ export function Header() {
                 {siteConfig.name}
               </span>
               <span className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">
-                Healthcare Access Platform
+                Healthcare Access
               </span>
             </div>
           </Link>
@@ -56,7 +56,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-slate-600 hover:text-teal-800 transition-colors"
+              className="text-sm font-medium text-slate-600 hover:text-teal-800 transition-colors py-2"
             >
               {item.label}
             </Link>
@@ -64,9 +64,9 @@ export function Header() {
           {isAuthenticated && (
             <Link
               href={getPortalLink()}
-              className="text-sm font-semibold text-teal-800 hover:text-teal-900 transition-colors flex items-center gap-1.5"
+              className="text-sm font-semibold text-teal-800 hover:text-teal-900 transition-colors flex items-center gap-1.5 py-2"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
               {getPortalLabel()}
             </Link>
           )}
@@ -78,8 +78,8 @@ export function Header() {
             isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <div className="flex flex-col text-right">
-                  <span className="text-xs font-semibold text-slate-800 max-w-[140px] truncate">
-                    {userProfile?.displayName || userProfile?.email || "User"}
+                  <span className="text-xs font-semibold text-slate-800 max-w-[150px] truncate">
+                    {userProfile?.displayName || userProfile?.email || "Citizen"}
                   </span>
                   <span className="text-[10px] font-mono text-teal-700 font-medium uppercase">
                     {role || "Citizen"}
@@ -103,13 +103,24 @@ export function Header() {
           )}
         </div>
 
-        {/* Mobile Hamburger Button */}
+        {/* Mobile Actions & Menu Trigger */}
         <div className="flex md:hidden items-center gap-2">
-          {isAuthenticated && (
-            <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-              {role || "Citizen"}
-            </span>
+          {!isLoading && (
+            isAuthenticated ? (
+              <Link href={getPortalLink()}>
+                <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200 inline-block">
+                  Portal
+                </span>
+              </Link>
+            ) : (
+              <Link href="/auth/sign-in">
+                <Button variant="primary" size="sm" className="h-8 text-xs px-2.5">
+                  Sign In
+                </Button>
+              </Link>
+            )
           )}
+
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}

@@ -2,6 +2,8 @@ import { FastifyPluginAsync } from "fastify";
 import { healthRoutes } from "./health.js";
 import { authRoutes } from "./auth.js";
 import { householdRoutes } from "./household.js";
+import { schemeRoutes } from "./scheme.js";
+import { eligibilityRoutes } from "./eligibility.js";
 import { testAuthRoutes } from "./test-auth.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
@@ -13,6 +15,12 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Register household & member management routes
   await fastify.register(householdRoutes);
+
+  // Register scheme registry routes
+  await fastify.register(schemeRoutes);
+
+  // Register deterministic eligibility evaluation routes
+  await fastify.register(eligibilityRoutes);
 
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);

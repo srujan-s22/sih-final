@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,11 @@ export function Modal({
   className,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -43,11 +49,11 @@ export function Modal({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  const content = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 transition-opacity"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -59,10 +65,10 @@ export function Modal({
       <div
         ref={modalRef}
         className={cn(
-          "w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-lg transition-all",
-          "animate-in fade-in-0 zoom-in-95 duration-150",
+          "w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl transition-all relative z-[101]",
           className
         )}
+        style={{ backgroundColor: "#ffffff" }}
       >
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -110,4 +116,6 @@ export function Modal({
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

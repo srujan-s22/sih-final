@@ -4,8 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Shell } from "@/components/layout/shell";
-import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -19,7 +17,30 @@ import {
   Gender,
   CreateMemberInput,
 } from "@shared/types/household";
+import { EligibilityResult } from "@shared/types/eligibility";
 import { householdService } from "@/services/household-service";
+import { eligibilityService } from "@/services/eligibility-service";
+import {
+  Home,
+  Users,
+  ShieldCheck,
+  Plus,
+  Edit3,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  MapPin,
+  CreditCard,
+  Phone,
+  User,
+  HeartPulse,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  FileCheck,
+  ArrowRight,
+  Info,
+} from "lucide-react";
 
 const INCOME_OPTIONS: Array<{ value: IncomeCategory; label: string }> = [
   { value: "BPL", label: "Below Poverty Line (BPL)" },
@@ -52,7 +73,9 @@ export default function CitizenPage() {
   // Data states
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [eligibilityResults, setEligibilityResults] = useState<EligibilityResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -77,18 +100,35 @@ export default function CitizenPage() {
   const [memberForm, setMemberForm] = useState<CreateMemberInput>({
     fullName: "",
     age: 18,
-    gender: "male",
+    gender: "female",
     relationship: "Spouse",
     disabilityStatus: false,
     chronicConditions: [],
   });
-  const [chronicConditionsInput, setChronicConditionsInput] = useState("");
   const [memberSubmitting, setMemberSubmitting] = useState(false);
   const [memberFormError, setMemberFormError] = useState<string | null>(null);
 
   // Remove Member State
   const [removingMember, setRemovingMember] = useState<Member | null>(null);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
+
+  // Scheme Details Disclosure State
+  const [expandedSchemeId, setExpandedSchemeId] = useState<string | null>(null);
+
+  // Load Eligibility Evaluation
+  const loadEligibility = useCallback(async () => {
+    setIsEvaluating(true);
+    try {
+      const res = await eligibilityService.evaluateMyHousehold();
+      if (res.success && res.data) {
+        setEligibilityResults(res.data.results || []);
+      }
+    } catch {
+      // Non-blocking for portal view
+    } finally {
+      setIsEvaluating(false);
+    }
+  }, []);
 
   // Load Household Data
   const loadHouseholdData = useCallback(async () => {
@@ -110,9 +150,13 @@ export default function CitizenPage() {
             pincode: res.data.household.pincode,
             contactPhone: res.data.household.contactPhone || "",
           });
+
+          // Fetch deterministic scheme evaluations
+          await loadEligibility();
         } else {
           setHousehold(null);
           setMembers([]);
+          setEligibilityResults([]);
         }
       } else {
         setError(res.error.message);
@@ -122,7 +166,7 @@ export default function CitizenPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadEligibility]);
 
   useEffect(() => {
     loadHouseholdData();
@@ -141,7 +185,8 @@ export default function CitizenPage() {
         if (res.success) {
           setHousehold(res.data.household);
           setIsEditingHousehold(false);
-          setSuccessMessage("Household details updated.");
+          setSuccessMessage("Household details updated successfully.");
+          await loadEligibility();
         } else {
           setHouseholdFormError(res.error.message);
         }
@@ -151,7 +196,8 @@ export default function CitizenPage() {
         if (res.success) {
           setHousehold(res.data.household);
           setIsEditingHousehold(false);
-          setSuccessMessage("Household saved.");
+          setSuccessMessage("Household profile created successfully.");
+          await loadEligibility();
         } else {
           setHouseholdFormError(res.error.message);
         }
@@ -175,7 +221,6 @@ export default function CitizenPage() {
       disabilityStatus: false,
       chronicConditions: [],
     });
-    setChronicConditionsInput("");
     setMemberFormError(null);
     setIsMemberModalOpen(true);
   };
@@ -191,7 +236,6 @@ export default function CitizenPage() {
       disabilityStatus: member.disabilityStatus,
       chronicConditions: member.chronicConditions,
     });
-    setChronicConditionsInput((member.chronicConditions || []).join(", "));
     setMemberFormError(null);
     setIsMemberModalOpen(true);
   };
@@ -202,15 +246,10 @@ export default function CitizenPage() {
     setMemberFormError(null);
     setMemberSubmitting(true);
 
-    const conditionsArray = chronicConditionsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const payload: CreateMemberInput = {
       ...memberForm,
       age: Number(memberForm.age),
-      chronicConditions: conditionsArray,
+      chronicConditions: memberForm.chronicConditions || [],
     };
 
     try {
@@ -222,6 +261,7 @@ export default function CitizenPage() {
           );
           setIsMemberModalOpen(false);
           setSuccessMessage("Member details updated.");
+          await loadEligibility();
         } else {
           setMemberFormError(res.error.message);
         }
@@ -230,7 +270,8 @@ export default function CitizenPage() {
         if (res.success) {
           setMembers((prev) => [...prev, res.data.member]);
           setIsMemberModalOpen(false);
-          setSuccessMessage("Member added.");
+          setSuccessMessage("Family member added.");
+          await loadEligibility();
         } else {
           setMemberFormError(res.error.message);
         }
@@ -252,7 +293,8 @@ export default function CitizenPage() {
       if (res.success) {
         setMembers((prev) => prev.filter((m) => m.id !== removingMember.id));
         setRemovingMember(null);
-        setSuccessMessage("Member removed.");
+        setSuccessMessage("Member removed from household.");
+        await loadEligibility();
       }
     } catch {
       setError("Failed to remove member. Please try again.");
@@ -261,11 +303,16 @@ export default function CitizenPage() {
     }
   };
 
+  const citizenDisplayName =
+    userProfile?.displayName || userProfile?.email?.split("@")[0] || "Citizen";
+
+  const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
+
   if (isLoading) {
     return (
       <ProtectedRoute allowedRoles={["CITIZEN", "ASHA", "ADMIN"]}>
         <Shell className="py-12">
-          <LoadingState message="Loading household details..." />
+          <LoadingState message="Loading your household information..." />
         </Shell>
       </ProtectedRoute>
     );
@@ -273,321 +320,603 @@ export default function CitizenPage() {
 
   return (
     <ProtectedRoute allowedRoles={["CITIZEN", "ASHA", "ADMIN"]}>
-      <Shell className="py-8 space-y-8 max-w-4xl">
-        <PageHeader
-          title="Citizen Portal"
-          description="Manage your household and family members."
-        />
+      <Shell className="py-6 sm:py-8 space-y-6 sm:space-y-8 max-w-4xl">
+        {/* Top Greeting & Action Purpose */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                Welcome, {citizenDisplayName}
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">
+              Let&apos;s make sure your household can access the healthcare support it may be eligible for.
+            </p>
+          </div>
+
+          {/* Setup Progress Summary Chips */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                household
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-amber-50 text-amber-800 border-amber-200"
+              }`}
+            >
+              {household ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Household Set Up</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Setup Needed</span>
+                </>
+              )}
+            </span>
+
+            {household && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                <Users className="w-3.5 h-3.5 text-teal-700" />
+                <span>
+                  {members.length} {members.length === 1 ? "Member" : "Members"}
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Global Feedback Notifications */}
         {error && (
-          <div role="alert" className="p-3 text-xs sm:text-sm text-rose-800 bg-rose-50 border border-rose-200 rounded-md flex items-center justify-between">
-            <span>{error}</span>
-            <Button size="sm" variant="outline" onClick={loadHouseholdData} className="h-7 text-xs">
+          <div
+            role="alert"
+            className="p-3.5 text-xs sm:text-sm text-rose-800 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{error}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={loadHouseholdData}
+              className="h-7 text-xs shrink-0"
+            >
               Try again
             </Button>
           </div>
         )}
 
         {successMessage && (
-          <div role="status" className="p-3 text-xs sm:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md flex items-center justify-between">
-            <span>{successMessage}</span>
+          <div
+            role="status"
+            className="p-3.5 text-xs sm:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
             <button
               type="button"
               onClick={() => setSuccessMessage(null)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs"
+              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs shrink-0 p-1"
             >
               Dismiss
             </button>
           </div>
         )}
 
-        {/* SECTION 1: HOUSEHOLD DETAILS */}
-        {!household && !isEditingHousehold ? (
-          /* Empty State: No Household Added Yet */
-          <Card>
-            <CardHeader>
-              <CardTitle>Your household</CardTitle>
-              <CardDescription>
-                Add your household details to continue.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setIsEditingHousehold(true)}
-              >
-                Set up household
-              </Button>
-            </CardContent>
-          </Card>
-        ) : isEditingHousehold ? (
-          /* Household Form: Create or Edit */
-          <Card>
-            <CardHeader>
-              <CardTitle>{household ? "Edit household details" : "Add household details"}</CardTitle>
-              <CardDescription>
-                Enter your household and location information.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleHouseholdSubmit} className="space-y-4">
-                {householdFormError && (
-                  <div role="alert" className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md">
-                    {householdFormError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Head of Household"
-                    placeholder="e.g. Ramesh Kumar"
-                    value={householdForm.headOfHouseholdName}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, headOfHouseholdName: e.target.value })
-                    }
-                    required
-                  />
-
-                  <Input
-                    label="Ration Card Number"
-                    placeholder="e.g. RC-BR-2026-1002"
-                    value={householdForm.rationCardNumber}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, rationCardNumber: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Select
-                    label="Income Category"
-                    options={INCOME_OPTIONS}
-                    value={householdForm.incomeCategory}
-                    onChange={(e) =>
-                      setHouseholdForm({
-                        ...householdForm,
-                        incomeCategory: e.target.value as IncomeCategory,
-                      })
-                    }
-                    required
-                  />
-
-                  <Input
-                    label="Contact Phone (Optional)"
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    value={householdForm.contactPhone || ""}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, contactPhone: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="State"
-                    placeholder="e.g. Bihar"
-                    value={householdForm.state}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, state: e.target.value })
-                    }
-                    required
-                  />
-
-                  <Input
-                    label="District"
-                    placeholder="e.g. Patna"
-                    value={householdForm.district}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, district: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Village / City"
-                    placeholder="e.g. Bakhtiyarpur"
-                    value={householdForm.village}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, village: e.target.value })
-                    }
-                    required
-                  />
-
-                  <Input
-                    label="Pincode"
-                    placeholder="6-digit postal code"
-                    value={householdForm.pincode}
-                    onChange={(e) =>
-                      setHouseholdForm({ ...householdForm, pincode: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3">
-                  {household && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsEditingHousehold(false)}
-                      disabled={householdSubmitting}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    disabled={householdSubmitting}
-                  >
-                    {householdSubmitting ? "Saving..." : "Save details"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Household Summary Card */
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle>Household details</CardTitle>
-                <CardDescription>
-                  Registered household and location information.
-                </CardDescription>
+        {/* TASK 1: YOUR HOUSEHOLD */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
+                <Home className="w-4 h-4" />
               </div>
+              <div>
+                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
+                  Task 1
+                </span>
+                <h2 className="text-base font-bold text-slate-900">Your household</h2>
+              </div>
+            </div>
+
+            {household && !isEditingHousehold && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditingHousehold(true)}
+                className="h-8 text-xs px-3 flex items-center gap-1.5"
               >
-                Edit
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit</span>
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-6 text-xs sm:text-sm">
+            )}
+          </div>
+
+          {!household && !isEditingHousehold ? (
+            /* Empty State */
+            <div className="py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <p className="text-xs sm:text-sm text-slate-600 max-w-md">
+                Add your household details to discover which healthcare schemes your family may qualify for.
+              </p>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setIsEditingHousehold(true)}
+                className="shrink-0 font-semibold"
+              >
+                Set up household
+              </Button>
+            </div>
+          ) : isEditingHousehold ? (
+            /* Form: Create or Edit */
+            <form onSubmit={handleHouseholdSubmit} className="space-y-4 pt-1">
+              {householdFormError && (
+                <div
+                  role="alert"
+                  className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md"
+                >
+                  {householdFormError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Head of Household"
+                  placeholder="e.g. Ramesh Kumar"
+                  value={householdForm.headOfHouseholdName}
+                  onChange={(e) =>
+                    setHouseholdForm({
+                      ...householdForm,
+                      headOfHouseholdName: e.target.value,
+                    })
+                  }
+                  required
+                />
+
+                <Input
+                  label="Ration Card Number"
+                  placeholder="e.g. RC-BR-2026-1002"
+                  value={householdForm.rationCardNumber}
+                  onChange={(e) =>
+                    setHouseholdForm({
+                      ...householdForm,
+                      rationCardNumber: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select
+                  label="Income Category"
+                  options={INCOME_OPTIONS}
+                  value={householdForm.incomeCategory}
+                  onChange={(e) =>
+                    setHouseholdForm({
+                      ...householdForm,
+                      incomeCategory: e.target.value as IncomeCategory,
+                    })
+                  }
+                  required
+                />
+
+                <Input
+                  label="Contact Phone (Optional)"
+                  type="tel"
+                  placeholder="10-digit mobile number"
+                  value={householdForm.contactPhone || ""}
+                  onChange={(e) =>
+                    setHouseholdForm({ ...householdForm, contactPhone: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="State"
+                  placeholder="e.g. Bihar"
+                  value={householdForm.state}
+                  onChange={(e) =>
+                    setHouseholdForm({ ...householdForm, state: e.target.value })
+                  }
+                  required
+                />
+
+                <Input
+                  label="District"
+                  placeholder="e.g. Patna"
+                  value={householdForm.district}
+                  onChange={(e) =>
+                    setHouseholdForm({ ...householdForm, district: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Village / Town"
+                  placeholder="e.g. Bakhtiyarpur"
+                  value={householdForm.village}
+                  onChange={(e) =>
+                    setHouseholdForm({ ...householdForm, village: e.target.value })
+                  }
+                  required
+                />
+
+                <Input
+                  label="Pincode"
+                  placeholder="6-digit postal code"
+                  value={householdForm.pincode}
+                  onChange={(e) =>
+                    setHouseholdForm({ ...householdForm, pincode: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
+                {household && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingHousehold(false)}
+                    disabled={householdSubmitting}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={householdSubmitting}
+                  className="w-full sm:w-auto font-semibold"
+                >
+                  {householdSubmitting ? "Saving..." : "Save details"}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            /* Summary Row */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-3.5 gap-x-6 text-xs sm:text-sm pt-1">
+              <div className="flex items-start gap-2.5">
+                <User className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
                 <div>
-                  <span className="block text-slate-500 font-medium">Head of Household</span>
+                  <span className="block text-slate-500 text-xs font-medium">Head of Household</span>
                   <span className="font-semibold text-slate-900">{household?.headOfHouseholdName}</span>
                 </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <CreditCard className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
                 <div>
-                  <span className="block text-slate-500 font-medium">Ration Card</span>
-                  <span className="font-mono text-slate-900">{household?.rationCardNumber}</span>
+                  <span className="block text-slate-500 text-xs font-medium">Ration Card</span>
+                  <span className="font-mono text-slate-900 font-medium">{household?.rationCardNumber}</span>
                 </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
                 <div>
-                  <span className="block text-slate-500 font-medium">Income Category</span>
-                  <span className="font-medium text-teal-800">{household?.incomeCategory}</span>
+                  <span className="block text-slate-500 text-xs font-medium">Income Tier</span>
+                  <span className="font-semibold text-teal-800">{household?.incomeCategory}</span>
                 </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 sm:col-span-2">
+                <MapPin className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
                 <div>
-                  <span className="block text-slate-500 font-medium">Location</span>
-                  <span className="text-slate-800">
+                  <span className="block text-slate-500 text-xs font-medium">Address</span>
+                  <span className="text-slate-800 font-medium">
                     {household?.village}, {household?.district}, {household?.state} — {household?.pincode}
                   </span>
                 </div>
-                {household?.contactPhone && (
-                  <div>
-                    <span className="block text-slate-500 font-medium">Phone</span>
-                    <span className="text-slate-800">{household.contactPhone}</span>
-                  </div>
-                )}
               </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* SECTION 2: FAMILY MEMBERS */}
+              {household?.contactPhone && (
+                <div className="flex items-start gap-2.5">
+                  <Phone className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="block text-slate-500 text-xs font-medium">Contact Phone</span>
+                    <span className="text-slate-800 font-medium">{household.contactPhone}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* TASK 2: FAMILY MEMBERS */}
         {household && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle>Family members</CardTitle>
-                <CardDescription>
-                  Who lives in your household.
-                </CardDescription>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
+                    Task 2
+                  </span>
+                  <h2 className="text-base font-bold text-slate-900">Family members</h2>
+                </div>
               </div>
+
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleOpenAddMember}
+                className="h-8 text-xs px-3 font-semibold flex items-center gap-1.5"
               >
-                + Add member
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add member</span>
               </Button>
-            </CardHeader>
+            </div>
 
-            <CardContent>
-              {members.length === 0 ? (
-                <div className="py-6 text-center text-xs sm:text-sm text-slate-500 space-y-3">
-                  <p>No family members added yet.</p>
-                  <Button variant="outline" size="sm" onClick={handleOpenAddMember}>
-                    Add your first member
-                  </Button>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-900 text-sm">
-                            {member.fullName}
-                          </span>
-                          <span className="text-xs text-slate-500 font-medium">
-                            ({member.relationship})
+            {members.length === 0 ? (
+              <div className="py-6 text-center text-xs sm:text-sm text-slate-500 space-y-3">
+                <p>No family members added yet.</p>
+                <Button variant="outline" size="sm" onClick={handleOpenAddMember} className="font-semibold">
+                  Add first family member
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/50 rounded-lg px-2 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">
+                          {member.fullName}
+                        </span>
+                        <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-100">
+                          {member.relationship}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        {member.age} yrs •{" "}
+                        {member.gender.charAt(0).toUpperCase() + member.gender.slice(1)}
+                        {member.disabilityStatus && " • Person with disability"}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto pt-1 sm:pt-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2.5 flex items-center gap-1"
+                        onClick={() => handleOpenEditMember(member)}
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2.5 text-rose-700 hover:text-rose-800 hover:bg-rose-50 flex items-center gap-1"
+                        onClick={() => setRemovingMember(member)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remove</span>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TASK 3: DETERMINISTIC HEALTHCARE SUPPORT EVALUATION */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
+                <HeartPulse className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
+                  Task 3
+                </span>
+                <h2 className="text-base font-bold text-slate-900">Healthcare support</h2>
+              </div>
+            </div>
+
+            {household && (
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                {isEvaluating
+                  ? "Evaluating..."
+                  : `${eligibleCount} May Qualify (${eligibilityResults.length} Evaluated)`}
+              </span>
+            )}
+          </div>
+
+          {!household ? (
+            <div className="py-4 text-xs sm:text-sm text-slate-500">
+              Complete your household profile above to check available healthcare support.
+            </div>
+          ) : eligibilityResults.length === 0 ? (
+            <div className="py-4 text-xs sm:text-sm text-slate-500">
+              No active healthcare schemes evaluated yet.
+            </div>
+          ) : (
+            <div className="space-y-3 pt-1">
+              {eligibilityResults.map((res) => {
+                const isExpanded = expandedSchemeId === res.schemeId;
+                const isEligible = res.status === "ELIGIBLE";
+                const isNeedsInfo = res.status === "NEEDS_INFORMATION";
+
+                return (
+                  <div
+                    key={res.schemeId}
+                    className="rounded-xl border border-slate-200 p-4 space-y-3 bg-slate-50/50"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-slate-900">
+                            {res.schemeShortName || res.schemeName}
+                          </h3>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                              isEligible
+                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                : isNeedsInfo
+                                ? "text-amber-800 bg-amber-50 border-amber-200"
+                                : "text-slate-600 bg-slate-100 border-slate-200"
+                            }`}
+                          >
+                            {isEligible
+                              ? "May Qualify"
+                              : isNeedsInfo
+                              ? "Details Needed"
+                              : "Not Applicable"}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600">
-                          {member.age} yrs • {member.gender.charAt(0).toUpperCase() + member.gender.slice(1)}
-                          {member.disabilityStatus && " • Person with disability"}
-                        </p>
+                        <p className="text-xs text-slate-600">{res.benefitSummary}</p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-auto pt-1 sm:pt-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs px-2.5"
-                          onClick={() => handleOpenEditMember(member)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs px-2.5 text-rose-700 hover:text-rose-800 hover:bg-rose-50"
-                          onClick={() => setRemovingMember(member)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs self-start sm:self-auto flex items-center gap-1 font-medium shrink-0"
+                        onClick={() =>
+                          setExpandedSchemeId(isExpanded ? null : res.schemeId)
+                        }
+                      >
+                        <span>{isExpanded ? "Hide details" : "View support details"}</span>
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+
+                    {/* Progressive Disclosure Accordion Details */}
+                    {isExpanded && (
+                      <div className="pt-3 border-t border-slate-200/80 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                        {/* 1. Matched Rules */}
+                        {res.matchedRules.length > 0 && (
+                          <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
+                            <span className="font-bold text-slate-900 block">
+                              Why this may apply:
+                            </span>
+                            <ul className="space-y-1 text-slate-700">
+                              {res.matchedRules.map((m, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                  <span>{m.explanation}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 2. Missing Requirements */}
+                        {res.missingRequirements.length > 0 && (
+                          <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-1.5">
+                            <span className="font-bold text-amber-900 block">
+                              Information needed to confirm support:
+                            </span>
+                            <ul className="space-y-1 text-amber-800">
+                              {res.missingRequirements.map((req, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                  <span>{req.actionPrompt}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 3. Required Documents */}
+                        {res.requiredDocuments && res.requiredDocuments.length > 0 && (
+                          <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
+                            <span className="font-bold text-slate-900 block">
+                              Required documents:
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              {res.requiredDocuments.map((doc) => (
+                                <div
+                                  key={doc.id}
+                                  className="p-2 rounded bg-slate-50 border border-slate-200/80 flex items-start gap-2"
+                                >
+                                  <FileCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="font-semibold text-slate-900">
+                                      {doc.name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">
+                                      {doc.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 4. Actionable Next Steps */}
+                        {res.nextActions && res.nextActions.length > 0 && (
+                          <div className="p-3 bg-teal-50/60 rounded-lg border border-teal-100 space-y-1.5">
+                            <span className="font-bold text-teal-950 block">
+                              Recommended next steps:
+                            </span>
+                            <ul className="space-y-2 pt-1">
+                              {res.nextActions.map((action) => (
+                                <li
+                                  key={action.id}
+                                  className="flex items-start justify-between gap-2 p-2 bg-white rounded border border-teal-100"
+                                >
+                                  <div className="space-y-0.5">
+                                    <p className="font-bold text-slate-900">
+                                      {action.title}
+                                    </p>
+                                    <p className="text-[11px] text-slate-600">
+                                      {action.description}
+                                    </p>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 shrink-0">
+                                    {action.actionType.replace("_", " ")}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* MODAL: ADD / EDIT MEMBER */}
         <Modal
           isOpen={isMemberModalOpen}
           onClose={() => setIsMemberModalOpen(false)}
           title={editingMemberId ? "Edit member" : "Add family member"}
-          description="Enter member demographic details."
+          description="Enter your family member's information."
         >
           <form onSubmit={handleMemberSubmit} className="space-y-4 pt-2">
             {memberFormError && (
-              <div role="alert" className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md">
+              <div
+                role="alert"
+                className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md"
+              >
                 {memberFormError}
               </div>
             )}
@@ -607,7 +936,9 @@ export default function CitizenPage() {
                 min="0"
                 max="125"
                 value={memberForm.age.toString()}
-                onChange={(e) => setMemberForm({ ...memberForm, age: parseInt(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setMemberForm({ ...memberForm, age: parseInt(e.target.value) || 0 })
+                }
                 required
               />
 
@@ -626,7 +957,9 @@ export default function CitizenPage() {
               label="Relationship to Head"
               options={RELATIONSHIP_OPTIONS}
               value={memberForm.relationship}
-              onChange={(e) => setMemberForm({ ...memberForm, relationship: e.target.value })}
+              onChange={(e) =>
+                setMemberForm({ ...memberForm, relationship: e.target.value })
+              }
               required
             />
 
@@ -641,17 +974,18 @@ export default function CitizenPage() {
                 className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-700"
               />
               <label htmlFor="disabilityStatus" className="text-xs font-medium text-slate-700">
-                Recognized disability or special need
+                Person with recognized disability
               </label>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-3">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsMemberModalOpen(false)}
                 disabled={memberSubmitting}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
@@ -660,6 +994,7 @@ export default function CitizenPage() {
                 variant="primary"
                 size="sm"
                 disabled={memberSubmitting}
+                className="w-full sm:w-auto font-semibold"
               >
                 {memberSubmitting ? "Saving..." : "Save member"}
               </Button>
@@ -672,20 +1007,25 @@ export default function CitizenPage() {
           isOpen={Boolean(removingMember)}
           onClose={() => setRemovingMember(null)}
           title="Remove member"
-          description="Are you sure you want to remove this member from your household?"
+          description="Are you sure you want to remove this member?"
         >
           <div className="space-y-4 pt-2">
             <p className="text-xs sm:text-sm text-slate-700">
-              This will remove <strong className="font-semibold text-slate-900">{removingMember?.fullName}</strong> from your household records.
+              Remove{" "}
+              <strong className="font-semibold text-slate-900">
+                {removingMember?.fullName}
+              </strong>{" "}
+              from your household records?
             </p>
 
-            <div className="flex justify-end gap-2.5 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setRemovingMember(null)}
                 disabled={removeSubmitting}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
@@ -693,7 +1033,7 @@ export default function CitizenPage() {
                 type="button"
                 variant="primary"
                 size="sm"
-                className="bg-rose-700 hover:bg-rose-800 text-white"
+                className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto font-semibold"
                 onClick={handleConfirmRemoveMember}
                 disabled={removeSubmitting}
               >

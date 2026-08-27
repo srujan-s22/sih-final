@@ -1,5 +1,6 @@
 export type IncomeCategory = "BPL" | "AAY" | "APL" | "OTHER";
 export type Gender = "male" | "female" | "other";
+export type MaternalStatus = "none" | "pregnant" | "lactating";
 
 export interface Member {
   id: string;
@@ -10,6 +11,7 @@ export interface Member {
   relationship: string;
   disabilityStatus: boolean;
   chronicConditions: string[];
+  maternalStatus?: MaternalStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +52,7 @@ export interface CreateMemberInput {
   relationship: string;
   disabilityStatus?: boolean;
   chronicConditions?: string[];
+  maternalStatus?: MaternalStatus;
 }
 
 export type UpdateMemberInput = Partial<CreateMemberInput>;

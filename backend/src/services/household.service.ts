@@ -133,6 +133,7 @@ export class HouseholdService {
       relationship: input.relationship,
       disabilityStatus: Boolean(input.disabilityStatus),
       chronicConditions: Array.isArray(input.chronicConditions) ? input.chronicConditions : [],
+      ...(input.maternalStatus && { maternalStatus: input.maternalStatus }),
       createdAt: now,
       updatedAt: now,
     };
@@ -176,6 +177,7 @@ export class HouseholdService {
       ...(input.relationship && { relationship: input.relationship }),
       ...(input.disabilityStatus !== undefined && { disabilityStatus: input.disabilityStatus }),
       ...(input.chronicConditions !== undefined && { chronicConditions: input.chronicConditions }),
+      ...(input.maternalStatus !== undefined && { maternalStatus: input.maternalStatus }),
     };
 
     const updated = await this.householdRepo.updateMember(household.id, memberId, safeUpdates);

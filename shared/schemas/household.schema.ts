@@ -8,6 +8,10 @@ export const GenderSchema = z.enum(["male", "female", "other"], {
   errorMap: () => ({ message: "Gender must be male, female, or other" }),
 });
 
+export const MaternalStatusSchema = z.enum(["none", "pregnant", "lactating"], {
+  errorMap: () => ({ message: "Maternal status must be one of: none, pregnant, lactating" }),
+});
+
 export const CreateHouseholdSchema = z.object({
   headOfHouseholdName: z
     .string({ required_error: "Head of household name is required" })
@@ -70,6 +74,7 @@ export const CreateMemberSchema = z.object({
   chronicConditions: z
     .array(z.string().trim().max(100))
     .default([]),
+  maternalStatus: MaternalStatusSchema.optional(),
 });
 
 export const UpdateMemberSchema = CreateMemberSchema.partial();
