@@ -18,8 +18,10 @@ import {
   CreateMemberInput,
 } from "@shared/types/household";
 import { EligibilityResult } from "@shared/types/eligibility";
+import { GuidanceResponse } from "@shared/types/guidance";
 import { householdService } from "@/services/household-service";
 import { eligibilityService } from "@/services/eligibility-service";
+import { guidanceService } from "@/services/guidance-service";
 import {
   Home,
   Users,
@@ -115,13 +117,23 @@ export default function CitizenPage() {
   // Scheme Details Disclosure State
   const [expandedSchemeId, setExpandedSchemeId] = useState<string | null>(null);
 
-  // Load Eligibility Evaluation
+  // Healthcare Access Guidance State (Phase 5)
+  const [guidance, setGuidance] = useState<GuidanceResponse | null>(null);
+
+  // Load Eligibility Evaluation & Guidance Plan
   const loadEligibility = useCallback(async () => {
     setIsEvaluating(true);
     try {
-      const res = await eligibilityService.evaluateMyHousehold();
-      if (res.success && res.data) {
-        setEligibilityResults(res.data.results || []);
+      const [eligRes, guideRes] = await Promise.all([
+        eligibilityService.evaluateMyHousehold(),
+        guidanceService.getMyGuidance(),
+      ]);
+
+      if (eligRes.success && eligRes.data) {
+        setEligibilityResults(eligRes.data.results || []);
+      }
+      if (guideRes.success && guideRes.data) {
+        setGuidance(guideRes.data);
       }
     } catch {
       // Non-blocking for portal view
@@ -151,12 +163,13 @@ export default function CitizenPage() {
             contactPhone: res.data.household.contactPhone || "",
           });
 
-          // Fetch deterministic scheme evaluations
+          // Fetch deterministic scheme evaluations and guidance
           await loadEligibility();
         } else {
           setHousehold(null);
           setMembers([]);
           setEligibilityResults([]);
+          setGuidance(null);
         }
       } else {
         setError(res.error.message);
@@ -717,189 +730,316 @@ export default function CitizenPage() {
           </div>
         )}
 
-        {/* TASK 3: DETERMINISTIC HEALTHCARE SUPPORT EVALUATION */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+        {/* TASK 3: HEALTHCARE ACCESS GUIDANCE & ACTION PLAN (PHASE 5) */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
                 <HeartPulse className="w-4 h-4" />
               </div>
               <div>
                 <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                  Task 3
+                  Task 3 • Action Guidance
                 </span>
-                <h2 className="text-base font-bold text-slate-900">Healthcare support</h2>
+                <h2 className="text-base font-bold text-slate-900">Healthcare access guidance</h2>
               </div>
             </div>
 
-            {household && (
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                {isEvaluating
-                  ? "Evaluating..."
-                  : `${eligibleCount} May Qualify (${eligibilityResults.length} Evaluated)`}
-              </span>
+            {household && guidance && (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                    guidance.householdStatus === "ACTION_NEEDED"
+                      ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                      : guidance.householdStatus === "MORE_INFORMATION_NEEDED"
+                      ? "text-amber-800 bg-amber-50 border-amber-200"
+                      : "text-slate-700 bg-slate-100 border-slate-200"
+                  }`}
+                >
+                  {isEvaluating
+                    ? "Evaluating..."
+                    : guidance.householdStatus === "ACTION_NEEDED"
+                    ? "Action Needed"
+                    : guidance.householdStatus === "MORE_INFORMATION_NEEDED"
+                    ? "Details Needed"
+                    : "No Current Match"}
+                </span>
+              </div>
             )}
           </div>
 
           {!household ? (
-            <div className="py-4 text-xs sm:text-sm text-slate-500">
-              Complete your household profile above to check available healthcare support.
-            </div>
-          ) : eligibilityResults.length === 0 ? (
-            <div className="py-4 text-xs sm:text-sm text-slate-500">
-              No active healthcare schemes evaluated yet.
+            <div className="py-6 text-xs sm:text-sm text-slate-500 text-center">
+              Complete your household profile above to check applicable healthcare support.
             </div>
           ) : (
-            <div className="space-y-3 pt-1">
-              {eligibilityResults.map((res) => {
-                const isExpanded = expandedSchemeId === res.schemeId;
-                const isEligible = res.status === "ELIGIBLE";
-                const isNeedsInfo = res.status === "NEEDS_INFORMATION";
+            <div className="space-y-6">
+              {/* 1. TOP HIGHLIGHT: YOUR NEXT STEP */}
+              {guidance && guidance.actionPlan.length > 0 && (
+                <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-teal-50/90 to-emerald-50/70 border border-teal-200/80 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-teal-800 shrink-0" />
+                    <span className="text-[11px] font-bold text-teal-900 uppercase tracking-wider">
+                      Your immediate next step
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      {guidance.actionPlan[0].title}
+                    </h3>
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      {guidance.actionPlan[0].description}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-teal-900 font-medium">
+                    <span className="bg-white/80 px-2.5 py-0.5 rounded border border-teal-200 font-semibold">
+                      Reason: {guidance.actionPlan[0].reason}
+                    </span>
+                  </div>
+                </div>
+              )}
 
-                return (
-                  <div
-                    key={res.schemeId}
-                    className="rounded-xl border border-slate-200 p-4 space-y-3 bg-slate-50/50"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-bold text-slate-900">
-                            {res.schemeShortName || res.schemeName}
-                          </h3>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                              isEligible
-                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                : isNeedsInfo
-                                ? "text-amber-800 bg-amber-50 border-amber-200"
-                                : "text-slate-600 bg-slate-100 border-slate-200"
-                            }`}
-                          >
-                            {isEligible
-                              ? "May Qualify"
+              {/* 2. HEALTHCARE SUPPORT FOUND */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Healthcare support matching your household</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {guidance ? guidance.eligibleSchemes.length : eligibleCount} Eligible Pathway(s)
+                  </span>
+                </div>
+
+                {eligibilityResults.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-slate-200 text-xs text-slate-500 bg-slate-50">
+                    No active schemes evaluated yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {eligibilityResults.map((res) => {
+                      const isExpanded = expandedSchemeId === res.schemeId;
+                      const isEligible = res.status === "ELIGIBLE";
+                      const isNeedsInfo = res.status === "NEEDS_INFORMATION";
+
+                      return (
+                        <div
+                          key={res.schemeId}
+                          className={`rounded-xl border p-4 space-y-3 transition-colors ${
+                            isEligible
+                              ? "border-emerald-200 bg-emerald-50/20"
                               : isNeedsInfo
-                              ? "Details Needed"
-                              : "Not Applicable"}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600">{res.benefitSummary}</p>
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs self-start sm:self-auto flex items-center gap-1 font-medium shrink-0"
-                        onClick={() =>
-                          setExpandedSchemeId(isExpanded ? null : res.schemeId)
-                        }
-                      >
-                        <span>{isExpanded ? "Hide details" : "View support details"}</span>
-                        {isExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        )}
-                      </Button>
-                    </div>
-
-                    {/* Progressive Disclosure Accordion Details */}
-                    {isExpanded && (
-                      <div className="pt-3 border-t border-slate-200/80 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
-                        {/* 1. Matched Rules */}
-                        {res.matchedRules.length > 0 && (
-                          <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
-                            <span className="font-bold text-slate-900 block">
-                              Why this may apply:
-                            </span>
-                            <ul className="space-y-1 text-slate-700">
-                              {res.matchedRules.map((m, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                  <span>{m.explanation}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* 2. Missing Requirements */}
-                        {res.missingRequirements.length > 0 && (
-                          <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-1.5">
-                            <span className="font-bold text-amber-900 block">
-                              Information needed to confirm support:
-                            </span>
-                            <ul className="space-y-1 text-amber-800">
-                              {res.missingRequirements.map((req, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                                  <span>{req.actionPrompt}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* 3. Required Documents */}
-                        {res.requiredDocuments && res.requiredDocuments.length > 0 && (
-                          <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
-                            <span className="font-bold text-slate-900 block">
-                              Required documents:
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                              {res.requiredDocuments.map((doc) => (
-                                <div
-                                  key={doc.id}
-                                  className="p-2 rounded bg-slate-50 border border-slate-200/80 flex items-start gap-2"
+                              ? "border-amber-200 bg-amber-50/20"
+                              : "border-slate-200 bg-slate-50/40"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-slate-900">
+                                  {res.schemeShortName || res.schemeName}
+                                </h4>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                    isEligible
+                                      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                      : isNeedsInfo
+                                      ? "text-amber-800 bg-amber-50 border-amber-200"
+                                      : "text-slate-600 bg-slate-100 border-slate-200"
+                                  }`}
                                 >
-                                  <FileCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                                  <div>
-                                    <p className="font-semibold text-slate-900">
-                                      {doc.name}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500">
-                                      {doc.description}
-                                    </p>
+                                  {isEligible
+                                    ? "May Qualify"
+                                    : isNeedsInfo
+                                    ? "Details Needed"
+                                    : "Not Applicable"}
+                                </span>
+                                {res.pathwayCode && (
+                                  <span className="text-[10px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                    {res.pathwayCode}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-600">{res.benefitSummary}</p>
+                            </div>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs self-start sm:self-auto flex items-center gap-1 font-medium shrink-0"
+                              onClick={() =>
+                                setExpandedSchemeId(isExpanded ? null : res.schemeId)
+                              }
+                            >
+                              <span>{isExpanded ? "Hide details" : "View guidance"}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Progressive Disclosure Accordion */}
+                          {isExpanded && (
+                            <div className="pt-3 border-t border-slate-200/80 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
+                              {/* Why this may apply */}
+                              {res.matchedRules.length > 0 && (
+                                <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
+                                  <span className="font-bold text-slate-900 block">
+                                    Why this may apply:
+                                  </span>
+                                  <ul className="space-y-1 text-slate-700">
+                                    {res.matchedRules.map((m, idx) => (
+                                      <li key={idx} className="flex items-start gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                        <span>{m.explanation}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Missing Information / Gaps */}
+                              {res.missingRequirements.length > 0 && (
+                                <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-1.5">
+                                  <span className="font-bold text-amber-900 block">
+                                    Information needed to confirm support:
+                                  </span>
+                                  <ul className="space-y-1 text-amber-800">
+                                    {res.missingRequirements.map((req, idx) => (
+                                      <li key={idx} className="flex items-start gap-1.5">
+                                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                        <span>{req.actionPrompt}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Required Documents */}
+                              {res.requiredDocuments && res.requiredDocuments.length > 0 && (
+                                <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
+                                  <span className="font-bold text-slate-900 block">
+                                    Required documents:
+                                  </span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                    {res.requiredDocuments.map((doc) => (
+                                      <div
+                                        key={doc.id}
+                                        className="p-2 rounded bg-slate-50 border border-slate-200/80 flex items-start gap-2"
+                                      >
+                                        <FileCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                                        <div>
+                                          <p className="font-semibold text-slate-900">
+                                            {doc.name}
+                                          </p>
+                                          <p className="text-[11px] text-slate-500">
+                                            {doc.description}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                              ))}
+                              )}
                             </div>
-                          </div>
-                        )}
-
-                        {/* 4. Actionable Next Steps */}
-                        {res.nextActions && res.nextActions.length > 0 && (
-                          <div className="p-3 bg-teal-50/60 rounded-lg border border-teal-100 space-y-1.5">
-                            <span className="font-bold text-teal-950 block">
-                              Recommended next steps:
-                            </span>
-                            <ul className="space-y-2 pt-1">
-                              {res.nextActions.map((action) => (
-                                <li
-                                  key={action.id}
-                                  className="flex items-start justify-between gap-2 p-2 bg-white rounded border border-teal-100"
-                                >
-                                  <div className="space-y-0.5">
-                                    <p className="font-bold text-slate-900">
-                                      {action.title}
-                                    </p>
-                                    <p className="text-[11px] text-slate-600">
-                                      {action.description}
-                                    </p>
-                                  </div>
-                                  <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 shrink-0">
-                                    {action.actionType.replace("_", " ")}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              {/* 3. STEP-BY-STEP ACTION PLAN */}
+              {guidance && guidance.actionPlan.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-teal-700" />
+                      <span>Step-by-step action plan</span>
+                    </h3>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {guidance.actionPlan.length} Step(s)
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {guidance.actionPlan.map((act) => (
+                      <div
+                        key={act.id}
+                        className="p-3.5 rounded-xl border border-slate-200/90 bg-white flex items-start justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-900 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                            {act.stepNumber}
+                          </span>
+                          <div className="space-y-0.5">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                              {act.title}
+                            </h4>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              {act.description}
+                            </p>
+                            <p className="text-[11px] text-slate-400 font-medium pt-0.5">
+                              {act.reason}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
+                            act.priority === "REQUIRED"
+                              ? "text-rose-800 bg-rose-50 border-rose-200"
+                              : "text-amber-800 bg-amber-50 border-amber-200"
+                          }`}
+                        >
+                          {act.priority}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. DOCUMENT READINESS CHECKLIST */}
+              {guidance && guidance.documentReadiness.items.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileCheck className="w-4 h-4 text-teal-700" />
+                      <span>Document readiness checklist</span>
+                    </h3>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {guidance.documentReadiness.readyCount} /{" "}
+                      {guidance.documentReadiness.totalRequired} Ready
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {guidance.documentReadiness.items.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-2"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-slate-900">{doc.name}</p>
+                          <p className="text-[11px] text-slate-500">{doc.description}</p>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
+                            doc.status === "READY"
+                              ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                              : "text-amber-800 bg-amber-50 border-amber-200"
+                          }`}
+                        >
+                          {doc.status === "READY" ? "Ready" : "Details Needed"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -9,6 +9,7 @@ import { HouseholdService } from "../services/household.service.js";
 import { SchemeRepository } from "../repositories/scheme.repository.js";
 import { SchemeService } from "../services/scheme.service.js";
 import { EligibilityService } from "../services/eligibility/eligibility.service.js";
+import { GuidanceService } from "../services/guidance/guidance.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -20,6 +21,7 @@ declare module "fastify" {
     schemeRepository: SchemeRepository;
     schemeService: SchemeService;
     eligibilityService: EligibilityService;
+    guidanceService: GuidanceService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -42,6 +44,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   const schemeRepository = new SchemeRepository(fastify.firestore);
   const schemeService = new SchemeService(schemeRepository);
   const eligibilityService = new EligibilityService(schemeRepository, householdRepository);
+  const guidanceService = new GuidanceService(
+    householdRepository,
+    eligibilityService,
+    schemeRepository
+  );
 
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
@@ -50,6 +57,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("schemeRepository", schemeRepository);
   fastify.decorate("schemeService", schemeService);
   fastify.decorate("eligibilityService", eligibilityService);
+  fastify.decorate("guidanceService", guidanceService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 
