@@ -5,6 +5,7 @@ import { householdRoutes } from "./household.js";
 import { schemeRoutes } from "./scheme.js";
 import { eligibilityRoutes } from "./eligibility.js";
 import { guidanceRoutes } from "./guidance.js";
+import { evidenceRoutes } from "./evidence.js";
 import { testAuthRoutes } from "./test-auth.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
@@ -25,6 +26,9 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Register healthcare access guidance & action plan routes
   await fastify.register(guidanceRoutes);
+
+  // Register evidence & Tavily provenance routes
+  await fastify.register(evidenceRoutes);
 
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);

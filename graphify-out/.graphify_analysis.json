@@ -1,37 +1,21 @@
 {
   "communities": {
     "0": [
-      "backend_scripts_migrate_firestore_phase4c",
-      "backend_scripts_migrate_firestore_phase4c_migratefirestorephase4c",
       "backend_scripts_phase4_firestore_smoke",
       "backend_scripts_phase4_firestore_smoke_runphase4firestoresmoke",
       "backend_scripts_phase5_firestore_smoke",
       "backend_scripts_phase5_firestore_smoke_runphase5firestoresmoke",
-      "backend_scripts_seed_firestore_schemes",
-      "backend_scripts_seed_firestore_schemes_runseed",
       "backend_src_plugins_auth",
       "backend_src_plugins_auth_fastify",
-      "backend_src_plugins_auth_fastifyinstance",
       "backend_src_plugins_auth_fastifyrequest",
       "backend_src_repositories_household_repository",
+      "backend_src_repositories_household_repository_householdrepository",
+      "backend_src_repositories_household_repository_householdrepository_clearmemorystore",
+      "backend_src_repositories_household_repository_householdrepository_constructor",
       "backend_src_repositories_scheme_repository",
-      "backend_src_repositories_scheme_repository_schemerepository",
-      "backend_src_repositories_scheme_repository_schemerepository_clearmemorystore",
-      "backend_src_repositories_scheme_repository_schemerepository_constructor",
-      "backend_src_repositories_scheme_repository_schemerepository_createscheme",
-      "backend_src_repositories_scheme_repository_schemerepository_createschemeversion",
-      "backend_src_repositories_scheme_repository_schemerepository_deletescheme",
-      "backend_src_repositories_scheme_repository_schemerepository_getactiveversion",
-      "backend_src_repositories_scheme_repository_schemerepository_getschemebyid",
-      "backend_src_repositories_scheme_repository_schemerepository_getschemeversion",
-      "backend_src_repositories_scheme_repository_schemerepository_isunittestmode",
-      "backend_src_repositories_scheme_repository_schemerepository_listactiveschemes",
-      "backend_src_repositories_scheme_repository_schemerepository_listschemeversions",
-      "backend_src_repositories_scheme_repository_schemerepository_updatescheme",
       "backend_src_services_eligibility_eligibility_service",
       "backend_src_services_eligibility_eligibility_service_eligibilityservice",
       "backend_src_services_eligibility_eligibility_service_eligibilityservice_constructor",
-      "backend_src_services_eligibility_eligibility_service_eligibilityservice_evaluatehouseholdforscheme",
       "backend_src_services_eligibility_eligibility_service_eligibilityservice_evaluatehouseholdforschemes",
       "backend_src_services_eligibility_eligibility_service_ieligibilityservice",
       "backend_src_services_eligibility_eligibility_service_ieligibilityservice_evaluatecitizenhousehold",
@@ -45,11 +29,6 @@
       "backend_src_services_eligibility_rule_engine_membermatchesrule",
       "backend_src_services_eligibility_rule_engine_ruleevaluationresult",
       "backend_src_services_eligibility_rule_engine_rulesetevaluationresult",
-      "backend_src_services_eligibility_scheme_seed",
-      "backend_src_services_eligibility_scheme_seed_all_seed_schemes_data",
-      "backend_src_services_eligibility_scheme_seed_development_fixture_schemes",
-      "backend_src_services_eligibility_scheme_seed_seedschemeregistry",
-      "backend_src_services_eligibility_scheme_seed_verified_production_schemes",
       "backend_src_services_guidance_action_plan_service",
       "backend_src_services_guidance_action_plan_service_actionplanservice",
       "backend_src_services_guidance_action_plan_service_actionplanservice_generateactionplan",
@@ -62,18 +41,30 @@
       "backend_src_services_guidance_guidance_service",
       "backend_src_services_guidance_guidance_service_guidanceservice",
       "backend_src_services_guidance_guidance_service_guidanceservice_constructor",
+      "backend_src_services_household_service",
       "backend_src_services_scheme_service",
       "backend_src_services_scheme_service_schemeservice",
       "backend_src_services_scheme_service_schemeservice_constructor",
-      "backend_src_services_scheme_service_schemeservice_getactiveschemes",
-      "backend_src_services_scheme_service_schemeservice_getschemebyid",
-      "backend_src_services_scheme_service_schemeservice_getschemewithactiveversion",
-      "backend_src_services_scheme_service_schemeservice_seedregistry",
       "backend_tests_action_plan_test",
       "backend_tests_document_readiness_test",
+      "backend_tests_evidence_safety_test",
       "backend_tests_gap_detection_test",
       "backend_tests_guidance_test",
       "backend_tests_rule_engine_test",
+      "frontend_app_citizen_page",
+      "frontend_app_citizen_page_gender_options",
+      "frontend_app_citizen_page_income_options",
+      "frontend_app_citizen_page_relationship_options",
+      "frontend_services_eligibility_service",
+      "frontend_services_eligibility_service_citizeneligibilityresponse",
+      "frontend_services_eligibility_service_eligibilityservice",
+      "frontend_services_guidance_service",
+      "frontend_services_guidance_service_guidanceservice",
+      "frontend_services_household_service",
+      "frontend_services_household_service_householdservice",
+      "frontend_services_scheme_service",
+      "frontend_services_scheme_service_schemeservice",
+      "shared_types_api_apiresult",
       "shared_types_eligibility",
       "shared_types_eligibility_actionpriority",
       "shared_types_eligibility_actiontype",
@@ -103,8 +94,21 @@
       "shared_types_guidance_gappriority",
       "shared_types_guidance_gaptype",
       "shared_types_guidance_guidanceactiontype",
+      "shared_types_guidance_guidanceresponse",
       "shared_types_guidance_householdguidancestatus",
-      "shared_types_guidance_overalldocumentreadiness"
+      "shared_types_guidance_overalldocumentreadiness",
+      "shared_types_household",
+      "shared_types_household_createhouseholdinput",
+      "shared_types_household_creatememberinput",
+      "shared_types_household_gender",
+      "shared_types_household_household",
+      "shared_types_household_householdresponse",
+      "shared_types_household_incomecategory",
+      "shared_types_household_maternalstatus",
+      "shared_types_household_member",
+      "shared_types_household_memberresponse",
+      "shared_types_household_updatehouseholdinput",
+      "shared_types_household_updatememberinput"
     ],
     "1": [
       "frontend_app_admin_page",
@@ -186,23 +190,87 @@
       "frontend_types_ui_statustype"
     ],
     "2": [
+      "backend_scripts_phase6_firestore_smoke",
+      "backend_scripts_phase6_firestore_smoke_runphase6firestoresmoke",
+      "backend_scripts_phase6_tavily_smoke",
+      "backend_scripts_phase6_tavily_smoke_runphase6tavilysmoke",
+      "backend_src_plugins_auth_fastifyinstance",
+      "backend_src_repositories_evidence_repository",
+      "backend_src_repositories_evidence_repository_evidencerepository",
+      "backend_src_repositories_evidence_repository_evidencerepository_clearmemorystore",
+      "backend_src_repositories_evidence_repository_evidencerepository_constructor",
+      "backend_src_repositories_evidence_repository_evidencerepository_createauditlog",
+      "backend_src_repositories_evidence_repository_evidencerepository_createconflict",
+      "backend_src_repositories_evidence_repository_evidencerepository_createevidence",
+      "backend_src_repositories_evidence_repository_evidencerepository_getconflictbyid",
+      "backend_src_repositories_evidence_repository_evidencerepository_getevidencebyid",
+      "backend_src_repositories_evidence_repository_evidencerepository_getsearchcache",
+      "backend_src_repositories_evidence_repository_evidencerepository_listconflicts",
+      "backend_src_repositories_evidence_repository_evidencerepository_listevidencebyschemeid",
+      "backend_src_repositories_evidence_repository_evidencerepository_setsearchcache",
+      "backend_src_repositories_evidence_repository_evidencerepository_updateverificationstatus",
+      "backend_src_services_evidence_evidence_service",
+      "backend_src_services_evidence_evidence_service_evidenceservice",
+      "backend_src_services_evidence_evidence_service_evidenceservice_constructor",
+      "backend_src_services_evidence_evidence_service_evidenceservice_detectruleconflicts",
+      "backend_src_services_evidence_evidence_service_evidenceservice_generatequeryhash",
+      "backend_src_services_evidence_evidence_service_evidenceservice_getverifiedschemeevidence",
+      "backend_src_services_evidence_evidence_service_evidenceservice_listconflicts",
+      "backend_src_services_evidence_evidence_service_evidenceservice_searchclaimevidence",
+      "backend_src_services_evidence_evidence_service_evidenceservice_updateverificationstatus",
+      "backend_src_services_evidence_source_validator",
+      "backend_src_services_evidence_source_validator_sourcevalidator",
+      "backend_src_services_evidence_source_validator_sourcevalidator_calculateauthorityscore",
+      "backend_src_services_evidence_source_validator_sourcevalidator_calculaterelevancescore",
+      "backend_src_services_evidence_source_validator_sourcevalidator_classifydocumenttype",
+      "backend_src_services_evidence_source_validator_sourcevalidator_classifyhostname",
+      "backend_src_services_evidence_source_validator_sourcevalidator_cleanexcerpt",
+      "backend_src_services_evidence_source_validator_sourcevalidator_computecontenthash",
+      "backend_src_services_evidence_source_validator_sourcevalidator_resolveorganization",
+      "backend_src_services_evidence_source_validator_sourcevalidator_safeparseurl",
+      "backend_src_services_evidence_source_validator_sourcevalidator_validatecandidate",
+      "backend_src_services_evidence_source_validator_validatedsourceresult",
+      "backend_src_services_evidence_tavily_service",
+      "backend_src_services_evidence_tavily_service_tavilysearchoptions",
+      "backend_src_services_evidence_tavily_service_tavilyservice",
+      "backend_src_services_evidence_tavily_service_tavilyservice_assertnopii",
+      "backend_src_services_evidence_tavily_service_tavilyservice_constructor",
+      "backend_src_services_evidence_tavily_service_tavilyservice_normalizequery",
+      "backend_src_services_evidence_tavily_service_tavilyservice_search",
+      "backend_tests_evidence_service_test",
+      "backend_tests_source_validator_test",
+      "backend_tests_tavily_service_test",
+      "shared_types_evidence",
+      "shared_types_evidence_evidenceauditlog",
+      "shared_types_evidence_evidencecandidate",
+      "shared_types_evidence_evidenceconflict",
+      "shared_types_evidence_evidenceconflictstatus",
+      "shared_types_evidence_evidenceconflicttype",
+      "shared_types_evidence_evidencerecord",
+      "shared_types_evidence_evidencesearchcacherecord",
+      "shared_types_evidence_evidencesearchrequest",
+      "shared_types_evidence_evidencesearchresponse",
+      "shared_types_evidence_evidenceverificationmethod",
+      "shared_types_evidence_evidenceverificationstatus",
+      "shared_types_evidence_publicverifiedevidence",
+      "shared_types_evidence_sourceauthoritytype",
+      "shared_types_evidence_sourcedocumenttype",
+      "shared_types_evidence_updateevidencestatusrequest"
+    ],
+    "3": [
+      "backend_scripts_migrate_firestore_phase4c",
+      "backend_scripts_migrate_firestore_phase4c_migratefirestorephase4c",
+      "backend_scripts_seed_firestore_schemes",
+      "backend_scripts_seed_firestore_schemes_runseed",
       "backend_src_app",
       "backend_src_app_buildapp",
-      "backend_src_config_constants",
       "backend_src_config_constants_app_name",
       "backend_src_config_constants_app_version",
-      "backend_src_config_constants_correlation_id_header",
-      "backend_src_config_constants_http_status",
-      "backend_src_config_constants_request_id_header",
       "backend_src_config_env",
       "backend_src_config_env_env",
       "backend_src_config_env_envconfig",
       "backend_src_config_env_envschema",
       "backend_src_config_env_parseenv",
-      "backend_src_plugins_correlation",
-      "backend_src_plugins_correlation_correlationplugin",
-      "backend_src_plugins_correlation_fastify",
-      "backend_src_plugins_correlation_fastifyrequest",
       "backend_src_plugins_cors",
       "backend_src_plugins_cors_corsplugin",
       "backend_src_plugins_errors",
@@ -212,18 +280,68 @@
       "backend_src_plugins_firebase_fastifyinstance",
       "backend_src_plugins_firebase_firebaseplugin",
       "backend_src_plugins_firebase_resolvefilepath",
+      "backend_src_repositories_scheme_repository_schemerepository",
+      "backend_src_repositories_scheme_repository_schemerepository_clearmemorystore",
+      "backend_src_repositories_scheme_repository_schemerepository_constructor",
+      "backend_src_repositories_scheme_repository_schemerepository_createscheme",
+      "backend_src_repositories_scheme_repository_schemerepository_createschemeversion",
+      "backend_src_repositories_scheme_repository_schemerepository_deletescheme",
+      "backend_src_repositories_scheme_repository_schemerepository_getactiveversion",
+      "backend_src_repositories_scheme_repository_schemerepository_getschemebyid",
+      "backend_src_repositories_scheme_repository_schemerepository_getschemeversion",
+      "backend_src_repositories_scheme_repository_schemerepository_isunittestmode",
+      "backend_src_repositories_scheme_repository_schemerepository_listactiveschemes",
+      "backend_src_repositories_scheme_repository_schemerepository_listschemeversions",
+      "backend_src_repositories_scheme_repository_schemerepository_updatescheme",
+      "backend_src_routes_health",
+      "backend_src_server",
+      "backend_src_server_startserver",
+      "backend_src_services_eligibility_eligibility_service_eligibilityservice_evaluatehouseholdforscheme",
+      "backend_src_services_eligibility_scheme_seed",
+      "backend_src_services_eligibility_scheme_seed_all_seed_schemes_data",
+      "backend_src_services_eligibility_scheme_seed_development_fixture_schemes",
+      "backend_src_services_eligibility_scheme_seed_seedschemeregistry",
+      "backend_src_services_eligibility_scheme_seed_verified_production_schemes",
+      "backend_src_services_scheme_service_schemeservice_getactiveschemes",
+      "backend_src_services_scheme_service_schemeservice_getschemebyid",
+      "backend_src_services_scheme_service_schemeservice_getschemewithactiveversion",
+      "backend_src_services_scheme_service_schemeservice_seedregistry",
+      "backend_tests_evidence_route_test",
+      "backend_tests_guidance_route_test",
+      "backend_tests_health_test",
+      "backend_tests_household_test",
+      "backend_tests_schemes_test",
+      "frontend_hooks_use_health_check",
+      "frontend_hooks_use_health_check_healthstate",
+      "shared_types_api_apierrorresponse",
+      "shared_types_api_errordetail",
+      "shared_types_api_healthcheckresponse",
+      "shared_types_api_js_shared_types_api",
+      "shared_types_api_ts_shared_types_api"
+    ],
+    "4": [
+      "backend_src_config_constants",
+      "backend_src_config_constants_correlation_id_header",
+      "backend_src_config_constants_current_consent_version",
+      "backend_src_config_constants_http_status",
+      "backend_src_config_constants_request_id_header",
+      "backend_src_plugins_correlation",
+      "backend_src_plugins_correlation_correlationplugin",
+      "backend_src_plugins_correlation_fastify",
+      "backend_src_plugins_correlation_fastifyrequest",
       "backend_src_plugins_guards",
       "backend_src_plugins_guards_requireauth",
       "backend_src_plugins_guards_requireconsent",
       "backend_src_plugins_guards_requirerole",
-      "backend_src_repositories_user_repository",
       "backend_src_routes_auth",
       "backend_src_routes_auth_authroutes",
       "backend_src_routes_eligibility",
       "backend_src_routes_eligibility_eligibilityroutes",
+      "backend_src_routes_evidence",
+      "backend_src_routes_evidence_evidenceroutes",
+      "backend_src_routes_evidence_requireadmin",
       "backend_src_routes_guidance",
       "backend_src_routes_guidance_guidanceroutes",
-      "backend_src_routes_health",
       "backend_src_routes_health_healthroutes",
       "backend_src_routes_household",
       "backend_src_routes_household_householdroutes",
@@ -233,12 +351,6 @@
       "backend_src_routes_scheme_schemeroutes",
       "backend_src_routes_test_auth",
       "backend_src_routes_test_auth_testauthroutes",
-      "backend_src_server",
-      "backend_src_server_startserver",
-      "backend_tests_guidance_route_test",
-      "backend_tests_health_test",
-      "backend_tests_household_test",
-      "backend_tests_schemes_test",
       "shared_schemas_auth_schema",
       "shared_schemas_auth_schema_consentstatusschema",
       "shared_schemas_auth_schema_consentsubmissioninput",
@@ -248,6 +360,18 @@
       "shared_schemas_auth_schema_userroleschema",
       "shared_schemas_auth_schema_usersyncinput",
       "shared_schemas_auth_schema_usersyncschema",
+      "shared_schemas_evidence_schema",
+      "shared_schemas_evidence_schema_evidenceconflictschema",
+      "shared_schemas_evidence_schema_evidenceconflictstatusschema",
+      "shared_schemas_evidence_schema_evidenceconflicttypeschema",
+      "shared_schemas_evidence_schema_evidencerecordschema",
+      "shared_schemas_evidence_schema_evidencesearchrequestschema",
+      "shared_schemas_evidence_schema_evidenceverificationmethodschema",
+      "shared_schemas_evidence_schema_evidenceverificationstatusschema",
+      "shared_schemas_evidence_schema_publicverifiedevidenceschema",
+      "shared_schemas_evidence_schema_sourceauthoritytypeschema",
+      "shared_schemas_evidence_schema_sourcedocumenttypeschema",
+      "shared_schemas_evidence_schema_updateevidencestatusrequestschema",
       "shared_schemas_household_schema",
       "shared_schemas_household_schema_createhouseholdschema",
       "shared_schemas_household_schema_creatememberschema",
@@ -255,10 +379,9 @@
       "shared_schemas_household_schema_incomecategoryschema",
       "shared_schemas_household_schema_maternalstatusschema",
       "shared_schemas_household_schema_updatehouseholdschema",
-      "shared_schemas_household_schema_updatememberschema",
-      "shared_types_api_js_shared_types_api"
+      "shared_schemas_household_schema_updatememberschema"
     ],
-    "3": [
+    "5": [
       "frontend_app_layout",
       "frontend_app_layout_metadata",
       "frontend_app_layout_rootlayout",
@@ -279,8 +402,6 @@
       "frontend_config_env_env",
       "frontend_config_site",
       "frontend_config_site_siteconfig",
-      "frontend_hooks_use_health_check",
-      "frontend_hooks_use_health_check_healthstate",
       "frontend_hooks_use_health_check_usehealthcheck",
       "frontend_lib_auth_auth_context",
       "frontend_lib_auth_auth_context_authcontext",
@@ -309,18 +430,9 @@
       "frontend_services_api_client_apiclient_request",
       "frontend_services_api_client_apiclient_settokenprovider",
       "frontend_services_api_client_apiclient_setunauthorizedhandler",
-      "frontend_services_api_client_authfailurecallback",
-      "frontend_services_auth_service",
-      "frontend_services_auth_service_authservice",
-      "frontend_services_scheme_service",
-      "frontend_services_scheme_service_schemeservice",
-      "shared_types_api_apierrorresponse",
-      "shared_types_api_apiresult",
-      "shared_types_api_errordetail",
-      "shared_types_api_healthcheckresponse",
-      "shared_types_api_ts_shared_types_api"
+      "frontend_services_api_client_authfailurecallback"
     ],
-    "4": [
+    "6": [
       "backend_package",
       "backend_package_dependencies",
       "backend_package_dependencies_dotenv",
@@ -362,7 +474,7 @@
       "vitest",
       "zod"
     ],
-    "5": [
+    "7": [
       "clsx",
       "firebase",
       "frontend_package",
@@ -403,10 +515,10 @@
       "types_react",
       "types_react_dom"
     ],
-    "6": [
-      "backend_src_config_constants_current_consent_version",
+    "8": [
       "backend_src_config_constants_default_user_role",
       "backend_src_plugins_auth_authplugin",
+      "backend_src_repositories_user_repository",
       "backend_src_repositories_user_repository_userrepository",
       "backend_src_repositories_user_repository_userrepository_clearmemorystore",
       "backend_src_repositories_user_repository_userrepository_constructor",
@@ -427,6 +539,8 @@
       "backend_src_services_user_service_userservice_recordconsent",
       "backend_tests_auth_test",
       "frontend_components_auth_protected_route_protectedrouteprops",
+      "frontend_services_auth_service",
+      "frontend_services_auth_service_authservice",
       "shared_types_auth",
       "shared_types_auth_authmeresponse",
       "shared_types_auth_authsyncresponse",
@@ -438,7 +552,7 @@
       "shared_types_auth_userrole",
       "shared_types_index"
     ],
-    "7": [
+    "9": [
       "shared_schemas_eligibility_schema",
       "shared_schemas_eligibility_schema_eligibilityresultschema",
       "shared_schemas_eligibility_schema_eligibilitystatusschema",
@@ -473,37 +587,7 @@
       "shared_schemas_scheme_schema_targetscopeschema",
       "shared_schemas_scheme_schema_versionstatusschema"
     ],
-    "8": [
-      "backend_src_services_household_service",
-      "frontend_app_citizen_page",
-      "frontend_app_citizen_page_gender_options",
-      "frontend_app_citizen_page_income_options",
-      "frontend_app_citizen_page_relationship_options",
-      "frontend_services_eligibility_service",
-      "frontend_services_eligibility_service_citizeneligibilityresponse",
-      "frontend_services_eligibility_service_eligibilityservice",
-      "frontend_services_guidance_service",
-      "frontend_services_guidance_service_guidanceservice",
-      "frontend_services_household_service",
-      "frontend_services_household_service_householdservice",
-      "shared_types_guidance_guidanceresponse",
-      "shared_types_household",
-      "shared_types_household_createhouseholdinput",
-      "shared_types_household_creatememberinput",
-      "shared_types_household_gender",
-      "shared_types_household_household",
-      "shared_types_household_householdresponse",
-      "shared_types_household_incomecategory",
-      "shared_types_household_maternalstatus",
-      "shared_types_household_member",
-      "shared_types_household_memberresponse",
-      "shared_types_household_updatehouseholdinput",
-      "shared_types_household_updatememberinput"
-    ],
-    "9": [
-      "backend_src_repositories_household_repository_householdrepository",
-      "backend_src_repositories_household_repository_householdrepository_clearmemorystore",
-      "backend_src_repositories_household_repository_householdrepository_constructor",
+    "10": [
       "backend_src_repositories_household_repository_householdrepository_createhousehold",
       "backend_src_repositories_household_repository_householdrepository_createmember",
       "backend_src_repositories_household_repository_householdrepository_deletemember",
@@ -526,7 +610,7 @@
       "backend_src_services_household_service_householdservice_updatehousehold",
       "backend_src_services_household_service_householdservice_updatemember"
     ],
-    "10": [
+    "11": [
       "backend_tsconfig_compileroptions",
       "backend_tsconfig_compileroptions_declaration",
       "backend_tsconfig_compileroptions_esmoduleinterop",
@@ -544,7 +628,7 @@
       "backend_tsconfig_paths_shared",
       "ref_es2022"
     ],
-    "11": [
+    "12": [
       "frontend_tsconfig_compileroptions",
       "frontend_tsconfig_compileroptions_allowjs",
       "frontend_tsconfig_compileroptions_esmoduleinterop",
@@ -562,7 +646,7 @@
       "frontend_tsconfig_compileroptions_target",
       "frontend_tsconfig_paths_shared"
     ],
-    "12": [
+    "13": [
       "package",
       "package_name",
       "package_private",
@@ -579,7 +663,7 @@
       "ref_frontend",
       "ref_shared"
     ],
-    "13": [
+    "14": [
       "backend_src_repositories_firebase_base_repository",
       "backend_src_repositories_firebase_base_repository_basefirestorerepository",
       "backend_src_repositories_firebase_base_repository_basefirestorerepository_constructor",
@@ -593,7 +677,7 @@
       "backend_src_repositories_firebase_base_repository_filtercondition",
       "backend_src_repositories_firebase_base_repository_listoptions"
     ],
-    "14": [
+    "15": [
       "backend_src_services_gaps_gap_service",
       "backend_src_services_gaps_gap_service_gapservice",
       "backend_src_services_gaps_gap_service_gapservice_detectgaps",
@@ -605,18 +689,6 @@
       "shared_types_gaps_js_shared_types_gaps",
       "shared_types_gaps_ts_shared_types_gaps",
       "shared_types_household_js_shared_types_household"
-    ],
-    "15": [
-      "backend_src_services_evidence_evidence_service",
-      "backend_src_services_evidence_evidence_service_evidenceservice",
-      "backend_src_services_evidence_evidence_service_evidenceservice_verifyevidence",
-      "backend_src_services_evidence_evidence_service_ievidenceservice",
-      "backend_src_services_evidence_evidence_service_ievidenceservice_verifyevidence",
-      "shared_types_actions_actionresolution",
-      "shared_types_actions_evidencerecord",
-      "shared_types_actions_followup",
-      "shared_types_actions_js_shared_types_actions",
-      "shared_types_actions_ts_shared_types_actions"
     ],
     "16": [
       "backend_tsconfig_json_ref_node_modules",
@@ -715,172 +787,181 @@
       "shared_schemas_common_schema_ts_shared_schemas_common_schema"
     ],
     "29": [
+      "shared_types_actions_actionresolution",
+      "shared_types_actions_evidencerecord",
+      "shared_types_actions_followup",
+      "shared_types_actions_ts_shared_types_actions"
+    ],
+    "30": [
       "shared_types_actions_d",
       "shared_types_actions_d_actionresolution",
       "shared_types_actions_d_evidencerecord",
       "shared_types_actions_d_followup"
     ],
-    "30": [
+    "31": [
       "shared_types_common_auditlogentry",
       "shared_types_common_paginationparams",
       "shared_types_common_statustype",
       "shared_types_common_ts_shared_types_common"
     ],
-    "31": [
+    "32": [
       "shared_types_common_d",
       "shared_types_common_d_auditlogentry",
       "shared_types_common_d_paginationparams",
       "shared_types_common_d_statustype"
     ],
-    "32": [
+    "33": [
       "shared_types_eligibility_d",
       "shared_types_eligibility_d_eligibilityresult",
       "shared_types_eligibility_d_scheme",
       "shared_types_eligibility_d_schemerule"
     ],
-    "33": [
+    "34": [
       "shared_types_gaps_d",
       "shared_types_gaps_d_gapseverity",
       "shared_types_gaps_d_gapstatus",
       "shared_types_gaps_d_healthcaregap"
     ],
-    "34": [
+    "35": [
       "frontend_hooks_use_media_query",
       "frontend_hooks_use_media_query_useismobile",
       "frontend_hooks_use_media_query_usemediaquery"
     ],
-    "35": [
+    "36": [
       "shared_schemas_health_schema_healthcheckresponsedto",
       "shared_schemas_health_schema_healthcheckresponseschema",
       "shared_schemas_health_schema_ts_shared_schemas_health_schema"
     ],
-    "36": [
+    "37": [
       "shared_types_household_d",
       "shared_types_household_d_household",
       "shared_types_household_d_member"
     ],
-    "37": [
+    "38": [
       "frontend_next_config",
       "frontend_next_config_nextconfig"
     ],
-    "38": [
+    "39": [
       "shared_schemas_common_schema_d",
       "shared_schemas_common_schema_d_apierrorresponsedto"
     ],
-    "39": [
+    "40": [
       "shared_schemas_common_schema_js_shared_schemas_common_schema",
       "shared_schemas_common_schema_zod_1"
     ],
-    "40": [
+    "41": [
       "shared_schemas_health_schema_d",
       "shared_schemas_health_schema_d_healthcheckresponsedto"
     ],
-    "41": [
+    "42": [
       "shared_schemas_health_schema_js_shared_schemas_health_schema",
       "shared_schemas_health_schema_zod_1"
     ],
-    "42": [
+    "43": [
       "asyncclient"
     ],
-    "43": [
+    "44": [
       "asyncio"
     ],
-    "44": [
+    "45": [
       "backend_app_api_v1_health_py_request"
     ],
-    "45": [
+    "46": [
       "backend_app_core_cors_py_fastapi"
     ],
-    "46": [
+    "47": [
       "backend_app_core_errors_py_fastapi"
     ],
-    "47": [
+    "48": [
       "backend_app_core_middleware_py_request"
     ],
-    "48": [
+    "49": [
       "backend_app_main_py_fastapi"
     ],
-    "49": [
+    "50": [
       "backend_app_schemas_common_py_basemodel"
     ],
-    "50": [
+    "51": [
       "backend_app_schemas_health_py_basemodel"
     ],
-    "51": [
+    "52": [
       "backend_app_services_firebase_admin_py_any"
     ],
-    "52": [
+    "53": [
       "backend_app_services_firebase_admin_py_firestoreclient"
     ],
-    "53": [
+    "54": [
       "backend_app_services_firebase_repository_py_any"
     ],
-    "54": [
+    "55": [
       "backend_app_services_firebase_repository_py_firestoreclient"
     ],
-    "55": [
+    "56": [
       "backend_tests_setup"
     ],
-    "56": [
+    "57": [
       "backend_vitest_config"
     ],
-    "57": [
+    "58": [
       "basehttpmiddleware"
     ],
-    "58": [
+    "59": [
       "basesettings"
     ],
-    "59": [
+    "60": [
       "fixture"
     ],
-    "60": [
+    "61": [
       "frontend_postcss_config"
     ],
-    "61": [
+    "62": [
       "get"
     ],
-    "62": [
+    "63": [
       "healthcheckresponse"
     ],
-    "63": [
+    "64": [
       "logger"
     ],
-    "64": [
+    "65": [
       "logrecord"
     ],
-    "65": [
+    "66": [
       "requestresponseendpoint"
     ],
-    "66": [
+    "67": [
       "response"
     ],
-    "67": [
-      "shared_types_common_js_shared_types_common"
-    ],
     "68": [
-      "shared_types_eligibility_js_shared_types_eligibility"
+      "shared_types_actions_js_shared_types_actions"
     ],
     "69": [
+      "shared_types_common_js_shared_types_common"
+    ],
+    "70": [
+      "shared_types_eligibility_js_shared_types_eligibility"
+    ],
+    "71": [
       "t"
     ]
   },
   "cohesion": {
-    "0": 0.05041075429424944,
+    "0": 0.05261336102457598,
     "1": 0.06766917293233082,
-    "2": 0.06720321931589537,
-    "3": 0.07062146892655367,
-    "4": 0.05,
-    "5": 0.05128205128205128,
-    "6": 0.125,
-    "7": 0.08143939393939394,
-    "8": 0.16666666666666666,
-    "9": 0.18478260869565216,
-    "10": 0.125,
+    "2": 0.07925407925407925,
+    "3": 0.06497175141242938,
+    "4": 0.07401129943502825,
+    "5": 0.08503401360544217,
+    "6": 0.05,
+    "7": 0.05128205128205128,
+    "8": 0.12941176470588237,
+    "9": 0.08143939393939394,
+    "10": 0.18571428571428572,
     "11": 0.125,
-    "12": 0.13333333333333333,
-    "13": 0.24242424242424243,
-    "14": 0.2,
-    "15": 0.2222222222222222,
+    "12": 0.125,
+    "13": 0.13333333333333333,
+    "14": 0.24242424242424243,
+    "15": 0.2,
     "16": 0.2222222222222222,
     "17": 0.2222222222222222,
     "18": 0.3333333333333333,
@@ -899,10 +980,10 @@
     "31": 0.5,
     "32": 0.5,
     "33": 0.5,
-    "34": 1.0,
-    "35": 0.6666666666666666,
+    "34": 0.5,
+    "35": 1.0,
     "36": 0.6666666666666666,
-    "37": 1.0,
+    "37": 0.6666666666666666,
     "38": 1.0,
     "39": 1.0,
     "40": 1.0,
@@ -934,7 +1015,9 @@
     "66": 1.0,
     "67": 1.0,
     "68": 1.0,
-    "69": 1.0
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0
   },
   "gods": [
     {
@@ -945,7 +1028,7 @@
     {
       "id": "backend_src_repositories_scheme_repository_schemerepository",
       "label": "SchemeRepository",
-      "degree": 23
+      "degree": 26
     },
     {
       "id": "frontend_lib_auth_auth_context_useauth",
@@ -953,14 +1036,24 @@
       "degree": 21
     },
     {
+      "id": "backend_src_repositories_household_repository_householdrepository",
+      "label": "HouseholdRepository",
+      "degree": 20
+    },
+    {
+      "id": "backend_src_repositories_evidence_repository_evidencerepository",
+      "label": "EvidenceRepository",
+      "degree": 20
+    },
+    {
       "id": "frontend_services_api_client_apiclient",
       "label": "ApiClient",
       "degree": 19
     },
     {
-      "id": "backend_src_repositories_household_repository_householdrepository",
-      "label": "HouseholdRepository",
-      "degree": 19
+      "id": "shared_types_household_household",
+      "label": "Household",
+      "degree": 16
     },
     {
       "id": "frontend_tsconfig_compileroptions",
@@ -968,24 +1061,14 @@
       "degree": 16
     },
     {
-      "id": "shared_types_household_household",
-      "label": "Household",
+      "id": "backend_src_services_evidence_source_validator_sourcevalidator",
+      "label": "SourceValidator",
+      "degree": 16
+    },
+    {
+      "id": "backend_src_services_eligibility_scheme_seed_seedschemeregistry",
+      "label": "seedSchemeRegistry()",
       "degree": 15
-    },
-    {
-      "id": "backend_src_app_buildapp",
-      "label": "buildApp()",
-      "degree": 14
-    },
-    {
-      "id": "backend_tsconfig_compileroptions",
-      "label": "compilerOptions",
-      "degree": 14
-    },
-    {
-      "id": "shared_types_eligibility_schemeversion",
-      "label": "SchemeVersion",
-      "degree": 13
     }
   ],
   "surprises": [
@@ -998,7 +1081,7 @@
       ],
       "confidence": "EXTRACTED",
       "relation": "references",
-      "why": "connects across different repos/directories; bridges separate communities; peripheral node `CitizenEligibilityResponse` unexpectedly reaches hub `EligibilityResult`"
+      "why": "connects across different repos/directories; peripheral node `CitizenEligibilityResponse` unexpectedly reaches hub `EligibilityResult`"
     },
     {
       "source": "HealthState",
@@ -1024,6 +1107,17 @@
     },
     {
       "source": "buildApp()",
+      "target": "correlationPlugin()",
+      "source_files": [
+        "backend/src/app.ts",
+        "backend/src/plugins/correlation.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities; peripheral node `correlationPlugin()` unexpectedly reaches hub `buildApp()`"
+    },
+    {
+      "source": "buildApp()",
       "target": "authPlugin()",
       "source_files": [
         "backend/src/app.ts",
@@ -1032,17 +1126,6 @@
       "confidence": "INFERRED",
       "relation": "indirect_call",
       "why": "inferred connection - not explicitly stated in source; bridges separate communities"
-    },
-    {
-      "source": "buildApp()",
-      "target": "correlationPlugin()",
-      "source_files": [
-        "backend/src/app.ts",
-        "backend/src/plugins/correlation.ts"
-      ],
-      "confidence": "INFERRED",
-      "relation": "indirect_call",
-      "why": "inferred connection - not explicitly stated in source; peripheral node `correlationPlugin()` unexpectedly reaches hub `buildApp()`"
     }
   ],
   "tokens": {

@@ -17,6 +17,12 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
   FIREBASE_CREDENTIALS_PATH: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+
+  // Phase 6 Evidence & Tavily Integration (Server-Side Only)
+  TAVILY_API_KEY: z.string().optional(),
+  EVIDENCE_CACHE_TTL_HOURS: z.coerce.number().default(72),
+  EVIDENCE_MAX_SEARCH_RESULTS: z.coerce.number().default(3),
+  EVIDENCE_REQUEST_TIMEOUT_MS: z.coerce.number().default(10000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

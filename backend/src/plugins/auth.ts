@@ -10,6 +10,8 @@ import { SchemeRepository } from "../repositories/scheme.repository.js";
 import { SchemeService } from "../services/scheme.service.js";
 import { EligibilityService } from "../services/eligibility/eligibility.service.js";
 import { GuidanceService } from "../services/guidance/guidance.service.js";
+import { EvidenceRepository } from "../repositories/evidence.repository.js";
+import { EvidenceService } from "../services/evidence/evidence.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -22,6 +24,8 @@ declare module "fastify" {
     schemeService: SchemeService;
     eligibilityService: EligibilityService;
     guidanceService: GuidanceService;
+    evidenceRepository: EvidenceRepository;
+    evidenceService: EvidenceService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -49,6 +53,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     eligibilityService,
     schemeRepository
   );
+  const evidenceRepository = new EvidenceRepository(fastify.firestore);
+  const evidenceService = new EvidenceService(evidenceRepository, schemeRepository);
 
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
@@ -58,6 +64,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("schemeService", schemeService);
   fastify.decorate("eligibilityService", eligibilityService);
   fastify.decorate("guidanceService", guidanceService);
+  fastify.decorate("evidenceRepository", evidenceRepository);
+  fastify.decorate("evidenceService", evidenceService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 
