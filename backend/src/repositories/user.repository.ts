@@ -19,6 +19,7 @@ export class UserRepository extends BaseFirestoreRepository<UserProfile> {
     }
     const hasServiceAccount = Boolean(
       env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      env.GOOGLE_APPLICATION_CREDENTIALS ||
       (env.FIREBASE_CREDENTIALS_PATH && fs.existsSync(env.FIREBASE_CREDENTIALS_PATH)) ||
       (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY)
     );

@@ -4,12 +4,16 @@ import * as admin from "firebase-admin";
 import { UserProfile } from "../../../shared/types/auth.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { UserService } from "../services/user.service.js";
+import { HouseholdRepository } from "../repositories/household.repository.js";
+import { HouseholdService } from "../services/household.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
   interface FastifyInstance {
     userRepository: UserRepository;
     userService: UserService;
+    householdRepository: HouseholdRepository;
+    householdService: HouseholdService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -24,12 +28,16 @@ declare module "fastify" {
  * Verifies Bearer Firebase ID tokens and populates trusted userProfile.
  */
 const authPlugin: FastifyPluginAsync = async (fastify) => {
-  // Initialize repository and service
+  // Initialize repositories and services
   const userRepository = new UserRepository(fastify.firestore);
   const userService = new UserService(userRepository);
+  const householdRepository = new HouseholdRepository(fastify.firestore);
+  const householdService = new HouseholdService(householdRepository);
 
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
+  fastify.decorate("householdRepository", householdRepository);
+  fastify.decorate("householdService", householdService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 

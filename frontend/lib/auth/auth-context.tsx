@@ -21,6 +21,7 @@ export interface AuthContextType {
   userProfile: UserProfile | null;
   role: UserRole | null;
   isLoading: boolean;
+  isFirebaseReady: boolean;
   isAuthenticated: boolean;
   isConsentRequired: boolean;
   error: string | null;
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [isConsentRequired, setIsConsentRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen to Firebase auth state changes
   useEffect(() => {
+    const ready = isClientFirebaseReady();
+    setIsFirebaseReady(ready);
+
     const auth = getClientAuth();
     if (!auth) {
       // Local foundation mode when client Firebase credentials are not yet supplied
@@ -206,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userProfile,
         role,
         isLoading,
+        isFirebaseReady,
         isAuthenticated,
         isConsentRequired,
         error,

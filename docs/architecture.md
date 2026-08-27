@@ -30,7 +30,8 @@ The platform uses a unified, end-to-end TypeScript architecture:
      (Config, Auth,       (Future:          (Future:
       Role Guards,         Lyzr / Gemini)    Tavily, n8n,
       Consent Service,                       Sarvam, Exotel,
-      Error Envelope)                        Swytchcode)
+      Household Service,                     Swytchcode)
+      Error Envelope)
              |
              v
        Firebase Service Layer
@@ -38,10 +39,14 @@ The platform uses a unified, end-to-end TypeScript architecture:
              |
              v
        Firestore Repository Layer
-      (UserRepository, BaseFirestoreRepository)
+      (UserRepository, HouseholdRepository)
              |
              v
-        Cloud Firestore (/users/{uid}, /consent_history)
+        Cloud Firestore
+        ├── /users/{uid}
+        │   └── /consent_history/{consentId}
+        └── /households/{householdId}
+            └── /members/{memberId}
 ```
 
 ---
@@ -57,25 +62,33 @@ The platform uses a unified, end-to-end TypeScript architecture:
 - Supported Roles: `CITIZEN`, `ASHA`, `ADMIN`.
 - **Single Source of Truth**: The server-managed Firestore document `/users/{uid}`.
 - **Role Preservation**: User sync upon sign-in is strictly idempotent. Existing `ASHA` or `ADMIN` roles are **never** overwritten or reset.
-- **Role Assignment**: Only an authenticated user with `ADMIN` role can assign privileged roles via `POST /api/v1/auth/role/assign`. The actor identity is strictly extracted from the verified token context (`request.user.uid`).
-
-### 2.3 Consent Model & Versioning
-- **Current Consent State**: Stored directly on `/users/{uid}` (`consentStatus`, `consentVersion`, `consentedAt`).
-- **Immutable Consent History**: Stored in `/users/{uid}/consent_history/{consentId}` capturing (`userId`, `consentVersion`, `accepted`, `timestamp`, `method`).
-- **Re-Consent Trigger**: If `CURRENT_CONSENT_VERSION` is bumped in the future, backend guards (`requireConsent`) and frontend route wrappers (`ProtectedRoute`) automatically mandate renewed acceptance.
+- **Role Assignment**: Only an authenticated user with `ADMIN` role can assign privileged roles via `POST /api/v1/auth/role/assign`.
 
 ---
 
-## 3. Observability & Correlation Tracing
+## 3. Household Onboarding & Management (Phase 3)
+
+### 3.1 Ownership Model & Security
+- **Single Household per Citizen**: Each authenticated citizen manages their family household (`id = "hh_" + ownerUid`).
+- **Authoritative Ownership**: Ownership is derived strictly from verified token context (`request.user.uid`).
+- **Tamper Protection**: Any client-provided `ownerUid` or `id` payload fields are ignored during creation and strictly forbidden from updates.
+- **IDOR Protection**: Citizens can only query, update, and manage members within their own household. Cross-user access is rejected with HTTP 404 / 403.
+
+### 3.2 Member Subcollection Isolation
+- Members are stored in subcollection `/households/{householdId}/members/{memberId}`.
+- Cascades ownership scoping directly from parent household, ensuring isolated queries and preventing global document enumeration.
+
+---
+
+## 4. Observability & Correlation Tracing
 
 All requests entering the Fastify backend pass through the `correlationPlugin`:
-- Incoming requests with `X-Correlation-ID` or `X-Request-ID` headers preserve their ID; otherwise a unique ID (`req_<random>_<timestamp>`) is generated.
+- Incoming requests with `X-Correlation-ID` or `X-Request-ID` headers preserve their ID; otherwise a unique ID is generated.
 - The correlation ID is attached to `request.correlationId`, injected into all Pino structured logs, and returned in HTTP response headers.
-- This provides seamless end-to-end tracing across Next.js, Fastify, Firebase, and external services.
 
 ---
 
-## 4. Deployment Target
+## 5. Deployment Target
 
 - **Target Platform**: Render (Node.js Native Web Service)
 - **Node Runtime**: Node.js 20+ / 22+

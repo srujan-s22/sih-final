@@ -32,7 +32,8 @@ SwasthyaSetu is built on an end-to-end TypeScript architecture with strict separ
      (Config, Auth,       (Future:          (Future:
       Role Guards,         Lyzr / Gemini)    Tavily, n8n,
       Consent Service,                       Sarvam, Exotel,
-      Error Envelope)                        Swytchcode)
+      Household Service,                     Swytchcode)
+      Error Envelope)
              |
              v
        Firebase Service Layer
@@ -40,17 +41,21 @@ SwasthyaSetu is built on an end-to-end TypeScript architecture with strict separ
              |
              v
        Firestore Repository Layer
-      (UserRepository, BaseFirestoreRepository)
+      (UserRepository, HouseholdRepository)
              |
              v
-        Cloud Firestore (/users/{uid}, /consent_history)
+        Cloud Firestore
+        ├── /users/{uid}
+        │   └── /consent_history/{consentId}
+        └── /households/{householdId}
+            └── /members/{memberId}
 ```
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Lucide React. Contains no business or eligibility rules.
-- **Backend**: Node.js, TypeScript, Fastify with correlation ID tracking, RFC-compliant error responses, and Zod runtime schema validation.
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Lucide React.
+- **Backend**: Node.js, TypeScript, Fastify v5 with correlation ID tracking, RFC-compliant error responses, and Zod runtime schema validation.
 - **Shared Layer (`shared/`)**: Canonical TypeScript types and Zod schemas shared across frontend and backend.
-- **Database & Platform**: Cloud Firestore (persistent source of truth) managed strictly through the server-side Firebase Admin SDK (`firebase-admin`).
-- **Security & Consent**: Role-based access control (`CITIZEN`, `ASHA`, `ADMIN`) with server-side role resolution and structured consent tracking (`CURRENT_CONSENT_VERSION = "1.0"`).
+- **Database & Platform**: Cloud Firestore managed strictly through the server-side Firebase Admin SDK (`firebase-admin`).
+- **Security & Ownership**: Role-based access control (`CITIZEN`, `ASHA`, `ADMIN`), strict token-based household ownership (`ownerUid = request.user.uid`), and IDOR protection.
 - **Development Tooling**: Graphify persistent knowledge graph, Git, Vitest.
 - **Deployment Target**: Render (Node.js Native Web Service).
 
@@ -71,7 +76,7 @@ SwasthyaSetu is built on an end-to-end TypeScript architecture with strict separ
 │   │   ├── auth/                 # AuthContext, AuthProvider, useAuth hook
 │   │   ├── firebase/             # client.ts (Auth SDK), errors.ts (sanitizer)
 │   │   └── utils.ts
-│   ├── services/                 # api-client.ts, auth-service.ts
+│   ├── services/                 # api-client.ts, auth-service.ts, household-service.ts
 │   ├── types/                    # UI-specific definitions
 │   ├── config/                   # site.ts, env.ts, constants.ts
 │   ├── .env.example
@@ -83,25 +88,25 @@ SwasthyaSetu is built on an end-to-end TypeScript architecture with strict separ
 │   │   ├── app.ts                # Fastify application factory
 │   │   ├── config/               # Zod-validated env.ts & constants.ts
 │   │   ├── plugins/              # correlation.ts, cors.ts, errors.ts, firebase.ts, auth.ts, guards.ts
-│   │   ├── routes/               # health.ts, auth.ts, test-auth.ts, index.ts
-│   │   ├── services/             # user.service.ts, firebase, eligibility, gaps, etc.
-│   │   └── repositories/         # user.repository.ts, base.repository.ts
-│   ├── tests/                    # health.test.ts, auth.test.ts
+│   │   ├── routes/               # health.ts, auth.ts, household.ts, test-auth.ts, index.ts
+│   │   ├── services/             # user.service.ts, household.service.ts, firebase, etc.
+│   │   └── repositories/         # user.repository.ts, household.repository.ts, base.repository.ts
+│   ├── tests/                    # health.test.ts, auth.test.ts, household.test.ts
 │   ├── .env.example
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vitest.config.ts
 │
 ├── shared/                       # Canonical Shared Contracts
-│   ├── types/                    # auth.ts, api.ts, household.ts, eligibility.ts, gaps.ts, actions.ts
-│   ├── schemas/                  # auth.schema.ts, health.schema.ts, common.schema.ts
+│   ├── types/                    # auth.ts, household.ts, eligibility.ts, gaps.ts, api.ts
+│   ├── schemas/                  # auth.schema.ts, household.schema.ts, health.schema.ts, common.schema.ts
 │   └── package.json
 │
 ├── docs/                         # Technical Specifications
-│   ├── architecture.md           # Master system architecture, role & consent model
-│   ├── firestore-architecture.md # Planned 11-collection Firestore data model & rules
+│   ├── architecture.md           # Master system architecture, role, consent & household ownership
+│   ├── firestore-architecture.md # Planned 11-collection Firestore data model & subcollections
 │   ├── design-system.md          # Restrained neutral-first design tokens & typography
-│   ├── api-specification.md      # API versioning, correlation IDs, auth contracts
+│   ├── api-specification.md      # API versioning, correlation IDs, auth & household contracts
 │   └── graphify.md               # Knowledge graph workflow & CLI guide
 │
 ├── firestore.rules               # Restrictive baseline Firestore security rules
@@ -143,7 +148,7 @@ SwasthyaSetu is built on an end-to-end TypeScript architecture with strict separ
 
 ## 4. Running Automated Tests & Builds
 
-### Backend Vitest Test Suite (17 Tests)
+### Backend Vitest Test Suite (28 Tests)
 ```bash
 npm test
 ```
@@ -155,14 +160,10 @@ npm run build
 
 ---
 
-## 5. Authentication, Roles & Consent (Phase 2)
+## 5. Phase 3 Implemented Capabilities
 
-- **Authentication**: Firebase Authentication (Email/Password + optional Google Sign-In).
-- **Session Handling**: Bearer token transmitted in `Authorization: Bearer <ID_TOKEN>`.
-- **Role Verification**: Server-side resolved from `/users/{uid}`.
-  - `CITIZEN`: Standard citizen access (`/citizen`).
-  - `ASHA`: Frontline healthcare worker workspace (`/asha`).
-  - `ADMIN`: System governance and role assignment (`/admin`).
-- **Role Preservation**: User sync is idempotent; existing ASHA or ADMIN roles are never overwritten on sign-in.
-- **Consent Versioning**: `CURRENT_CONSENT_VERSION = "1.0"` verified by `requireConsent` and `ProtectedRoute`.
-- **403 Unauthorized**: Dedicated `/unauthorized` route for role violations.
+- **Household Management**: Idempotent creation, retrieval, and updating of citizen household profiles.
+- **Family Member Subcollections**: Adding, editing, listing, and removing members (`/households/{householdId}/members/{memberId}`).
+- **Strict Server-Side Ownership**: `ownerUid` derived exclusively from verified Firebase tokens.
+- **IDOR Protection**: Complete isolation preventing cross-household data access.
+- **Restrained Citizen UI**: Clean, mobile-first, short human wording on `/citizen`.

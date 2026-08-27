@@ -138,6 +138,49 @@ class ApiClient {
   }
 
   /**
+   * Generic PATCH request
+   */
+  public async patch<T>(
+    endpoint: string,
+    body?: unknown,
+    options: RequestInit = {}
+  ): Promise<ApiResult<T>> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "PATCH",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  /**
+   * Generic PUT request
+   */
+  public async put<T>(
+    endpoint: string,
+    body?: unknown,
+    options: RequestInit = {}
+  ): Promise<ApiResult<T>> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "PUT",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  /**
+   * Generic DELETE request
+   */
+  public async delete<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResult<T>> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "DELETE",
+    });
+  }
+
+  /**
    * Health Check Convenience Method
    */
   public async checkHealth(): Promise<ApiResult<HealthCheckResponse>> {

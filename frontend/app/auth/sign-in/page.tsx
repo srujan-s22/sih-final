@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { getFriendlyAuthErrorMessage } from "@/lib/firebase/errors";
-import { isClientFirebaseReady } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,6 +16,7 @@ export default function SignInPage() {
   const {
     isAuthenticated,
     isConsentRequired,
+    isFirebaseReady,
     role,
     signInWithEmail,
     signUpWithEmail,
@@ -235,7 +235,7 @@ export default function SignInPage() {
               </Button>
             </form>
 
-            {isClientFirebaseReady() && (
+            {isFirebaseReady && (
               <div className="space-y-3 pt-2">
                 <div className="relative flex items-center justify-center">
                   <div className="border-t border-slate-200 w-full" />
