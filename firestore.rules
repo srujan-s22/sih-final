@@ -8,9 +8,10 @@ rules_version = '2';
  * ARCHITECTURAL PRINCIPLES:
  * 1. Restrictive Default: All direct client read/write access is denied by default.
  * 2. Server-Side Data Boundary: Consequential domain collections (households,
- *    members, schemes, rules, gaps, evidence, actions, followups, audit logs)
- *    are managed EXCLUSIVELY by the Fastify Node.js backend using Firebase Admin SDK.
- * 3. Client Firebase SDK is restricted to authenticated user profile/consent operations.
+ *    members, schemes, rules, gaps, evidence, actions, followups, audit logs,
+ *    role assignments) are managed EXCLUSIVELY by the Fastify Node.js backend
+ *    using the Firebase Admin SDK.
+ * 3. Role Security: Clients CANNOT write or mutate the `role` field.
  * 4. NEVER use `allow read, write: if true;` in any environment.
  */
 
@@ -22,19 +23,30 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Authenticated User Profiles (Phase 2 Foundation)
+    // Authenticated User Profiles (Phase 2 Identity & Consent)
     match /users/{userId} {
-      // Only the authenticated user can read or update their own profile metadata
+      // Authenticated users can read their own profile document
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow create, update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['displayName', 'phoneNumber', 'role', 'updatedAt']);
-      allow delete: if false;
-    }
+      
+      // Clients may ONLY update safe presentation metadata (displayName, phoneNumber, updatedAt)
+      // Client writes to `role`, `consentStatus`, `consentVersion`, `consentedAt` are strictly FORBIDDEN
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'updatedAt']);
+        
+      // Client-side document creation & deletion are forbidden; managed by backend sync
+      allow create, delete: if false;
 
-    // User Notifications (Phase 2 Foundation)
-    match /users/{userId}/notifications/{notificationId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // Notifications are written solely by backend services
+      // Consent History Subcollection (Audit Trail)
+      match /consent_history/{consentId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // Written exclusively by backend UserService
+      }
+
+      // Notifications Subcollection
+      match /notifications/{notificationId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false; // Written exclusively by backend NotificationService
+      }
     }
 
     // Core Domain Collections (Server-Only Access via Firebase Admin SDK)

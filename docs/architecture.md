@@ -14,6 +14,7 @@ The platform uses a unified, end-to-end TypeScript architecture:
                    (App Router, Tailwind v4)
                                |
                    Centralized API Client
+                   (Bearer <Firebase ID Token>)
                                |
                     Shared TypeScript Contracts
                    (shared/types & shared/schemas)
@@ -27,41 +28,41 @@ The platform uses a unified, end-to-end TypeScript architecture:
              v                 v                 v
        Core Services      AI Services       Integration
      (Config, Auth,       (Future:          (Future:
-      Correlation,         Lyzr / Gemini)    Tavily, n8n,
-      Error Envelope)                        Sarvam, Exotel,
-             |                               Swytchcode)
+      Role Guards,         Lyzr / Gemini)    Tavily, n8n,
+      Consent Service,                       Sarvam, Exotel,
+      Error Envelope)                        Swytchcode)
+             |
              v
        Firebase Service Layer
       (Admin SDK, Token Verification)
              |
              v
        Firestore Repository Layer
+      (UserRepository, BaseFirestoreRepository)
              |
              v
-        Cloud Firestore (Single Source of Truth)
+        Cloud Firestore (/users/{uid}, /consent_history)
 ```
 
 ---
 
-## 2. Core Architectural Principles
+## 2. Authentication, Roles & Authorization (Phase 2)
 
-### 2.1 Unified TypeScript Ecosystem
-1. **Frontend (Next.js 16 + React 19)**:
-   - Responsible for presentation, UI components, client accessibility, and responsive layouts.
-   - Contains **zero** business, eligibility, or gap identification logic.
-   - Does **not** query Firestore directly for consequential application domain data.
-2. **Backend (Node.js + Fastify + TypeScript)**:
-   - High-throughput, low-overhead HTTP engine with native TypeScript plugins and Zod runtime schema validation.
-   - The single authoritative gatekeeper for business logic, rule processing, and persistence.
-   - Manages all privileged operations via the server-side Firebase Admin SDK (`firebase-admin`).
-3. **Shared Contracts (`shared/`)**:
-   - Canonical types and Zod validation schemas shared between frontend and backend.
-   - Eliminates contract drift and duplicated models.
-4. **Database (Cloud Firestore)**:
-   - The persistent source of truth.
-   - Direct client mutations on domain data are blocked by default via `firestore.rules`.
-5. **AI Layer (Future Phases)**:
-   - AI outputs (Gemini, Lyzr) are treated as recommendations and structured drafts; they are **never** the direct, unvalidated source of truth. All AI outputs are validated with Zod schemas before being used in business logic.
+### 2.1 Authentication vs. Authorization vs. Consent
+- **Authentication**: Proves *WHO* the user is via Firebase Authentication ID tokens.
+- **Authorization**: Determines *WHAT* the user is permitted to do via server-side role resolution from `/users/{uid}`.
+- **Consent**: Determines whether the user has reviewed and accepted healthcare data processing terms (`CURRENT_CONSENT_VERSION = "1.0"`).
+
+### 2.2 Role Architecture & Authoritative Source
+- Supported Roles: `CITIZEN`, `ASHA`, `ADMIN`.
+- **Single Source of Truth**: The server-managed Firestore document `/users/{uid}`.
+- **Role Preservation**: User sync upon sign-in is strictly idempotent. Existing `ASHA` or `ADMIN` roles are **never** overwritten or reset.
+- **Role Assignment**: Only an authenticated user with `ADMIN` role can assign privileged roles via `POST /api/v1/auth/role/assign`. The actor identity is strictly extracted from the verified token context (`request.user.uid`).
+
+### 2.3 Consent Model & Versioning
+- **Current Consent State**: Stored directly on `/users/{uid}` (`consentStatus`, `consentVersion`, `consentedAt`).
+- **Immutable Consent History**: Stored in `/users/{uid}/consent_history/{consentId}` capturing (`userId`, `consentVersion`, `accepted`, `timestamp`, `method`).
+- **Re-Consent Trigger**: If `CURRENT_CONSENT_VERSION` is bumped in the future, backend guards (`requireConsent`) and frontend route wrappers (`ProtectedRoute`) automatically mandate renewed acceptance.
 
 ---
 
@@ -70,7 +71,7 @@ The platform uses a unified, end-to-end TypeScript architecture:
 All requests entering the Fastify backend pass through the `correlationPlugin`:
 - Incoming requests with `X-Correlation-ID` or `X-Request-ID` headers preserve their ID; otherwise a unique ID (`req_<random>_<timestamp>`) is generated.
 - The correlation ID is attached to `request.correlationId`, injected into all Pino structured logs, and returned in HTTP response headers.
-- This provides seamless end-to-end tracing across Next.js, Fastify, Firebase, and future external microservices (Lyzr, Gemini, Tavily, n8n, Sarvam, Exotel, Swytchcode).
+- This provides seamless end-to-end tracing across Next.js, Fastify, Firebase, and external services.
 
 ---
 

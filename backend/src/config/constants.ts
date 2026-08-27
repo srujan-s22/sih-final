@@ -4,6 +4,9 @@ export const APP_VERSION = "1.0.0";
 export const CORRELATION_ID_HEADER = "x-correlation-id";
 export const REQUEST_ID_HEADER = "x-request-id";
 
+export const CURRENT_CONSENT_VERSION = "1.0";
+export const DEFAULT_USER_ROLE = "CITIZEN" as const;
+
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,

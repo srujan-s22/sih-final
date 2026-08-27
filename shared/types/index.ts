@@ -1,4 +1,5 @@
 export * from "./api.js";
+export * from "./auth.js";
 export * from "./common.js";
 export * from "./household.js";
 export * from "./eligibility.js";

@@ -2,12 +2,33 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export function Header() {
+  const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { isAuthenticated, userProfile, role, signOut, isLoading } = useAuth();
+
+  const getPortalLink = () => {
+    if (role === "ADMIN") return "/admin";
+    if (role === "ASHA") return "/asha";
+    return "/citizen";
+  };
+
+  const getPortalLabel = () => {
+    if (role === "ADMIN") return "Admin Area";
+    if (role === "ASHA") return "ASHA Workspace";
+    return "Citizen Portal";
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/auth/sign-in");
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur-xs">
@@ -40,20 +61,55 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+          {isAuthenticated && (
+            <Link
+              href={getPortalLink()}
+              className="text-sm font-semibold text-teal-800 hover:text-teal-900 transition-colors flex items-center gap-1.5"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {getPortalLabel()}
+            </Link>
+          )}
         </nav>
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            Check Status
-          </Button>
-          <Button variant="primary" size="sm">
-            Citizen Portal
-          </Button>
+          {!isLoading && (
+            isAuthenticated ? (
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col text-right">
+                  <span className="text-xs font-semibold text-slate-800 max-w-[140px] truncate">
+                    {userProfile?.displayName || userProfile?.email || "User"}
+                  </span>
+                  <span className="text-[10px] font-mono text-teal-700 font-medium uppercase">
+                    {role || "Citizen"}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                >
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Link href="/auth/sign-in">
+                <Button variant="primary" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            )
+          )}
         </div>
 
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
+          {isAuthenticated && (
+            <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+              {role || "Citizen"}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}

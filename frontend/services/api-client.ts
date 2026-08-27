@@ -1,18 +1,31 @@
 import { env } from "@/config/env";
+import { getCurrentUserToken } from "@/lib/firebase/client";
 import { ApiErrorResponse, ApiResult, HealthCheckResponse } from "@shared/types/api";
+
+type AuthFailureCallback = () => void;
 
 class ApiClient {
   private baseUrl: string;
+  private onUnauthorizedCallback: AuthFailureCallback | null = null;
+  private customTokenProvider: (() => Promise<string | null>) | null = null;
 
   constructor() {
     this.baseUrl = env.apiBaseUrl.replace(/\/$/, "");
+  }
+
+  public setUnauthorizedHandler(callback: AuthFailureCallback) {
+    this.onUnauthorizedCallback = callback;
+  }
+
+  public setTokenProvider(provider: () => Promise<string | null>) {
+    this.customTokenProvider = provider;
   }
 
   private generateCorrelationId(): string {
     return `req_${Math.random().toString(36).substring(2, 11)}_${Date.now().toString(36)}`;
   }
 
-  private async request<T>(
+  public async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResult<T>> {
@@ -26,6 +39,21 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
+    // Attach Bearer token if not explicitly provided
+    if (!headers["Authorization"] && !headers["authorization"]) {
+      try {
+        const token = this.customTokenProvider
+          ? await this.customTokenProvider()
+          : await getCurrentUserToken();
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+      } catch {
+        // Continue unauthenticated if token resolution fails
+      }
+    }
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -37,6 +65,10 @@ class ApiClient {
         response.headers.get("X-Correlation-ID") || correlationId;
 
       if (!response.ok) {
+        if (response.status === 401 && this.onUnauthorizedCallback) {
+          this.onUnauthorizedCallback();
+        }
+
         let errorData: ApiErrorResponse;
         try {
           const body = await response.json();
@@ -63,7 +95,12 @@ class ApiClient {
         return { success: false, error: errorData, correlationId: responseCorrelationId };
       }
 
-      const data = (await response.json()) as T;
+      const jsonResponse = await response.json();
+      // Handle unwrapping of standardized backend envelope: { success: true, data: T }
+      const data = (jsonResponse && typeof jsonResponse === "object" && "data" in jsonResponse)
+        ? jsonResponse.data
+        : jsonResponse;
+
       return { success: true, data, correlationId: responseCorrelationId };
     } catch (err: unknown) {
       const networkError: ApiErrorResponse = {
@@ -90,13 +127,13 @@ class ApiClient {
    */
   public async post<T>(
     endpoint: string,
-    body: unknown,
+    body?: unknown,
     options: RequestInit = {}
   ): Promise<ApiResult<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: "POST",
-      body: JSON.stringify(body),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   }
 
