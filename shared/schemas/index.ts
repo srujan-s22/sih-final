@@ -6,3 +6,4 @@ export * from "./guidance.schema.js";
 export * from "./evidence.schema.js";
 export * from "./ai.schema.js";
 export * from "./assistant.schema.js";
+export * from "./case.schema.js";

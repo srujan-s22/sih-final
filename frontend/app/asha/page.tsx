@@ -2,168 +2,286 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { useAuth } from "@/lib/auth/auth-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Modal } from "@/components/ui/modal";
-import { LoadingState } from "@/components/ui/loading-state";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  Household,
-  Member,
-  CreateHouseholdInput,
-  IncomeCategory,
-  Gender,
-  CreateMemberInput,
-} from "@shared/types/household";
-import { GuidanceResponse } from "@shared/types/guidance";
-import { householdService } from "@/services/household-service";
-import { guidanceService } from "@/services/guidance-service";
 import {
   Users,
-  ShieldCheck,
   AlertCircle,
-  CheckCircle2,
-  MapPin,
-  FileCheck,
-  Plus,
-  Search,
-  ArrowRight,
-  Filter,
-  UserPlus,
-  Eye,
   Clock,
-  HeartHandshake,
+  CheckCircle2,
+  Plus,
   Bot,
+  Search,
+  Calendar,
+  ShieldCheck,
+  ChevronRight,
+  Activity,
+  X,
+  Send,
 } from "lucide-react";
+import { caseService } from "@/services/case-service";
+import {
+  AshaCase,
+  CaseDetailResponse,
+  CaseSummaryResponse,
+  CaseStatus,
+  CasePriority,
+  FieldRegistrationInput,
+} from "@shared/types/case";
+import { IncomeCategory } from "@shared/types/household";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
-const INCOME_OPTIONS: Array<{ value: IncomeCategory; label: string }> = [
-  { value: "BPL", label: "Below Poverty Line (BPL)" },
-  { value: "AAY", label: "Antyodaya Anna Yojana (AAY)" },
-  { value: "APL", label: "Above Poverty Line (APL)" },
-  { value: "OTHER", label: "Other" },
-];
-
-export default function AshaPage() {
-  const { userProfile } = useAuth();
-
-  // Data State
-  const [household, setHousehold] = useState<Household | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [guidance, setGuidance] = useState<GuidanceResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default function AshaWorkspacePage() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Caseload Data
+  const [cases, setCases] = useState<AshaCase[]>([]);
+  const [summary, setSummary] = useState<CaseSummaryResponse | null>(null);
+
+  // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCase, setSelectedCase] = useState<Household | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+
+  // Case Detail Modal State
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [caseDetail, setCaseDetail] = useState<CaseDetailResponse | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<"overview" | "gaps" | "schemes" | "notes" | "followups" | "history">("overview");
+
+  // New Note / Follow-up inputs
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [isNoteSubmitting, setIsNoteSubmitting] = useState(false);
+
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpReason, setFollowUpReason] = useState("");
+  const [isFollowUpSubmitting, setIsFollowUpSubmitting] = useState(false);
+
+  // Field Registration Modal
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [registerSubmitting, setRegisterSubmitting] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  const [registerForm, setRegisterForm] = useState<FieldRegistrationInput>({
+    headOfHouseholdName: "",
+    headAge: 35,
+    headGender: "female",
+    incomeCategory: "BPL",
+    state: "Karnataka",
+    district: "Bengaluru Rural",
+    village: "",
+    pincode: "560001",
+    contactPhone: "",
+    rationCardNumber: "",
+  });
+
+  // Phase 8 Assistant Integration
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
-  // Field Onboarding Modal State
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [registerForm, setRegisterForm] = useState<CreateHouseholdInput>({
-    headOfHouseholdName: "",
-    rationCardNumber: "",
-    incomeCategory: "BPL",
-    state: "",
-    district: "",
-    village: "",
-    pincode: "",
-    contactPhone: "",
-  });
-  const [registerSubmitting, setRegisterSubmitting] = useState(false);
-  const [registerError, setRegisterError] = useState<string | null>(null);
-  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
-
-  // Load ASHA Data
-  const loadAshaData = useCallback(async () => {
+  // Load ASHA Caseload & Summary
+  const loadCaseload = useCallback(async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
-      const [hhRes, guideRes] = await Promise.all([
-        householdService.getHousehold(),
-        guidanceService.getMyGuidance(),
+      const [casesRes, summaryRes] = await Promise.all([
+        caseService.listCases(),
+        caseService.getSummary(),
       ]);
 
-      if (hhRes.success && hhRes.data) {
-        setHousehold(hhRes.data.household);
-        setMembers(hhRes.data.members || []);
+      if (casesRes.success && casesRes.data) {
+        setCases(casesRes.data.cases);
       }
-      if (guideRes.success && guideRes.data) {
-        setGuidance(guideRes.data);
+      if (summaryRes.success && summaryRes.data) {
+        setSummary(summaryRes.data);
       }
     } catch {
-      // Non-blocking
+      setErrorMessage("Could not load assigned caseload data.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadAshaData();
-  }, [loadAshaData]);
+    loadCaseload();
+  }, [loadCaseload]);
 
-  // Handle Assisted Registration
+  // Load Case Detail
+  const openCaseDetail = async (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setDetailTab("overview");
+    setIsDetailLoading(true);
+    try {
+      const res = await caseService.getCaseDetail(caseId);
+      if (res.success && res.data) {
+        setCaseDetail(res.data);
+      } else {
+        setErrorMessage(res.success ? null : (res as any).error?.message || "Failed to load case details.");
+      }
+    } catch {
+      setErrorMessage("Error retrieving case details.");
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const closeCaseDetail = () => {
+    setSelectedCaseId(null);
+    setCaseDetail(null);
+  };
+
+  // Status / Priority Update
+  const handleStatusChange = async (newStatus: CaseStatus) => {
+    if (!selectedCaseId || !caseDetail) return;
+    try {
+      const res = await caseService.updateCase(selectedCaseId, { status: newStatus });
+      if (res.success && res.data) {
+        setCaseDetail((prev) => (prev ? { ...prev, case: res.data.case } : null));
+        await loadCaseload();
+      }
+    } catch {
+      // Error handled quietly
+    }
+  };
+
+  const handlePriorityChange = async (newPriority: CasePriority) => {
+    if (!selectedCaseId || !caseDetail) return;
+    try {
+      const res = await caseService.updateCase(selectedCaseId, { priority: newPriority });
+      if (res.success && res.data) {
+        setCaseDetail((prev) => (prev ? { ...prev, case: res.data.case } : null));
+        await loadCaseload();
+      }
+    } catch {
+      // Error handled quietly
+    }
+  };
+
+  // Add Case Note
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCaseId || !newNoteContent.trim()) return;
+    setIsNoteSubmitting(true);
+    try {
+      const res = await caseService.addNote(selectedCaseId, newNoteContent.trim());
+      if (res.success && res.data) {
+        setNewNoteContent("");
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+      }
+    } catch {
+      // Error handled quietly
+    } finally {
+      setIsNoteSubmitting(false);
+    }
+  };
+
+  // Schedule Follow-Up
+  const handleScheduleFollowUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCaseId || !followUpDate || !followUpReason.trim()) return;
+    setIsFollowUpSubmitting(true);
+    try {
+      const res = await caseService.createFollowUp(selectedCaseId, {
+        scheduledAt: followUpDate,
+        reason: followUpReason.trim(),
+      });
+      if (res.success && res.data) {
+        setFollowUpDate("");
+        setFollowUpReason("");
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+        await loadCaseload();
+      }
+    } catch {
+      // Error handled quietly
+    } finally {
+      setIsFollowUpSubmitting(false);
+    }
+  };
+
+  // Complete Follow-Up
+  const handleCompleteFollowUp = async (followUpId: string) => {
+    if (!selectedCaseId) return;
+    try {
+      const res = await caseService.updateFollowUp(selectedCaseId, followUpId, {
+        status: "COMPLETED",
+      });
+      if (res.success) {
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+        await loadCaseload();
+      }
+    } catch {
+      // Error handled quietly
+    }
+  };
+
+  // Handle Field Registration
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError(null);
     setRegisterSubmitting(true);
-
     try {
-      const res = await householdService.createHousehold(registerForm);
-      if (res.success) {
-        setHousehold(res.data.household);
+      const res = await caseService.createFieldRegistration(registerForm);
+      if (res.success && res.data) {
         setIsRegisterModalOpen(false);
-        setRegisterSuccess(`Household registered for ${res.data.household.headOfHouseholdName}`);
-        await loadAshaData();
+        setRegisterSuccess(`Case registered for ${res.data.household.headOfHouseholdName}`);
+        await loadCaseload();
+        openCaseDetail(res.data.case.id);
       } else {
-        setRegisterError(res.error.message);
+        setRegisterError(res.success ? null : (res as any).error?.message || "Failed to register household case in field.");
       }
     } catch {
-      setRegisterError("Failed to register household in field.");
+      setRegisterError("Failed to register household case in field.");
     } finally {
       setRegisterSubmitting(false);
     }
   };
 
   const navTabs = [
-    { id: "overview", label: "Overview", icon: HeartHandshake },
-    { id: "cases", label: "Households & Cases", icon: Users },
+    { id: "overview", label: "Overview", icon: Activity },
+    { id: "cases", label: "Caseload", icon: Users },
     { id: "attention", label: "Needs Attention", icon: AlertCircle },
-    { id: "register", label: "Field Registration", icon: UserPlus },
+    { id: "followups", label: "Follow-ups", icon: Clock },
   ];
 
-  // Cases List (Derived from real household data)
-  const householdList = household ? [household] : [];
-  const filteredCases = householdList.filter((h) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
+  // Filtered Cases
+  const filteredCases = cases.filter((c) => {
+    if (statusFilter !== "ALL" && c.status !== statusFilter) return false;
+    if (priorityFilter !== "ALL" && c.priority !== priorityFilter) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
     return (
-      h.headOfHouseholdName.toLowerCase().includes(query) ||
-      h.district.toLowerCase().includes(query) ||
-      (h.rationCardNumber && h.rationCardNumber.toLowerCase().includes(query))
+      c.headOfHouseholdName.toLowerCase().includes(q) ||
+      c.district.toLowerCase().includes(q) ||
+      c.id.toLowerCase().includes(q)
     );
   });
 
-  const needsAttentionCount = guidance?.gaps?.length ? guidance.gaps.length : 0;
-  const pendingActionsCount = guidance?.actionPlan?.length ? guidance.actionPlan.length : 0;
-  const eligibleSchemesCount = guidance?.eligibleSchemes?.length ? guidance.eligibleSchemes.length : 0;
+  const needsAttentionCases = cases.filter(
+    (c) => c.status === "NEEDS_ATTENTION" || c.detectedGapsCount > 0 || c.priority === "URGENT" || c.priority === "HIGH"
+  );
+
+  const upcomingFollowUpCases = cases.filter((c) => c.nextFollowUpAt);
 
   return (
     <ProtectedRoute allowedRoles={["ASHA", "ADMIN"]}>
       <AuthenticatedShell
         role="ASHA"
-        title="ASHA Field Workspace"
-        description="Monitor household cases, identify healthcare access gaps, and assist families with government scheme enrollment."
+        title="ASHA Operational Workspace"
+        description="Manage assigned households, monitor healthcare access gaps, schedule follow-ups, and assist families with government health programs."
         navTabs={navTabs}
         activeTab={activeTab}
-        onTabChange={(tabId) => {
-          if (tabId === "register") {
-            setIsRegisterModalOpen(true);
-          } else {
-            setActiveTab(tabId);
-          }
-        }}
+        onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -182,7 +300,7 @@ export default function AshaPage() {
                 setRegisterError(null);
                 setIsRegisterModalOpen(true);
               }}
-              className="text-xs font-semibold flex items-center gap-1.5"
+              className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Register Household</span>
@@ -192,159 +310,270 @@ export default function AshaPage() {
       >
         {/* Success Alert */}
         {registerSuccess && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-800 flex items-center justify-between">
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <p className="font-semibold">{registerSuccess}</p>
             </div>
             <button
               onClick={() => setRegisterSuccess(null)}
-              className="text-xs text-emerald-700 hover:text-emerald-900 font-bold"
+              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4"
             >
-              Dismiss
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs sm:text-sm text-red-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <p>{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-red-700 hover:text-red-900 font-bold text-xs ml-4"
+            >
+              ✕
             </button>
           </div>
         )}
 
         {isLoading ? (
-          <div className="py-16">
-            <LoadingState message="Loading ASHA field caseload and assigned households..." />
+          <div className="py-16 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mb-3" />
+            <p className="text-sm font-medium text-slate-500">Loading assigned caseload...</p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* 1. Quick Overview Operational Metrics */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Assigned Households
-                </span>
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                  {householdList.length}
-                </p>
-                <p className="text-[11px] text-slate-400">Verified in field cache</p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
-                <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">
-                  Needs Attention
-                </span>
-                <p className="text-2xl sm:text-3xl font-extrabold text-amber-800">
-                  {needsAttentionCount}
-                </p>
-                <p className="text-[11px] text-slate-400">Access gaps detected</p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
-                <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">
-                  Eligible Pathways
-                </span>
-                <p className="text-2xl sm:text-3xl font-extrabold text-emerald-800">
-                  {eligibleSchemesCount}
-                </p>
-                <p className="text-[11px] text-slate-400">Verified scheme matches</p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
-                <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide">
-                  Pending Actions
-                </span>
-                <p className="text-2xl sm:text-3xl font-extrabold text-teal-900">
-                  {pendingActionsCount}
-                </p>
-                <p className="text-[11px] text-slate-400">e-KYC & document tasks</p>
-              </div>
-            </div>
-
-            {/* 2. My Households & Cases Section */}
-            {(activeTab === "overview" || activeTab === "cases") && (
-              <section className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      Caseload Households
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-500">
-                      Families under your operational coverage area.
-                    </p>
+          <div>
+            {/* ============================================================ */}
+            {/* 1. OVERVIEW TAB */}
+            {/* ============================================================ */}
+            {activeTab === "overview" && (
+              <div className="space-y-6">
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                  <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Assigned Cases</p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">{summary?.totalAssigned ?? 0}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Persisted households</p>
                   </div>
-
-                  <div className="w-full sm:w-64">
-                    <Input
-                      placeholder="Search family or ration card..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                  <div className="bg-white rounded-xl border border-amber-200/80 p-4 shadow-2xs bg-amber-50/20">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Needs Attention</p>
+                    <p className="text-2xl font-bold text-amber-900 mt-1">{summary?.needsAttentionCount ?? 0}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">Identified healthcare gaps</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-blue-200/80 p-4 shadow-2xs bg-blue-50/20">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Upcoming Follow-ups</p>
+                    <p className="text-2xl font-bold text-blue-900 mt-1">{summary?.upcomingFollowUpsCount ?? 0}</p>
+                    <p className="text-xs text-blue-600 mt-0.5">Scheduled visits/tasks</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-emerald-200/80 p-4 shadow-2xs bg-emerald-50/20">
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Resolved / Closed</p>
+                    <p className="text-2xl font-bold text-emerald-900 mt-1">{summary?.resolvedCount ?? 0}</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">Completed enrollments</p>
                   </div>
                 </div>
 
-                {householdList.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-3">
-                    <Users className="w-8 h-8 text-slate-400 mx-auto" />
-                    <h3 className="text-sm font-bold text-slate-800">No households registered yet</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      Use the button below to register a rural household directly during field visits.
+                {/* Urgent Queue / Action Needed Section */}
+                <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <h3 className="text-sm font-bold text-slate-900">Priority Cases Requiring Field Attention</h3>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {needsAttentionCases.length} case{needsAttentionCases.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  {needsAttentionCases.length === 0 ? (
+                    <div className="py-8 text-center bg-slate-50/60 rounded-lg border border-dashed border-slate-200">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
+                      <p className="text-sm font-semibold text-slate-700">No Urgent Cases</p>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
+                        All assigned households are in normal status with no critical healthcare gap escalations.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {needsAttentionCases.slice(0, 5).map((c) => (
+                        <div
+                          key={c.id}
+                          onClick={() => openCaseDetail(c.id)}
+                          className="py-3.5 flex items-center justify-between hover:bg-slate-50/80 px-2 rounded-lg cursor-pointer transition-colors"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-slate-900">{c.headOfHouseholdName}</span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  c.priority === "URGENT"
+                                    ? "bg-red-100 text-red-800"
+                                    : c.priority === "HIGH"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {c.priority}
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-400">
+                                {c.district}, {c.state}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {c.detectedGapsCount} gap{c.detectedGapsCount === 1 ? "" : "s"} identified • {c.memberCount} family member{c.memberCount === 1 ? "" : "s"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Button variant="outline" size="sm" className="text-xs font-semibold">
+                              Inspect Case <ChevronRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* 2. CASELOAD TAB */}
+            {/* ============================================================ */}
+            {activeTab === "cases" && (
+              <div className="space-y-4">
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search by family name, district, or case ID..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="text-xs py-1.5 px-2.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="NEW">New</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="NEEDS_ATTENTION">Needs Attention</option>
+                      <option value="FOLLOW_UP">Follow Up</option>
+                      <option value="RESOLVED">Resolved</option>
+                      <option value="CLOSED">Closed</option>
+                    </select>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      className="text-xs py-1.5 px-2.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
+                    >
+                      <option value="ALL">All Priorities</option>
+                      <option value="LOW">Low</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Case Roster Table / List */}
+                {filteredCases.length === 0 ? (
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8">
+                    <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-base font-bold text-slate-800">No Households Assigned Yet</h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+                      Your field-registered or supervisor-assigned cases will appear here. You can register a family directly during field visits.
                     </p>
                     <Button
                       variant="primary"
                       size="sm"
                       onClick={() => setIsRegisterModalOpen(true)}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold"
                     >
-                      + Register First Household
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Register First Household
                     </Button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
-                    {/* Desktop Table View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full text-left text-xs sm:text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[11px]">
-                          <tr>
+                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
                             <th className="py-3 px-4">Head of Household</th>
                             <th className="py-3 px-4">Location</th>
                             <th className="py-3 px-4">Category</th>
-                            <th className="py-3 px-4">Members</th>
                             <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4 text-right">Actions</th>
+                            <th className="py-3 px-4">Priority</th>
+                            <th className="py-3 px-4">Access Gaps</th>
+                            <th className="py-3 px-4 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {filteredCases.map((c) => (
-                            <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-3.5 px-4 font-bold text-slate-900">
-                                {c.headOfHouseholdName}
-                                <span className="block text-[11px] font-mono text-slate-400 font-normal">
-                                  {c.rationCardNumber || "No ration ID"}
-                                </span>
+                            <tr
+                              key={c.id}
+                              className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                              onClick={() => openCaseDetail(c.id)}
+                            >
+                              <td className="py-3.5 px-4">
+                                <div className="font-bold text-slate-900">{c.headOfHouseholdName}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
                               </td>
                               <td className="py-3.5 px-4 text-slate-600">
-                                {c.village}, {c.district}
+                                {c.district}, {c.state}
                               </td>
-                              <td className="py-3.5 px-4 font-semibold text-teal-800">
-                                {c.incomeCategory}
-                              </td>
-                              <td className="py-3.5 px-4 text-slate-700">
-                                {members.length} member{members.length === 1 ? "" : "s"}
+                              <td className="py-3.5 px-4">
+                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold rounded text-[10px]">
+                                  {c.incomeCategory}
+                                </span>
                               </td>
                               <td className="py-3.5 px-4">
                                 <span
-                                  className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                                    eligibleSchemesCount > 0
-                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                      : "bg-amber-50 text-amber-800 border-amber-200"
+                                  className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                    c.status === "NEEDS_ATTENTION"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : c.status === "ACTIVE"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : c.status === "RESOLVED"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : "bg-slate-100 text-slate-700"
                                   }`}
                                 >
-                                  {eligibleSchemesCount > 0
-                                    ? "✓ Eligible Match"
-                                    : "Needs Info"}
+                                  {c.status.replace("_", " ")}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setSelectedCase(c)}
-                                  className="text-xs"
+                              <td className="py-3.5 px-4">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                    c.priority === "URGENT"
+                                      ? "bg-red-100 text-red-800"
+                                      : c.priority === "HIGH"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-slate-100 text-slate-600"
+                                  }`}
                                 >
+                                  {c.priority}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-slate-700">
+                                {c.detectedGapsCount > 0 ? (
+                                  <span className="text-amber-700 font-bold">
+                                    {c.detectedGapsCount} gap{c.detectedGapsCount === 1 ? "" : "s"}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 font-medium">None</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <Button variant="outline" size="sm" className="text-xs font-semibold py-1 px-2.5">
                                   View Case
                                 </Button>
                               </td>
@@ -353,249 +582,737 @@ export default function AshaPage() {
                         </tbody>
                       </table>
                     </div>
-
-                    {/* Mobile Card Stack View */}
-                    <div className="md:hidden divide-y divide-slate-100">
-                      {filteredCases.map((c) => (
-                        <div key={c.id} className="p-4 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="text-sm font-bold text-slate-900">
-                                {c.headOfHouseholdName}
-                              </h4>
-                              <p className="text-xs text-slate-500">
-                                {c.village}, {c.district}
-                              </p>
-                            </div>
-                            <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                              {c.incomeCategory}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span>{members.length} members</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedCase(c)}
-                              className="text-xs"
-                            >
-                              Review Case
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
-              </section>
+              </div>
             )}
 
-            {/* 3. Needs Attention Section */}
-            {(activeTab === "overview" || activeTab === "attention") && (
-              <section className="space-y-4">
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    Cases Requiring Attention
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500">
-                    Unmet access requirements, missing document proofs, or pending e-KYC steps.
-                  </p>
+            {/* ============================================================ */}
+            {/* 3. NEEDS ATTENTION TAB */}
+            {/* ============================================================ */}
+            {activeTab === "attention" && (
+              <div className="space-y-4">
+                <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Healthcare Gap Prioritization</p>
+                    <p className="mt-0.5 text-amber-800">
+                      These households have deterministically identified healthcare access gaps (e.g. missing maternal coverage, elder health support, or unverified documents).
+                    </p>
+                  </div>
                 </div>
 
-                {!guidance?.gaps || guidance.gaps.length === 0 ? (
-                  <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs sm:text-sm text-slate-500">
-                    No urgent gaps identified in your caseload.
+                {needsAttentionCases.length === 0 ? (
+                  <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2 opacity-80" />
+                    <p className="text-sm font-bold text-slate-800">No Families Currently Require Escalation</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      All assigned households have addressed current healthcare access gaps.
+                    </p>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs divide-y divide-slate-100">
-                    {guidance.gaps.map((gap) => (
-                      <div key={gap.id} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center font-bold shrink-0 mt-0.5">
-                          <AlertCircle className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h4 className="text-sm font-bold text-slate-900">
-                              {gap.title}
-                            </h4>
-                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 uppercase">
-                              {gap.priority}
-                            </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {needsAttentionCases.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => openCaseDetail(c.id)}
+                        className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs hover:border-amber-400 cursor-pointer transition-colors space-y-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{c.headOfHouseholdName}</h4>
+                            <p className="text-xs text-slate-400 font-mono">{c.district}, {c.state}</p>
                           </div>
-                          <p className="text-xs text-slate-600 leading-relaxed">
-                            {gap.description}
-                          </p>
-                          {gap.reason && (
-                            <p className="text-[11px] text-teal-800 font-medium">
-                              Scheme Impact: {gap.reason}
-                            </p>
-                          )}
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              c.priority === "URGENT" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {c.priority}
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-amber-50/50 rounded-lg border border-amber-100 text-xs text-amber-900">
+                          <strong>{c.detectedGapsCount} Access Gap{c.detectedGapsCount === 1 ? "" : "s"}</strong> requiring field assistance
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                          <span className="text-slate-400">Status: {c.status}</span>
+                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                            Inspect Case <ChevronRight className="w-3 h-3" />
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </section>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* 4. FOLLOW-UPS TAB */}
+            {/* ============================================================ */}
+            {activeTab === "followups" && (
+              <div className="space-y-4">
+                {upcomingFollowUpCases.length === 0 ? (
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
+                    <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <h3 className="text-sm font-bold text-slate-800">No Scheduled Follow-ups</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
+                      You can schedule reminder tasks, document verifications, and family check-ins directly inside any case.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs divide-y divide-slate-100">
+                    {upcomingFollowUpCases.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => openCaseDetail(c.id)}
+                        className="p-4 flex items-center justify-between hover:bg-slate-50/80 cursor-pointer transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span className="text-xs font-bold text-blue-900">
+                              {c.nextFollowUpAt ? new Date(c.nextFollowUpAt).toLocaleDateString() : "Scheduled"}
+                            </span>
+                            <span className="text-sm font-bold text-slate-900 ml-2">{c.headOfHouseholdName}</span>
+                          </div>
+                          <p className="text-xs text-slate-500 pl-6">
+                            Location: {c.district}, {c.state} • Status: {c.status}
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm" className="text-xs font-semibold">
+                          View Case <ChevronRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* Modal: Assisted Field Registration */}
-        <Modal
-          isOpen={isRegisterModalOpen}
-          onClose={() => setIsRegisterModalOpen(false)}
-          title="Assisted Household Registration"
-          description="Register a citizen household directly during field outreach."
-        >
-          <form onSubmit={handleRegisterSubmit} className="space-y-4">
-            {registerError && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
-                {registerError}
-              </div>
-            )}
-
-            <Input
-              label="Head of Household Full Name"
-              required
-              value={registerForm.headOfHouseholdName}
-              onChange={(e) =>
-                setRegisterForm({ ...registerForm, headOfHouseholdName: e.target.value })
-              }
-              placeholder="e.g. Ram Prasad"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="State"
-                required
-                value={registerForm.state}
-                onChange={(e) => setRegisterForm({ ...registerForm, state: e.target.value })}
-                placeholder="e.g. Bihar"
-              />
-              <Input
-                label="District"
-                required
-                value={registerForm.district}
-                onChange={(e) => setRegisterForm({ ...registerForm, district: e.target.value })}
-                placeholder="e.g. Patna"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Village / Ward"
-                required
-                value={registerForm.village}
-                onChange={(e) => setRegisterForm({ ...registerForm, village: e.target.value })}
-                placeholder="e.g. Ward 4"
-              />
-              <Input
-                label="Pincode"
-                required
-                value={registerForm.pincode}
-                onChange={(e) => setRegisterForm({ ...registerForm, pincode: e.target.value })}
-                placeholder="e.g. 800001"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select
-                label="Ration Category"
-                value={registerForm.incomeCategory}
-                onChange={(e) =>
-                  setRegisterForm({
-                    ...registerForm,
-                    incomeCategory: e.target.value as IncomeCategory,
-                  })
-                }
-                options={INCOME_OPTIONS}
-              />
-              <Input
-                label="Ration Card ID"
-                value={registerForm.rationCardNumber}
-                onChange={(e) =>
-                  setRegisterForm({ ...registerForm, rationCardNumber: e.target.value })
-                }
-                placeholder="e.g. RC-998877"
-              />
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsRegisterModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" disabled={registerSubmitting}>
-                {registerSubmitting ? "Registering..." : "Complete Registration"}
-              </Button>
-            </div>
-          </form>
-        </Modal>
-
-        {/* Modal: View Case Details */}
-        <Modal
-          isOpen={Boolean(selectedCase)}
-          onClose={() => setSelectedCase(null)}
-          title={`Household Case: ${selectedCase?.headOfHouseholdName}`}
-          description={`Location: ${selectedCase?.village}, ${selectedCase?.district}, ${selectedCase?.state}`}
-        >
-          <div className="space-y-4 text-xs sm:text-sm">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Ration Tier:</span>
-                <span className="font-bold text-teal-800">{selectedCase?.incomeCategory}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Ration Card:</span>
-                <span className="font-mono">{selectedCase?.rationCardNumber || "None"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Registered Members:</span>
-                <span className="font-semibold">{members.length}</span>
-              </div>
-            </div>
-
-            {guidance?.actionPlan && guidance.actionPlan.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">
-                  Pending Actions for ASHA Follow-up:
-                </h4>
-                <ul className="space-y-2">
-                  {guidance.actionPlan.map((step, idx) => (
-                    <li
-                      key={idx}
-                      className="p-2.5 rounded-lg bg-teal-50/50 border border-teal-100 flex items-start gap-2"
-                    >
-                      <span className="w-5 h-5 rounded-full bg-teal-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                        {idx + 1}
+        {/* ============================================================ */}
+        {/* CASE DETAIL DRAWER / MODAL */}
+        {/* ============================================================ */}
+        {selectedCaseId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/40 backdrop-blur-xs">
+            <div className="w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden animate-in slide-in-from-right duration-200">
+              {/* Header */}
+              <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {caseDetail ? caseDetail.household.headOfHouseholdName : "Loading Case..."}
+                    </h2>
+                    {caseDetail && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          caseDetail.case.priority === "URGENT"
+                            ? "bg-red-100 text-red-800"
+                            : caseDetail.case.priority === "HIGH"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {caseDetail.case.priority}
                       </span>
-                      <div>
-                        <p className="font-bold text-slate-900">{step.title}</p>
-                        <p className="text-xs text-slate-600">{step.description}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                    )}
+                  </div>
+                  {caseDetail && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Case ID: <span className="font-mono text-slate-700">{caseDetail.case.id}</span> • {caseDetail.household.district}, {caseDetail.household.state} • {caseDetail.household.incomeCategory}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsAssistantOpen(true)}
+                    className="text-xs font-semibold flex items-center gap-1 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                  >
+                    <Bot className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Ask AI About Case</span>
+                  </Button>
+                  <button
+                    onClick={closeCaseDetail}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-            )}
 
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedCase(null)}>
-                Close
-              </Button>
+              {/* Status & Priority Controls Bar */}
+              {caseDetail && (
+                <div className="px-6 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-600">Case Status:</span>
+                    <select
+                      value={caseDetail.case.status}
+                      onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
+                      className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
+                    >
+                      <option value="NEW">New</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="NEEDS_ATTENTION">Needs Attention</option>
+                      <option value="FOLLOW_UP">Follow Up</option>
+                      <option value="RESOLVED">Resolved</option>
+                      <option value="CLOSED">Closed</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-600">Priority:</span>
+                    <select
+                      value={caseDetail.case.priority}
+                      onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
+                      className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-Tabs */}
+              <div className="flex border-b border-slate-200 bg-white px-6 text-xs font-semibold overflow-x-auto">
+                <button
+                  onClick={() => setDetailTab("overview")}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    detailTab === "overview"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Household Info
+                </button>
+                <button
+                  onClick={() => setDetailTab("gaps")}
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                    detailTab === "gaps"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <span>Healthcare Gaps</span>
+                  {caseDetail && caseDetail.guidance.gaps.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px]">
+                      {caseDetail.guidance.gaps.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setDetailTab("schemes")}
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                    detailTab === "schemes"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <span>Eligible Schemes</span>
+                  {caseDetail && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
+                      {caseDetail.eligibilityResults.filter((r) => r.status === "ELIGIBLE").length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setDetailTab("notes")}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    detailTab === "notes"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Case Notes ({caseDetail?.notes.length || 0})
+                </button>
+                <button
+                  onClick={() => setDetailTab("followups")}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    detailTab === "followups"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Follow-ups ({caseDetail?.followUps.length || 0})
+                </button>
+                <button
+                  onClick={() => setDetailTab("history")}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    detailTab === "history"
+                      ? "border-emerald-600 text-emerald-800 font-bold"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Audit Trail
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {isDetailLoading || !caseDetail ? (
+                  <div className="py-12 text-center">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-emerald-600 border-t-transparent mb-2" />
+                    <p className="text-xs text-slate-500">Loading case information...</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* TAB: OVERVIEW */}
+                    {detailTab === "overview" && (
+                      <div className="space-y-5">
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Household Profile</h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div>
+                              <span className="text-slate-400">Head:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.headOfHouseholdName}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Income Category:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.incomeCategory}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Ration Card:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.rationCardNumber || "Not recorded"}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Village / Town:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.village || "Rural Area"}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">District:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.district}</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Pincode:</span>
+                              <p className="font-semibold text-slate-800">{caseDetail.household.pincode}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Family Members */}
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                            Family Members ({caseDetail.members.length})
+                          </h4>
+                          <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white overflow-hidden">
+                            {caseDetail.members.map((m) => (
+                              <div key={m.id} className="p-3 text-xs flex items-center justify-between">
+                                <div>
+                                  <span className="font-bold text-slate-900">{m.fullName}</span>
+                                  <p className="text-[11px] text-slate-500">
+                                    {m.age} yrs • {m.gender} • Relationship: {m.relationship}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {m.maternalStatus && m.maternalStatus !== "none" && (
+                                    <span className="px-2 py-0.5 bg-pink-100 text-pink-800 font-bold rounded text-[10px]">
+                                      {m.maternalStatus}
+                                    </span>
+                                  )}
+                                  {m.disabilityStatus && (
+                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-800 font-bold rounded text-[10px]">
+                                      PWD
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB: HEALTHCARE GAPS */}
+                    {detailTab === "gaps" && (
+                      <div className="space-y-4">
+                        <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                          <strong>Deterministic Healthcare Gap Analysis</strong>: Results generated from verified household composition rules.
+                        </div>
+
+                        {caseDetail.guidance.gaps.length === 0 ? (
+                          <div className="py-8 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                            <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1 opacity-80" />
+                            <p className="text-xs font-bold text-slate-800">No Identified Access Gaps</p>
+                            <p className="text-[11px] text-slate-500">This household is covered under applicable programs.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {caseDetail.guidance.gaps.map((gap, i) => (
+                              <div key={i} className="p-4 bg-white border border-amber-200 rounded-xl shadow-2xs space-y-2">
+                                <div className="flex items-start justify-between">
+                                  <h5 className="font-bold text-slate-900 text-xs sm:text-sm">{gap.title}</h5>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      gap.priority === "REQUIRED"
+                                        ? "bg-red-100 text-red-800"
+                                        : gap.priority === "IMPORTANT"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : "bg-slate-100 text-slate-700"
+                                    }`}
+                                  >
+                                    {gap.priority}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600">{gap.description}</p>
+                                <div className="text-[11px] font-medium text-amber-800 bg-amber-50/60 p-2 rounded">
+                                  <strong>Reason / Context:</strong> {gap.reason}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB: ELIGIBLE SCHEMES */}
+                    {detailTab === "schemes" && (
+                      <div className="space-y-3">
+                        {caseDetail.eligibilityResults.map((res) => (
+                          <div
+                            key={res.schemeId}
+                            className={`p-4 rounded-xl border ${
+                              res.status === "ELIGIBLE"
+                                ? "bg-emerald-50/20 border-emerald-200"
+                                : "bg-slate-50/60 border-slate-200"
+                            } space-y-2`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <h5 className="font-bold text-slate-900 text-xs sm:text-sm">{res.schemeName}</h5>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  res.status === "ELIGIBLE"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-slate-200 text-slate-700"
+                                }`}
+                              >
+                                {res.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600">{res.benefitSummary}</p>
+                            {res.status === "ELIGIBLE" && (
+                              <div className="text-[11px] text-emerald-800 flex items-center gap-1 font-semibold">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Verified Government Guideline Met</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* TAB: CASE NOTES */}
+                    {detailTab === "notes" && (
+                      <div className="space-y-5">
+                        {/* Note Input */}
+                        <form onSubmit={handleAddNote} className="space-y-2">
+                          <label className="text-xs font-bold text-slate-700">Add Field Observation / Note</label>
+                          <textarea
+                            rows={3}
+                            value={newNoteContent}
+                            onChange={(e) => setNewNoteContent(e.target.value)}
+                            placeholder="Enter notes regarding family visit, scheme application, or document verification..."
+                            className="w-full text-xs p-3 rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                          />
+                          <div className="flex justify-end">
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={isNoteSubmitting || !newNoteContent.trim()}
+                              className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+                            >
+                              <Send className="w-3 h-3 mr-1" /> Save Note
+                            </Button>
+                          </div>
+                        </form>
+
+                        {/* Notes History */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Note History</h4>
+                          {caseDetail.notes.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No notes recorded yet for this case.</p>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {caseDetail.notes.map((n) => (
+                                <div key={n.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                    <span className="font-semibold text-slate-700">{n.authorName}</span>
+                                    <span>{new Date(n.createdAt).toLocaleString()}</span>
+                                  </div>
+                                  <p className="text-slate-800 whitespace-pre-wrap">{n.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB: FOLLOW-UPS */}
+                    {detailTab === "followups" && (
+                      <div className="space-y-5">
+                        {/* Schedule Form */}
+                        <form onSubmit={handleScheduleFollowUp} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-800">Schedule New Follow-up</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-slate-600 font-semibold mb-1 block">Scheduled Date</label>
+                              <input
+                                type="date"
+                                value={followUpDate}
+                                onChange={(e) => setFollowUpDate(e.target.value)}
+                                className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="text-slate-600 font-semibold mb-1 block">Reason / Task</label>
+                              <input
+                                type="text"
+                                value={followUpReason}
+                                onChange={(e) => setFollowUpReason(e.target.value)}
+                                placeholder="e.g. Verify Ayushman card enrollment"
+                                className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={isFollowUpSubmitting || !followUpDate || !followUpReason.trim()}
+                              className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+                            >
+                              <Calendar className="w-3 h-3 mr-1" /> Schedule Task
+                            </Button>
+                          </div>
+                        </form>
+
+                        {/* Follow-up List */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Scheduled Tasks</h4>
+                          {caseDetail.followUps.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">No follow-ups recorded.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {caseDetail.followUps.map((fu) => (
+                                <div
+                                  key={fu.id}
+                                  className={`p-3 rounded-lg border flex items-center justify-between text-xs ${
+                                    fu.status === "COMPLETED"
+                                      ? "bg-slate-50 border-slate-200 opacity-60"
+                                      : "bg-white border-blue-200 shadow-2xs"
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900">{fu.reason}</span>
+                                      <span
+                                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                          fu.status === "COMPLETED" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
+                                        }`}
+                                      >
+                                        {fu.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                      Due: {new Date(fu.scheduledAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  {fu.status === "PENDING" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleCompleteFollowUp(fu.id)}
+                                      className="text-xs font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Mark Done
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB: AUDIT HISTORY */}
+                    {detailTab === "history" && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Immutable Case Activity Log</h4>
+                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl bg-white overflow-hidden text-xs">
+                          {caseDetail.activities.map((act) => (
+                            <div key={act.id} className="p-3 flex items-start justify-between">
+                              <div>
+                                <span className="font-bold text-slate-800">{act.type.replace("_", " ")}</span>
+                                <p className="text-[11px] text-slate-500">{act.description}</p>
+                                <p className="text-[10px] text-slate-400">Actor: {act.actorName} ({act.actorRole})</p>
+                              </div>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(act.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </Modal>
+        )}
 
-        {/* SwasthyaSetu ASHA Field Assistant Drawer */}
+        {/* ============================================================ */}
+        {/* FIELD REGISTRATION MODAL */}
+        {/* ============================================================ */}
+        {isRegisterModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+              <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Assisted Household Field Registration</h3>
+                  <p className="text-xs text-slate-500">Register a family directly into your ASHA jurisdiction.</p>
+                </div>
+                <button
+                  onClick={() => setIsRegisterModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleRegisterSubmit} className="p-6 space-y-4 text-xs">
+                {registerError && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 font-medium">
+                    {registerError}
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">Head of Household Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={registerForm.headOfHouseholdName}
+                    onChange={(e) => setRegisterForm({ ...registerForm, headOfHouseholdName: e.target.value })}
+                    placeholder="e.g. Ramesh Gowda"
+                    className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">Head Age *</label>
+                    <input
+                      type="number"
+                      required
+                      min={18}
+                      max={120}
+                      value={registerForm.headAge || 35}
+                      onChange={(e) => setRegisterForm({ ...registerForm, headAge: Number(e.target.value) })}
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">Head Gender *</label>
+                    <select
+                      value={registerForm.headGender || "female"}
+                      onChange={(e) => setRegisterForm({ ...registerForm, headGender: e.target.value as any })}
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300 bg-white"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">Income Category *</label>
+                    <select
+                      value={registerForm.incomeCategory}
+                      onChange={(e) => setRegisterForm({ ...registerForm, incomeCategory: e.target.value as IncomeCategory })}
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300 bg-white"
+                    >
+                      <option value="BPL">BPL (Below Poverty Line)</option>
+                      <option value="AAY">Antyodaya (AAY)</option>
+                      <option value="APL">APL (Above Poverty Line)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">Ration Card Number</label>
+                    <input
+                      type="text"
+                      value={registerForm.rationCardNumber || ""}
+                      onChange={(e) => setRegisterForm({ ...registerForm, rationCardNumber: e.target.value })}
+                      placeholder="e.g. RC-KA-9901"
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">District *</label>
+                    <input
+                      type="text"
+                      required
+                      value={registerForm.district}
+                      onChange={(e) => setRegisterForm({ ...registerForm, district: e.target.value })}
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700">Village / Locality</label>
+                    <input
+                      type="text"
+                      value={registerForm.village || ""}
+                      onChange={(e) => setRegisterForm({ ...registerForm, village: e.target.value })}
+                      placeholder="e.g. Hosahalli"
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsRegisterModalOpen(false)}
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={registerSubmitting}
+                    className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+                  >
+                    {registerSubmitting ? "Registering..." : "Complete Registration"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Phase 8 Assistant Drawer (Pre-scoped to current case if selected) */}
         <HealthcareAssistantDrawer
           isOpen={isAssistantOpen}
           onClose={() => setIsAssistantOpen(false)}
           userRole="ASHA"
+          caseId={selectedCaseId || undefined}
         />
       </AuthenticatedShell>
     </ProtectedRoute>

@@ -112,7 +112,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const result = await fastify.userService.getOrCreateUser(
-      request.user!,
+      request.user as any,
       { displayName, phoneNumber },
       verification.role
     );

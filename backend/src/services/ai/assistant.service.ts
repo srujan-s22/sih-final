@@ -16,6 +16,7 @@ import {
 import { UserRole } from "../../../../shared/types/auth.js";
 import { Scheme } from "../../../../shared/types/eligibility.js";
 import { EvidenceRecord } from "../../../../shared/types/evidence.js";
+import { CaseRepository } from "../../repositories/case.repository.js";
 
 interface RateLimitRecord {
   count: number;
@@ -34,7 +35,8 @@ export class AssistantService {
     private schemeRepo: SchemeRepository,
     private evidenceRepo: EvidenceRepository,
     private aiContextBuilder: AIContextBuilder,
-    private geminiService: GeminiService
+    private geminiService: GeminiService,
+    private caseRepo?: CaseRepository
   ) {}
 
   /**
@@ -113,6 +115,34 @@ export class AssistantService {
           members
         );
         guidance = await this.guidanceService.getCitizenGuidance(authenticatedUserUid);
+      }
+    } else if (userRole === "ASHA" && request.caseId && this.caseRepo) {
+      // ASHA query scoped to specific authorized assigned case
+      const c = await this.caseRepo.getCaseById(request.caseId.trim());
+      if (c && c.assignedAshaUid === authenticatedUserUid) {
+        household = await this.householdRepo.getHouseholdById(c.householdId);
+        if (household) {
+          members = await this.householdRepo.getMembers(household.id);
+          eligibilityResults = await this.eligibilityService.evaluateHouseholdForSchemes(
+            household,
+            members
+          );
+          guidance = await this.guidanceService.getCitizenGuidance(c.householdId);
+        }
+      }
+    } else if (userRole === "ADMIN" && request.caseId && this.caseRepo) {
+      // ADMIN query scoped to specific case
+      const c = await this.caseRepo.getCaseById(request.caseId.trim());
+      if (c) {
+        household = await this.householdRepo.getHouseholdById(c.householdId);
+        if (household) {
+          members = await this.householdRepo.getMembers(household.id);
+          eligibilityResults = await this.eligibilityService.evaluateHouseholdForSchemes(
+            household,
+            members
+          );
+          guidance = await this.guidanceService.getCitizenGuidance(c.householdId);
+        }
       }
     }
 

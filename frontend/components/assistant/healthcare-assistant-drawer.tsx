@@ -32,6 +32,7 @@ export interface HealthcareAssistantDrawerProps {
   userRole?: UserRole;
   initialPrompt?: string;
   schemeId?: string;
+  caseId?: string;
 }
 
 interface ChatEntry extends AssistantMessage {
@@ -54,6 +55,7 @@ export function HealthcareAssistantDrawer({
   userRole = "CITIZEN",
   initialPrompt,
   schemeId,
+  caseId,
 }: HealthcareAssistantDrawerProps) {
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -151,6 +153,7 @@ export function HealthcareAssistantDrawer({
         conversationHistory: historyPayload,
         language,
         schemeId: schemeId || null,
+        caseId: caseId || null,
         conversationId: conversationId || null,
       });
 

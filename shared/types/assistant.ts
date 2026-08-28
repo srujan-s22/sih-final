@@ -30,6 +30,7 @@ export interface AssistantChatRequest {
   conversationHistory?: AssistantMessage[];
   language?: "en" | "hi" | "kn";
   schemeId?: string | null;
+  caseId?: string | null;
   conversationId?: string | null;
 }
 

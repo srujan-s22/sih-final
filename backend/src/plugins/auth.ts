@@ -19,6 +19,8 @@ import { IntelligenceService } from "../services/ai/intelligence.service.js";
 import { PrivilegedAuthService } from "../services/privileged-auth.service.js";
 import { GeminiService } from "../services/ai/gemini.service.js";
 import { AssistantService } from "../services/ai/assistant.service.js";
+import { CaseRepository } from "../repositories/case.repository.js";
+import { CaseService } from "../services/case.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -28,6 +30,8 @@ declare module "fastify" {
     privilegedAuthService: PrivilegedAuthService;
     householdRepository: HouseholdRepository;
     householdService: HouseholdService;
+    caseRepository: CaseRepository;
+    caseService: CaseService;
     schemeRepository: SchemeRepository;
     schemeService: SchemeService;
     eligibilityService: EligibilityService;
@@ -44,7 +48,12 @@ declare module "fastify" {
   }
 
   interface FastifyRequest {
-    user: admin.auth.DecodedIdToken | null;
+    user: {
+      uid: string;
+      email?: string;
+      role?: string;
+      [key: string]: unknown;
+    } | null;
     userProfile: UserProfile | null;
   }
 }
@@ -55,11 +64,13 @@ declare module "fastify" {
  */
 const authPlugin: FastifyPluginAsync = async (fastify) => {
   // Initialize repositories and services
-  const userRepository = new UserRepository(fastify.firestore);
+  const firestoreInstance = (fastify as any).firestore || null;
+  const userRepository = new UserRepository(firestoreInstance);
   const userService = new UserService(userRepository);
-  const householdRepository = new HouseholdRepository(fastify.firestore);
+  const householdRepository = new HouseholdRepository(firestoreInstance);
   const householdService = new HouseholdService(householdRepository);
-  const schemeRepository = new SchemeRepository(fastify.firestore);
+  const caseRepository = new CaseRepository(firestoreInstance);
+  const schemeRepository = new SchemeRepository(firestoreInstance);
   const schemeService = new SchemeService(schemeRepository);
   const eligibilityService = new EligibilityService(schemeRepository, householdRepository);
   const guidanceService = new GuidanceService(
@@ -67,9 +78,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     eligibilityService,
     schemeRepository
   );
-  const evidenceRepository = new EvidenceRepository(fastify.firestore);
+  const caseService = new CaseService(caseRepository, householdRepository, eligibilityService, guidanceService);
+  const evidenceRepository = new EvidenceRepository(firestoreInstance);
   const evidenceService = new EvidenceService(evidenceRepository, schemeRepository);
-  const aiCacheRepository = new AICacheRepository(fastify.firestore);
+  const aiCacheRepository = new AICacheRepository(firestoreInstance);
   const aiContextBuilder = new AIContextBuilder();
   const lyzrService = new LyzrService();
   const intelligenceService = new IntelligenceService(
@@ -91,7 +103,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     schemeRepository,
     evidenceRepository,
     aiContextBuilder,
-    geminiService
+    geminiService,
+    caseRepository
   );
 
   const privilegedAuthService = new PrivilegedAuthService();
@@ -101,6 +114,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("privilegedAuthService", privilegedAuthService);
   fastify.decorate("householdRepository", householdRepository);
   fastify.decorate("householdService", householdService);
+  fastify.decorate("caseRepository", caseRepository);
+  fastify.decorate("caseService", caseService);
   fastify.decorate("schemeRepository", schemeRepository);
   fastify.decorate("schemeService", schemeService);
   fastify.decorate("eligibilityService", eligibilityService);

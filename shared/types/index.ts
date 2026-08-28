@@ -9,3 +9,4 @@ export type { FollowUp, ActionResolution } from "./actions.js";
 export * from "./guidance.js";
 export * from "./ai.js";
 export * from "./assistant.js";
+export * from "./case.js";

@@ -19,6 +19,7 @@ export const AssistantChatRequestSchema = z.object({
   conversationHistory: z.array(AssistantMessageSchema).max(10).optional().default([]),
   language: AssistantLanguageSchema.optional().default("en"),
   schemeId: z.string().max(100).optional().nullable(),
+  caseId: z.string().max(100).optional().nullable(),
   conversationId: z.string().max(100).optional().nullable(),
 });
 
