@@ -10,3 +10,4 @@ export * from "./guidance.js";
 export * from "./ai.js";
 export * from "./assistant.js";
 export * from "./case.js";
+export * from "./connection.js";

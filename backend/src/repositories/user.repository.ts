@@ -38,6 +38,51 @@ export class UserRepository extends BaseFirestoreRepository<UserProfile> {
     }
   }
 
+  public async getUserByServiceCode(serviceCode: string): Promise<UserProfile | null> {
+    const formatted = serviceCode.trim().toUpperCase();
+    if (!this.hasLiveFirestore()) {
+      for (const u of this.memoryStore.values()) {
+        if (u.role === "ASHA" && u.ashaServiceCode?.toUpperCase() === formatted) {
+          return { ...u };
+        }
+      }
+      return null;
+    }
+
+    try {
+      const snapshot = await this.getCollection()
+        .where("role", "==", "ASHA")
+        .where("ashaServiceCode", "==", formatted)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return null;
+      }
+      return snapshot.docs[0].data() as UserProfile;
+    } catch {
+      for (const u of this.memoryStore.values()) {
+        if (u.role === "ASHA" && u.ashaServiceCode?.toUpperCase() === formatted) {
+          return { ...u };
+        }
+      }
+      return null;
+    }
+  }
+
+  public async listAshaUsers(): Promise<UserProfile[]> {
+    if (!this.hasLiveFirestore()) {
+      return Array.from(this.memoryStore.values()).filter((u) => u.role === "ASHA");
+    }
+
+    try {
+      const snapshot = await this.getCollection().where("role", "==", "ASHA").get();
+      return snapshot.docs.map((d) => d.data() as UserProfile);
+    } catch {
+      return Array.from(this.memoryStore.values()).filter((u) => u.role === "ASHA");
+    }
+  }
+
   public async createUserProfile(profile: UserProfile): Promise<UserProfile> {
     if (!this.hasLiveFirestore()) {
       this.memoryStore.set(profile.uid, { ...profile });

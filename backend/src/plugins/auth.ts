@@ -21,6 +21,8 @@ import { GeminiService } from "../services/ai/gemini.service.js";
 import { AssistantService } from "../services/ai/assistant.service.js";
 import { CaseRepository } from "../repositories/case.repository.js";
 import { CaseService } from "../services/case.service.js";
+import { ConnectionRepository } from "../repositories/connection.repository.js";
+import { ConnectionService } from "../services/connection.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -32,6 +34,8 @@ declare module "fastify" {
     householdService: HouseholdService;
     caseRepository: CaseRepository;
     caseService: CaseService;
+    connectionRepository: ConnectionRepository;
+    connectionService: ConnectionService;
     schemeRepository: SchemeRepository;
     schemeService: SchemeService;
     eligibilityService: EligibilityService;
@@ -78,7 +82,21 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     eligibilityService,
     schemeRepository
   );
-  const caseService = new CaseService(caseRepository, householdRepository, eligibilityService, guidanceService);
+  const connectionRepository = new ConnectionRepository(firestoreInstance);
+  const caseService = new CaseService(
+    caseRepository,
+    householdRepository,
+    eligibilityService,
+    guidanceService,
+    userRepository,
+    connectionRepository
+  );
+  const connectionService = new ConnectionService(
+    connectionRepository,
+    userRepository,
+    householdRepository,
+    caseRepository
+  );
   const evidenceRepository = new EvidenceRepository(firestoreInstance);
   const evidenceService = new EvidenceService(evidenceRepository, schemeRepository);
   const aiCacheRepository = new AICacheRepository(firestoreInstance);
@@ -116,6 +134,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("householdService", householdService);
   fastify.decorate("caseRepository", caseRepository);
   fastify.decorate("caseService", caseService);
+  fastify.decorate("connectionRepository", connectionRepository);
+  fastify.decorate("connectionService", connectionService);
   fastify.decorate("schemeRepository", schemeRepository);
   fastify.decorate("schemeService", schemeService);
   fastify.decorate("eligibilityService", eligibilityService);

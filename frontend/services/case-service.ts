@@ -33,7 +33,7 @@ export class CaseServiceClient {
     if (filter?.search) params.append("search", filter.search);
 
     const qs = params.toString();
-    const endpoint = `/v1/asha/cases${qs ? `?${qs}` : ""}`;
+    const endpoint = `/api/v1/asha/cases${qs ? `?${qs}` : ""}`;
     return apiClient.get<{ cases: AshaCase[] }>(endpoint);
   }
 
@@ -41,14 +41,14 @@ export class CaseServiceClient {
    * Retrieves summary caseload metrics
    */
   public async getSummary(): Promise<ApiResult<CaseSummaryResponse>> {
-    return apiClient.get<CaseSummaryResponse>("/v1/asha/cases/summary");
+    return apiClient.get<CaseSummaryResponse>("/api/v1/asha/cases/summary");
   }
 
   /**
    * Retrieves aggregated case detail (household, deterministic eligibility, gaps, notes, follow-ups, activities)
    */
   public async getCaseDetail(caseId: string): Promise<ApiResult<CaseDetailResponse>> {
-    return apiClient.get<CaseDetailResponse>(`/v1/asha/cases/${encodeURIComponent(caseId)}`);
+    return apiClient.get<CaseDetailResponse>(`/api/v1/asha/cases/${encodeURIComponent(caseId)}`);
   }
 
   /**
@@ -59,7 +59,7 @@ export class CaseServiceClient {
     updates: UpdateCaseInput
   ): Promise<ApiResult<{ case: AshaCase }>> {
     return apiClient.patch<{ case: AshaCase }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}`,
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}`,
       updates
     );
   }
@@ -72,7 +72,7 @@ export class CaseServiceClient {
     content: string
   ): Promise<ApiResult<{ note: CaseNote }>> {
     return apiClient.post<{ note: CaseNote }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}/notes`,
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/notes`,
       { content }
     );
   }
@@ -82,7 +82,7 @@ export class CaseServiceClient {
    */
   public async getNotes(caseId: string): Promise<ApiResult<{ notes: CaseNote[] }>> {
     return apiClient.get<{ notes: CaseNote[] }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}/notes`
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/notes`
     );
   }
 
@@ -94,7 +94,7 @@ export class CaseServiceClient {
     input: CreateCaseFollowUpInput
   ): Promise<ApiResult<{ followUp: CaseFollowUp }>> {
     return apiClient.post<{ followUp: CaseFollowUp }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups`,
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups`,
       input
     );
   }
@@ -108,7 +108,7 @@ export class CaseServiceClient {
     updates: UpdateCaseFollowUpInput
   ): Promise<ApiResult<{ followUp: CaseFollowUp }>> {
     return apiClient.patch<{ followUp: CaseFollowUp }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}`,
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}`,
       updates
     );
   }
@@ -120,7 +120,7 @@ export class CaseServiceClient {
     caseId: string
   ): Promise<ApiResult<{ activities: CaseActivity[] }>> {
     return apiClient.get<{ activities: CaseActivity[] }>(
-      `/v1/asha/cases/${encodeURIComponent(caseId)}/activities`
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/activities`
     );
   }
 
@@ -131,7 +131,7 @@ export class CaseServiceClient {
     input: FieldRegistrationInput
   ): Promise<ApiResult<{ case: AshaCase; household: Household }>> {
     return apiClient.post<{ case: AshaCase; household: Household }>(
-      "/v1/asha/cases",
+      "/api/v1/asha/cases",
       input
     );
   }

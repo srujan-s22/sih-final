@@ -30,6 +30,11 @@ export class UserService {
       if (assignedRole && (assignedRole === "ASHA" || assignedRole === "ADMIN") && existing.role !== assignedRole) {
         updates.role = assignedRole;
       }
+      // Ensure ASHA worker has service code
+      if ((existing.role === "ASHA" || assignedRole === "ASHA") && !existing.ashaServiceCode) {
+        updates.ashaServiceCode = this.generateAshaCode();
+        if (!existing.serviceArea) updates.serviceArea = "Field Jurisdiction";
+      }
 
       let user = existing;
       if (Object.keys(updates).length > 0) {
@@ -43,15 +48,18 @@ export class UserService {
 
     // Brand new user registration: Role is verified assignedRole or defaults to CITIZEN
     const now = new Date().toISOString();
+    const effectiveRole = assignedRole || DEFAULT_USER_ROLE;
     const newUser: UserProfile = {
       uid: token.uid,
       email: token.email || "",
       displayName: metadata?.displayName || token.name || null,
       phoneNumber: metadata?.phoneNumber || token.phone_number || null,
-      role: assignedRole || DEFAULT_USER_ROLE,
+      role: effectiveRole,
       consentStatus: "pending",
       consentVersion: null,
       consentedAt: null,
+      ashaServiceCode: effectiveRole === "ASHA" ? this.generateAshaCode() : null,
+      serviceArea: effectiveRole === "ASHA" ? "Field Jurisdiction" : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -62,6 +70,15 @@ export class UserService {
       isNewUser: true,
       isConsentRequired: true,
     };
+  }
+
+  private generateAshaCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let randomPart = "";
+    for (let i = 0; i < 4; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `ASHA-KA-${randomPart}`;
   }
 
   /**

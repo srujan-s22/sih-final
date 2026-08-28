@@ -3,6 +3,8 @@ import { CaseService, CaseServiceError } from "../src/services/case.service.js";
 import { CaseRepository } from "../src/repositories/case.repository.js";
 import { HouseholdRepository } from "../src/repositories/household.repository.js";
 import { SchemeRepository } from "../src/repositories/scheme.repository.js";
+import { UserRepository } from "../src/repositories/user.repository.js";
+import { ConnectionRepository } from "../src/repositories/connection.repository.js";
 import { EligibilityService } from "../src/services/eligibility/eligibility.service.js";
 import { GuidanceService } from "../src/services/guidance/guidance.service.js";
 import { seedSchemeRegistry } from "../src/services/eligibility/scheme-seed.js";
@@ -12,6 +14,8 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
   let caseRepo: CaseRepository;
   let householdRepo: HouseholdRepository;
   let schemeRepo: SchemeRepository;
+  let userRepo: UserRepository;
+  let connectionRepo: ConnectionRepository;
   let eligibilityService: EligibilityService;
   let guidanceService: GuidanceService;
   let caseService: CaseService;
@@ -72,14 +76,30 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
     caseRepo = new CaseRepository(null);
     householdRepo = new HouseholdRepository(null);
     schemeRepo = new SchemeRepository(null);
+    userRepo = new UserRepository(null);
+    connectionRepo = new ConnectionRepository(null);
 
     caseRepo.clearMemoryStore();
     householdRepo.clearMemoryStore();
     schemeRepo.clearMemoryStore();
+    userRepo.clearMemoryStore();
+    connectionRepo.clearMemoryStore();
+
+    await userRepo.createUserProfile(ashaProfileA);
+    await userRepo.createUserProfile(ashaProfileB);
+    await userRepo.createUserProfile(citizenProfile);
+    await userRepo.createUserProfile(adminProfile);
 
     eligibilityService = new EligibilityService(schemeRepo, householdRepo);
     guidanceService = new GuidanceService(householdRepo, eligibilityService, schemeRepo);
-    caseService = new CaseService(caseRepo, householdRepo, eligibilityService, guidanceService);
+    caseService = new CaseService(
+      caseRepo,
+      householdRepo,
+      eligibilityService,
+      guidanceService,
+      userRepo,
+      connectionRepo
+    );
 
     await seedSchemeRegistry(schemeRepo, true);
   });
@@ -383,6 +403,30 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
         statusCode: 403,
       })
     );
+
+    // Admin cannot assign case to non-existent user
+    await expect(
+      caseService.assignCaseToAsha(hh.id, "nonexistent-user-999", adminProfile)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "USER_NOT_FOUND",
+        statusCode: 404,
+      })
+    );
+
+    // Admin cannot assign case to a Citizen
+    await expect(
+      caseService.assignCaseToAsha(hh.id, citizenProfile.uid, adminProfile)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "INVALID_TARGET_ROLE",
+        statusCode: 400,
+      })
+    );
+
+    // Admin successfully reassigns to ASHA B
+    const reassignedCase = await caseService.assignCaseToAsha(hh.id, ashaProfileB.uid, adminProfile);
+    expect(reassignedCase.assignedAshaUid).toBe(ashaProfileB.uid);
   });
 
   it("10. Field Registration ignores spoofed assignedAshaUid and enforces caller's authenticated UID", async () => {

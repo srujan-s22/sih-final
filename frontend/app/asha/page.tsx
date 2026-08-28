@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
+import { useAuth } from "@/lib/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import {
   Users,
@@ -18,8 +19,14 @@ import {
   Activity,
   X,
   Send,
+  Copy,
+  Check,
+  UserPlus,
+  Inbox,
+  Link2,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
+import { connectionService } from "@/services/connection-service";
 import {
   AshaCase,
   CaseDetailResponse,
@@ -28,10 +35,12 @@ import {
   CasePriority,
   FieldRegistrationInput,
 } from "@shared/types/case";
+import { AshaConnectionRequest } from "@shared/types/connection";
 import { IncomeCategory } from "@shared/types/household";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
 export default function AshaWorkspacePage() {
+  const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,6 +48,11 @@ export default function AshaWorkspacePage() {
   // Caseload Data
   const [cases, setCases] = useState<AshaCase[]>([]);
   const [summary, setSummary] = useState<CaseSummaryResponse | null>(null);
+
+  // Connection Requests Data
+  const [connectionRequests, setConnectionRequests] = useState<AshaConnectionRequest[]>([]);
+  const [isRequestsLoading, setIsRequestsLoading] = useState(false);
+  const [copiedServiceCode, setCopiedServiceCode] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,9 +118,63 @@ export default function AshaWorkspacePage() {
     }
   }, []);
 
+  // Load Pending Connection Requests
+  const loadPendingRequests = useCallback(async () => {
+    setIsRequestsLoading(true);
+    try {
+      const res = await connectionService.listPendingRequestsForAsha();
+      if (res.success && res.data) {
+        setConnectionRequests(res.data.requests);
+      }
+    } catch {
+      // Non-blocking
+    } finally {
+      setIsRequestsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadCaseload();
-  }, [loadCaseload]);
+    loadPendingRequests();
+  }, [loadCaseload, loadPendingRequests]);
+
+  // Handle Accept Connection Request
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      const res = await connectionService.acceptConnectionRequest(requestId);
+      if (res.success) {
+        setRegisterSuccess("Household connection accepted and added to your caseload.");
+        await Promise.all([loadCaseload(), loadPendingRequests()]);
+      } else {
+        setErrorMessage((res as any).error?.message || "Failed to accept connection request.");
+      }
+    } catch {
+      setErrorMessage("Failed to accept connection request.");
+    }
+  };
+
+  // Handle Reject Connection Request
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      const res = await connectionService.rejectConnectionRequest(requestId);
+      if (res.success) {
+        setRegisterSuccess("Connection request declined.");
+        await loadPendingRequests();
+      } else {
+        setErrorMessage((res as any).error?.message || "Failed to reject connection request.");
+      }
+    } catch {
+      setErrorMessage("Failed to reject connection request.");
+    }
+  };
+
+  const copyServiceCode = () => {
+    if (userProfile?.ashaServiceCode) {
+      navigator.clipboard.writeText(userProfile.ashaServiceCode);
+      setCopiedServiceCode(true);
+      setTimeout(() => setCopiedServiceCode(false), 2000);
+    }
+  };
 
   // Load Case Detail
   const openCaseDetail = async (caseId: string) => {
@@ -250,6 +318,7 @@ export default function AshaWorkspacePage() {
   const navTabs = [
     { id: "overview", label: "Overview", icon: Activity },
     { id: "cases", label: "Caseload", icon: Users },
+    { id: "requests", label: `Requests (${connectionRequests.length})`, icon: Inbox },
     { id: "attention", label: "Needs Attention", icon: AlertCircle },
     { id: "followups", label: "Follow-ups", icon: Clock },
   ];
@@ -284,6 +353,21 @@ export default function AshaWorkspacePage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
+            {userProfile?.ashaServiceCode && (
+              <button
+                onClick={copyServiceCode}
+                title="Click to copy your unique ASHA Service Code"
+                className="hidden sm:flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer font-mono"
+              >
+                <span className="text-[10px] font-semibold text-slate-400 font-sans uppercase">Code:</span>
+                <span className="font-bold text-slate-900">{userProfile.ashaServiceCode}</span>
+                {copiedServiceCode ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 ml-0.5" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                )}
+              </button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -683,6 +767,120 @@ export default function AshaWorkspacePage() {
                         <Button variant="outline" size="sm" className="text-xs font-semibold">
                           View Case <ChevronRight className="w-3 h-3 ml-1" />
                         </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5 — CONNECTION REQUESTS */}
+            {activeTab === "requests" && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Inbox className="w-5 h-5 text-emerald-700" />
+                      <span>Household Connection Requests</span>
+                      <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+                        {connectionRequests.length} Pending
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Citizens who entered your ASHA Service Code to link their households for doorstep healthcare guidance.
+                    </p>
+                  </div>
+
+                  {userProfile?.ashaServiceCode && (
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">
+                      <span className="text-[11px] font-semibold text-slate-500">Your Shareable ID:</span>
+                      <span className="text-xs font-mono font-bold text-slate-900">{userProfile.ashaServiceCode}</span>
+                      <button
+                        onClick={copyServiceCode}
+                        className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold flex items-center gap-1 ml-1 cursor-pointer"
+                      >
+                        {copiedServiceCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {connectionRequests.length === 0 ? (
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8">
+                    <Inbox className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-base font-bold text-slate-800">No Pending Requests</h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+                      When families in your assigned area enter your Service Code <span className="font-mono font-bold text-slate-700">{userProfile?.ashaServiceCode || "ASHA-KA-XXXX"}</span>, their requests will appear here for one-click verification and enrollment.
+                    </p>
+                    {userProfile?.ashaServiceCode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyServiceCode}
+                        className="text-xs"
+                      >
+                        {copiedServiceCode ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600 mr-1" /> Copied Code!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 mr-1" /> Copy Shareable Service ID
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {connectionRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-3.5 flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-slate-900">{req.headOfHouseholdName}</h4>
+                                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                  {req.incomeCategory}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500">
+                                {req.district}, {req.state} • {req.memberCount} member{req.memberCount === 1 ? "" : "s"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(req.requestedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          {req.responseNote && (
+                            <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 italic">
+                              "{req.responseNote}"
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRejectRequest(req.id)}
+                            className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold"
+                          >
+                            Decline
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleAcceptRequest(req.id)}
+                            className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                          >
+                            <Check className="w-3.5 h-3.5 mr-1" /> Accept & Add to Caseload
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -96,11 +96,12 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
       query = query.where("priority", "==", filter.priority);
     }
 
-    const snapshot = await query.orderBy("updatedAt", "desc").get();
-    return snapshot.docs.map((doc) => ({
+    const snapshot = await query.get();
+    const cases = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...(doc.data() as Omit<AshaCase, "id">),
     }));
+    return cases.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
   public async listAllCases(
@@ -125,11 +126,12 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
       query = query.where("priority", "==", filter.priority);
     }
 
-    const snapshot = await query.orderBy("updatedAt", "desc").get();
-    return snapshot.docs.map((doc) => ({
+    const snapshot = await query.get();
+    const cases = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...(doc.data() as Omit<AshaCase, "id">),
     }));
+    return cases.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
   public async createCase(caseData: AshaCase): Promise<AshaCase> {

@@ -249,6 +249,20 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
     });
     const householdId = regRes.json().data.household.id;
 
+    // Seed target ASHA worker in userRepository
+    await app.userRepository.createUserProfile({
+      uid: "new-asha-uid-999",
+      email: "newasha999@test.gov.in",
+      role: "ASHA",
+      displayName: "ASHA Meena",
+      phoneNumber: null,
+      consentStatus: "accepted",
+      consentVersion: "1.0",
+      consentedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     // Admin lists all platform cases
     const adminListRes = await app.inject({
       method: "GET",
@@ -258,7 +272,19 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
     expect(adminListRes.statusCode).toBe(HTTP_STATUS.OK);
     expect(adminListRes.json().data.cases.length).toBeGreaterThan(0);
 
-    // Admin reassigns case
+    // Admin cannot assign to non-existent user
+    const badAssignRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/cases/assign",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        householdId,
+        ashaUid: "completely-nonexistent-user",
+      },
+    });
+    expect(badAssignRes.statusCode).toBe(HTTP_STATUS.NOT_FOUND);
+
+    // Admin reassigns case to valid ASHA
     const assignRes = await app.inject({
       method: "POST",
       url: "/api/v1/admin/cases/assign",

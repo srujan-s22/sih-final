@@ -29,7 +29,11 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResult<T>> {
-    const url = `${this.baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+    let cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    if (cleanEndpoint.startsWith("/v1/")) {
+      cleanEndpoint = `/api${cleanEndpoint}`;
+    }
+    const url = `${this.baseUrl}${cleanEndpoint}`;
     const correlationId = this.generateCorrelationId();
 
     const headers: Record<string, string> = {

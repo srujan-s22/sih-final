@@ -19,6 +19,8 @@ import {
 } from "../../../shared/schemas/case.schema.js";
 import { CaseRepository } from "../repositories/case.repository.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
+import { UserRepository } from "../repositories/user.repository.js";
+import { ConnectionRepository } from "../repositories/connection.repository.js";
 import { EligibilityService } from "./eligibility/eligibility.service.js";
 import { GuidanceService } from "./guidance/guidance.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
@@ -40,7 +42,9 @@ export class CaseService {
     private caseRepo: CaseRepository,
     private householdRepo: HouseholdRepository,
     private eligibilityService: EligibilityService,
-    private guidanceService: GuidanceService
+    private guidanceService: GuidanceService,
+    private userRepo?: UserRepository,
+    private connectionRepo?: ConnectionRepository
   ) {}
 
   /**
@@ -550,6 +554,36 @@ export class CaseService {
         HTTP_STATUS.NOT_FOUND,
         "HOUSEHOLD_NOT_FOUND"
       );
+    }
+
+    // Validate target ASHA user
+    if (this.userRepo) {
+      const targetUser = await this.userRepo.getUserById(ashaUid);
+      if (!targetUser) {
+        throw new CaseServiceError(
+          `Target user with UID '${ashaUid}' does not exist.`,
+          HTTP_STATUS.NOT_FOUND,
+          "USER_NOT_FOUND"
+        );
+      }
+      if (targetUser.role !== "ASHA") {
+        throw new CaseServiceError(
+          `Target user '${ashaUid}' has role '${targetUser.role}'. Cases can only be assigned to users with the ASHA role.`,
+          HTTP_STATUS.BAD_REQUEST,
+          "INVALID_TARGET_ROLE"
+        );
+      }
+    }
+
+    // Synchronize active connection request if repository is provided
+    if (this.connectionRepo) {
+      const activeConn = await this.connectionRepo.getActiveRequestByHouseholdId(householdId);
+      if (activeConn && activeConn.ashaUid !== ashaUid) {
+        await this.connectionRepo.updateRequest(activeConn.id, {
+          status: "REVOKED",
+          responseNote: `Reassigned to ASHA worker ${ashaUid} by Administrator.`,
+        });
+      }
     }
 
     const existingCase = await this.caseRepo.getCaseByHouseholdId(householdId);

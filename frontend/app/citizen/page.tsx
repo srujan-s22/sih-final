@@ -22,6 +22,11 @@ import { GuidanceResponse } from "@shared/types/guidance";
 import { householdService } from "@/services/household-service";
 import { eligibilityService } from "@/services/eligibility-service";
 import { guidanceService } from "@/services/guidance-service";
+import { connectionService } from "@/services/connection-service";
+import {
+  AshaPublicDirectoryInfo,
+  CitizenConnectionStatusResponse,
+} from "@shared/types/connection";
 import {
   Users,
   ShieldCheck,
@@ -43,6 +48,10 @@ import {
   Layers,
   Sparkles,
   Bot,
+  QrCode,
+  Link2,
+  UserCheck,
+  Clock3,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -98,6 +107,15 @@ export default function CitizenPage() {
   });
   const [householdSubmitting, setHouseholdSubmitting] = useState(false);
   const [householdFormError, setHouseholdFormError] = useState<string | null>(null);
+
+  // ASHA Connection State
+  const [connectionStatus, setConnectionStatus] = useState<CitizenConnectionStatusResponse | null>(null);
+  const [serviceCodeInput, setServiceCodeInput] = useState("");
+  const [resolvedAsha, setResolvedAsha] = useState<AshaPublicDirectoryInfo | null>(null);
+  const [isResolvingAsha, setIsResolvingAsha] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
 
   // Member Modal State
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
@@ -310,10 +328,73 @@ export default function CitizenPage() {
     }
   };
 
+  // Load ASHA Connection Status
+  const loadConnectionStatus = useCallback(async () => {
+    try {
+      const res = await connectionService.getCitizenConnectionStatus();
+      if (res.success && res.data) {
+        setConnectionStatus(res.data);
+      }
+    } catch {
+      // Non-blocking
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConnectionStatus();
+  }, [loadConnectionStatus]);
+
+  // Handle ASHA Lookup by Service Code
+  const handleLookupAsha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceCodeInput.trim()) return;
+    setConnectionError(null);
+    setIsResolvingAsha(true);
+
+    try {
+      const res = await connectionService.resolveAshaServiceCode(serviceCodeInput);
+      if (res.success) {
+        setResolvedAsha(res.data);
+        setIsConnectionModalOpen(true);
+      } else {
+        setConnectionError(res.error.message || "ASHA worker not found. Please verify the service code.");
+      }
+    } catch {
+      setConnectionError("Failed to lookup ASHA service code. Please try again.");
+    } finally {
+      setIsResolvingAsha(false);
+    }
+  };
+
+  // Handle Confirm Connection Request
+  const handleConfirmConnection = async () => {
+    if (!resolvedAsha) return;
+    setConnectionError(null);
+    setIsConnecting(true);
+
+    try {
+      const res = await connectionService.requestConnection(resolvedAsha.serviceCode);
+      if (res.success) {
+        setSuccessMessage(`Connection request sent to ${resolvedAsha.displayName}. Awaiting worker confirmation.`);
+        setIsConnectionModalOpen(false);
+        setServiceCodeInput("");
+        setResolvedAsha(null);
+        await loadConnectionStatus();
+      } else {
+        setConnectionError(res.error.message || "Failed to submit connection request.");
+      }
+    } catch {
+      setConnectionError("Failed to submit connection request. Please try again.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   const navTabs = [
     { id: "overview", label: "Overview", icon: Users },
     { id: "household", label: "My Household", icon: MapPin },
     { id: "family", label: "Family Members", icon: Users },
+    { id: "asha-connection", label: "My ASHA Worker", icon: UserCheck },
     { id: "support", label: "Healthcare Support", icon: ShieldCheck },
     { id: "actions", label: "Next Steps", icon: FileCheck },
   ];
@@ -642,12 +723,146 @@ export default function CitizenPage() {
               )}
             </section>
 
-            {/* SECTION 3 — HEALTHCARE SUPPORT (MOST IMPORTANT) */}
+            {/* SECTION — MY ASSIGNED ASHA WORKER */}
+            <section id="asha-connection" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>3. Connect with Your ASHA Worker</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Connect your household with your local Accredited Social Health Activist (ASHA) for doorstep guidance and assistance.
+                  </p>
+                </div>
+              </div>
+
+              {connectionError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs sm:text-sm text-rose-800 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <p className="flex-1">{connectionError}</p>
+                </div>
+              )}
+
+              {/* STATE A: ACTIVE CONNECTION */}
+              {connectionStatus?.status === "ACTIVE" && connectionStatus.asha && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 sm:p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-100">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <UserCheck className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-slate-900">
+                            {connectionStatus.asha.displayName}
+                          </h3>
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                            Active ASHA Connection
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {connectionStatus.asha.serviceArea || "Field Jurisdiction"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-emerald-200 self-start sm:self-auto">
+                      <span className="text-[11px] font-semibold text-slate-500">Service Code:</span>
+                      <span className="text-xs font-mono font-bold text-slate-800">
+                        {connectionStatus.asha.serviceCode}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-600 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Your family profile is actively linked. Your ASHA worker can assist with doorstep enrollment and scheme facilitation.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* STATE B: PENDING REQUEST */}
+              {connectionStatus?.status === "PENDING" && connectionStatus.asha && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-5 sm:p-6 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <Clock3 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          Connection Request Sent to {connectionStatus.asha.displayName}
+                        </h4>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                          Awaiting Worker Confirmation
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Service Code: <span className="font-mono font-semibold">{connectionStatus.asha.serviceCode}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 pt-1">
+                        Your connection will become active once your ASHA worker reviews and accepts the request.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STATE C: NONE OR REJECTED (FORM TO CONNECT) */}
+              {(connectionStatus?.status === "NONE" || connectionStatus?.status === "REJECTED" || !connectionStatus) && (
+                <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 space-y-4">
+                  {connectionStatus?.status === "REJECTED" && (
+                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+                      Previous connection request was not accepted. You can enter a new Service Code provided by your local ASHA worker below.
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Link with your local ASHA worker
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Ask your village or ward ASHA worker for their unique 10-character Service Code (e.g. <span className="font-mono font-semibold">ASHA-KA-7K42</span>).
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleLookupAsha} className="flex flex-col sm:flex-row gap-3 max-w-lg">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="e.g. ASHA-KA-7K42"
+                        value={serviceCodeInput}
+                        onChange={(e) => setServiceCodeInput(e.target.value.toUpperCase())}
+                        className="font-mono uppercase text-sm tracking-wider"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      disabled={isResolvingAsha || !serviceCodeInput.trim() || !household}
+                      className="text-xs font-semibold whitespace-nowrap"
+                    >
+                      {isResolvingAsha ? "Looking up..." : "Look Up ASHA"}
+                    </Button>
+                  </form>
+
+                  {!household && (
+                    <p className="text-[11px] text-amber-700">
+                      * Please set up your household profile above before connecting with an ASHA worker.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* SECTION 4 — HEALTHCARE SUPPORT (MOST IMPORTANT) */}
             <section id="support" className="space-y-4 scroll-mt-24">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    3. Healthcare Support Identified
+                    4. Healthcare Support Identified
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500">
                     Verified entitlement pathways based on official government rules.
@@ -1082,6 +1297,73 @@ export default function CitizenPage() {
               {removeSubmitting ? "Removing..." : "Confirm Remove"}
             </Button>
           </div>
+        </Modal>
+
+        {/* Modal: Confirm ASHA Connection */}
+        <Modal
+          isOpen={isConnectionModalOpen}
+          onClose={() => {
+            setIsConnectionModalOpen(false);
+            setResolvedAsha(null);
+          }}
+          title="Confirm ASHA Connection"
+          description="Please review the details of the ASHA worker who will be linked to your family."
+        >
+          {resolvedAsha && (
+            <div className="space-y-4 pt-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-sm">
+                    {resolvedAsha.displayName.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{resolvedAsha.displayName}</h4>
+                    <p className="text-xs text-slate-500">{resolvedAsha.serviceArea || "Field Jurisdiction"}</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Service Code</span>
+                    <span className="font-mono font-bold text-slate-800">{resolvedAsha.serviceCode}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Assigned Area</span>
+                    <span className="text-slate-700">{resolvedAsha.serviceArea || "Village Jurisdiction"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-teal-50/70 rounded-lg border border-teal-200 text-xs text-teal-800 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                <span>
+                  By requesting connection, this verified ASHA worker will be notified and can assist your household with official doorstep health access.
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsConnectionModalOpen(false);
+                    setResolvedAsha(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleConfirmConnection}
+                  disabled={isConnecting}
+                  className="font-semibold"
+                >
+                  {isConnecting ? "Sending Request..." : "Request Connection"}
+                </Button>
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* Floating Healthcare Assistant Trigger */}

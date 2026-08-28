@@ -21,6 +21,8 @@ export interface UserProfile {
   consentStatus: ConsentStatus;
   consentVersion: string | null;
   consentedAt: string | null;
+  ashaServiceCode?: string | null;
+  serviceArea?: string | null;
   createdAt: string;
   updatedAt: string;
 }
