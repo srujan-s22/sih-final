@@ -42,7 +42,9 @@ import {
   Info,
   Layers,
   Sparkles,
+  Bot,
 } from "lucide-react";
+import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
 const INCOME_OPTIONS: Array<{ value: IncomeCategory; label: string }> = [
   { value: "BPL", label: "Below Poverty Line (BPL)" },
@@ -316,6 +318,8 @@ export default function CitizenPage() {
     { id: "actions", label: "Next Steps", icon: FileCheck },
   ];
 
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+
   return (
     <ProtectedRoute allowedRoles={["CITIZEN"]}>
       <AuthenticatedShell
@@ -325,6 +329,15 @@ export default function CitizenPage() {
         navTabs={navTabs}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAssistantOpen(true)}
+              className="text-xs flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 shadow-2xs font-semibold"
+            >
+              <Bot className="w-3.5 h-3.5 text-teal-700" />
+              <span>Ask Assistant</span>
+            </Button>
             {household && (
               <Button
                 variant="outline"
@@ -1070,6 +1083,23 @@ export default function CitizenPage() {
             </Button>
           </div>
         </Modal>
+
+        {/* Floating Healthcare Assistant Trigger */}
+        <button
+          onClick={() => setIsAssistantOpen(true)}
+          aria-label="Open SwasthyaSetu Healthcare Assistant"
+          className="fixed bottom-6 right-6 z-40 bg-teal-800 hover:bg-teal-900 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 border border-teal-700 cursor-pointer"
+        >
+          <Bot className="w-4 h-4 text-teal-200" />
+          <span>Ask Assistant</span>
+        </button>
+
+        {/* SwasthyaSetu Healthcare Assistant Drawer */}
+        <HealthcareAssistantDrawer
+          isOpen={isAssistantOpen}
+          onClose={() => setIsAssistantOpen(false)}
+          userRole="CITIZEN"
+        />
       </AuthenticatedShell>
     </ProtectedRoute>
   );

@@ -36,7 +36,9 @@ import {
   Eye,
   Clock,
   HeartHandshake,
+  Bot,
 } from "lucide-react";
+import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
 const INCOME_OPTIONS: Array<{ value: IncomeCategory; label: string }> = [
   { value: "BPL", label: "Below Poverty Line (BPL)" },
@@ -56,6 +58,7 @@ export default function AshaPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<Household | null>(null);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   // Field Onboarding Modal State
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -162,18 +165,29 @@ export default function AshaPage() {
           }
         }}
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setRegisterError(null);
-              setIsRegisterModalOpen(true);
-            }}
-            className="text-xs font-semibold flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Register Household</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAssistantOpen(true)}
+              className="text-xs font-semibold flex items-center gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-50 shadow-2xs"
+            >
+              <Bot className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Field Assistant</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setRegisterError(null);
+                setIsRegisterModalOpen(true);
+              }}
+              className="text-xs font-semibold flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Register Household</span>
+            </Button>
+          </div>
         }
       >
         {/* Success Alert */}
@@ -576,6 +590,13 @@ export default function AshaPage() {
             </div>
           </div>
         </Modal>
+
+        {/* SwasthyaSetu ASHA Field Assistant Drawer */}
+        <HealthcareAssistantDrawer
+          isOpen={isAssistantOpen}
+          onClose={() => setIsAssistantOpen(false)}
+          userRole="ASHA"
+        />
       </AuthenticatedShell>
     </ProtectedRoute>
   );

@@ -1,7 +1,7 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import * as admin from "firebase-admin";
-import { UserProfile } from "../../../shared/types/auth.js";
+import { UserProfile, UserRole } from "../../../shared/types/auth.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { UserService } from "../services/user.service.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
@@ -17,6 +17,8 @@ import { AIContextBuilder } from "../services/ai/ai-context-builder.js";
 import { LyzrService } from "../services/ai/lyzr.service.js";
 import { IntelligenceService } from "../services/ai/intelligence.service.js";
 import { PrivilegedAuthService } from "../services/privileged-auth.service.js";
+import { GeminiService } from "../services/ai/gemini.service.js";
+import { AssistantService } from "../services/ai/assistant.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -36,6 +38,8 @@ declare module "fastify" {
     aiContextBuilder: AIContextBuilder;
     lyzrService: LyzrService;
     intelligenceService: IntelligenceService;
+    geminiService: GeminiService;
+    assistantService: AssistantService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -79,6 +83,17 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     lyzrService
   );
 
+  const geminiService = new GeminiService();
+  const assistantService = new AssistantService(
+    householdRepository,
+    eligibilityService,
+    guidanceService,
+    schemeRepository,
+    evidenceRepository,
+    aiContextBuilder,
+    geminiService
+  );
+
   const privilegedAuthService = new PrivilegedAuthService();
 
   fastify.decorate("userRepository", userRepository);
@@ -96,6 +111,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("aiContextBuilder", aiContextBuilder);
   fastify.decorate("lyzrService", lyzrService);
   fastify.decorate("intelligenceService", intelligenceService);
+  fastify.decorate("geminiService", geminiService);
+  fastify.decorate("assistantService", assistantService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 

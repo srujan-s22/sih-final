@@ -24,7 +24,9 @@ import {
   Settings,
   Lock,
   RefreshCw,
+  Bot,
 } from "lucide-react";
+import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
 export default function AdminPage() {
   const { userProfile } = useAuth();
@@ -39,6 +41,7 @@ export default function AdminPage() {
   const [selectedSchemeId, setSelectedSchemeId] = useState<string>("ab-pmjay");
   const [schemeEvidence, setSchemeEvidence] = useState<EvidenceRecord[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   // Load Admin Data
   const loadAdminData = useCallback(async () => {
@@ -115,15 +118,26 @@ export default function AdminPage() {
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadAdminData}
-            className="text-xs flex items-center gap-1.5"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh Telemetry</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAssistantOpen(true)}
+              className="text-xs font-semibold flex items-center gap-1.5 border-slate-300 text-slate-800 hover:bg-slate-50 shadow-2xs"
+            >
+              <Bot className="w-3.5 h-3.5 text-slate-700" />
+              <span>Admin Assistant</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadAdminData}
+              className="text-xs flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh Telemetry</span>
+            </Button>
+          </div>
         }
       >
         {isLoading ? (
@@ -372,6 +386,13 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        {/* SwasthyaSetu Administrative Assistant Drawer */}
+        <HealthcareAssistantDrawer
+          isOpen={isAssistantOpen}
+          onClose={() => setIsAssistantOpen(false)}
+          userRole="ADMIN"
+        />
       </AuthenticatedShell>
     </ProtectedRoute>
   );
