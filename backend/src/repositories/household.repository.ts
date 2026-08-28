@@ -243,6 +243,25 @@ export class HouseholdRepository extends BaseFirestoreRepository<Household> {
   }
 
   /**
+   * Deletes a household document and in-memory references (for test cleanup)
+   */
+  public async deleteHousehold(householdId: string): Promise<boolean> {
+    if (this.isUnitTestMode()) {
+      this.memoryMembers.delete(householdId);
+      return this.memoryHouseholds.delete(householdId);
+    }
+
+    const docRef = this.getCollection().doc(householdId);
+    const existing = await docRef.get();
+    if (!existing.exists) {
+      return false;
+    }
+
+    await docRef.delete();
+    return true;
+  }
+
+  /**
    * Utility for test cleanup
    */
   public clearMemoryStore(): void {

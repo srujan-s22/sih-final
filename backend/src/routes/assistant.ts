@@ -3,6 +3,7 @@ import { requireAuth, requireConsent } from "../plugins/guards.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { AssistantChatRequestSchema } from "../../../shared/schemas/assistant.schema.js";
 import { GeminiProviderError } from "../services/ai/gemini.service.js";
+import { AssistantServiceError } from "../services/ai/assistant.service.js";
 
 export const assistantRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -77,6 +78,14 @@ export const assistantRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error({ correlationId, err }, "Assistant chat generation failed");
 
         if (err instanceof GeminiProviderError) {
+          return reply.status(err.statusCode).send({
+            success: false,
+            code: err.code,
+            message: err.message,
+          });
+        }
+
+        if (err instanceof AssistantServiceError) {
           return reply.status(err.statusCode).send({
             success: false,
             code: err.code,

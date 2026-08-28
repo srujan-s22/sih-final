@@ -236,4 +236,145 @@ describe("Phase 8: AssistantService Orchestration & Grounding Tests", () => {
       })
     );
   });
+
+  it("8. rejects unauthorized case context request for ASHA worker and makes ZERO calls to Gemini", async () => {
+    const caseRepo = new (await import("../src/repositories/case.repository.js")).CaseRepository(null as any);
+    const caseAssistantService = new AssistantService(
+      householdRepo,
+      eligibilityService,
+      guidanceService,
+      schemeRepo,
+      evidenceRepo,
+      aiContextBuilder,
+      geminiService,
+      caseRepo
+    );
+
+    // Create case assigned to asha-worker-A
+    await caseRepo.createCase({
+      id: "case-asha-A",
+      householdId: "hh-test-1",
+      assignedAshaUid: "asha-worker-A",
+      headOfHouseholdName: "Ramesh Kumar",
+      district: "Bengaluru",
+      state: "Karnataka",
+      incomeCategory: "BPL",
+      memberCount: 1,
+      status: "ACTIVE",
+      priority: "NORMAL",
+      detectedGapsCount: 0,
+      eligibleSchemesCount: 0,
+      lastContactAt: null,
+      nextFollowUpAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    // asha-worker-B attempts to query case-asha-A
+    await expect(
+      caseAssistantService.chat({
+        authenticatedUserUid: "asha-worker-B",
+        userRole: "ASHA",
+        request: {
+          message: "Tell me about this family's healthcare gaps",
+          caseId: "case-asha-A",
+        },
+      })
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "CASE_ACCESS_DENIED",
+        statusCode: 404,
+      })
+    );
+
+    // CRITICAL SECURITY INVARIANT: Zero Gemini API calls made on unauthorized case request
+    expect(generateSpy).not.toHaveBeenCalled();
+  });
+
+  it("9. rejects case context query from Citizen with 403 and makes ZERO calls to Gemini", async () => {
+    const caseRepo = new (await import("../src/repositories/case.repository.js")).CaseRepository(null as any);
+    const caseAssistantService = new AssistantService(
+      householdRepo,
+      eligibilityService,
+      guidanceService,
+      schemeRepo,
+      evidenceRepo,
+      aiContextBuilder,
+      geminiService,
+      caseRepo
+    );
+
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    await expect(
+      caseAssistantService.chat({
+        authenticatedUserUid: mockUid,
+        userRole: "CITIZEN",
+        request: {
+          message: "What is in case 123?",
+          caseId: "case-arbitrary-123",
+        },
+      })
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "FORBIDDEN_ROLE",
+        statusCode: 403,
+      })
+    );
+
+    // CRITICAL SECURITY INVARIANT: Zero Gemini API calls made
+    expect(generateSpy).not.toHaveBeenCalled();
+  });
+
+  it("10. allows authorized case context query for assigned ASHA worker", async () => {
+    const caseRepo = new (await import("../src/repositories/case.repository.js")).CaseRepository(null as any);
+    const caseAssistantService = new AssistantService(
+      householdRepo,
+      eligibilityService,
+      guidanceService,
+      schemeRepo,
+      evidenceRepo,
+      aiContextBuilder,
+      geminiService,
+      caseRepo
+    );
+
+    await caseRepo.createCase({
+      id: "case-auth-10",
+      householdId: "hh-test-1",
+      assignedAshaUid: "asha-worker-A",
+      headOfHouseholdName: "Ramesh Kumar",
+      district: "Bengaluru",
+      state: "Karnataka",
+      incomeCategory: "BPL",
+      memberCount: 1,
+      status: "ACTIVE",
+      priority: "NORMAL",
+      detectedGapsCount: 0,
+      eligibleSchemesCount: 0,
+      lastContactAt: null,
+      nextFollowUpAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const res = await caseAssistantService.chat({
+      authenticatedUserUid: "asha-worker-A",
+      userRole: "ASHA",
+      request: {
+        message: "Explain what schemes this assigned family can receive",
+        caseId: "case-auth-10",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    expect(res.reply).toBeDefined();
+  });
 });

@@ -17,6 +17,18 @@ import { UserRole } from "../../../../shared/types/auth.js";
 import { Scheme } from "../../../../shared/types/eligibility.js";
 import { EvidenceRecord } from "../../../../shared/types/evidence.js";
 import { CaseRepository } from "../../repositories/case.repository.js";
+import { HTTP_STATUS } from "../../config/constants.js";
+
+export class AssistantServiceError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 400,
+    public code: string = "ASSISTANT_ERROR"
+  ) {
+    super(message);
+    this.name = "AssistantServiceError";
+  }
+}
 
 interface RateLimitRecord {
   count: number;
@@ -107,6 +119,13 @@ export class AssistantService {
     let guidance: any = null;
 
     if (userRole === "CITIZEN") {
+      if (request.caseId) {
+        throw new AssistantServiceError(
+          "Citizens cannot query arbitrary case IDs.",
+          HTTP_STATUS.FORBIDDEN,
+          "FORBIDDEN_ROLE"
+        );
+      }
       household = await this.householdRepo.getHouseholdByOwnerUid(authenticatedUserUid);
       if (household) {
         members = await this.householdRepo.getMembers(household.id);
@@ -116,10 +135,23 @@ export class AssistantService {
         );
         guidance = await this.guidanceService.getCitizenGuidance(authenticatedUserUid);
       }
-    } else if (userRole === "ASHA" && request.caseId && this.caseRepo) {
-      // ASHA query scoped to specific authorized assigned case
-      const c = await this.caseRepo.getCaseById(request.caseId.trim());
-      if (c && c.assignedAshaUid === authenticatedUserUid) {
+    } else if (userRole === "ASHA") {
+      if (request.caseId) {
+        if (!this.caseRepo) {
+          throw new AssistantServiceError(
+            "Case repository unavailable.",
+            HTTP_STATUS.SERVICE_UNAVAILABLE,
+            "SERVICE_UNAVAILABLE"
+          );
+        }
+        const c = await this.caseRepo.getCaseById(request.caseId.trim());
+        if (!c || c.assignedAshaUid !== authenticatedUserUid) {
+          throw new AssistantServiceError(
+            "Case not found or access denied.",
+            HTTP_STATUS.NOT_FOUND,
+            "CASE_ACCESS_DENIED"
+          );
+        }
         household = await this.householdRepo.getHouseholdById(c.householdId);
         if (household) {
           members = await this.householdRepo.getMembers(household.id);
@@ -130,19 +162,30 @@ export class AssistantService {
           guidance = await this.guidanceService.getCitizenGuidance(c.householdId);
         }
       }
-    } else if (userRole === "ADMIN" && request.caseId && this.caseRepo) {
-      // ADMIN query scoped to specific case
+    } else if (userRole === "ADMIN" && request.caseId) {
+      if (!this.caseRepo) {
+        throw new AssistantServiceError(
+          "Case repository unavailable.",
+          HTTP_STATUS.SERVICE_UNAVAILABLE,
+          "SERVICE_UNAVAILABLE"
+        );
+      }
       const c = await this.caseRepo.getCaseById(request.caseId.trim());
-      if (c) {
-        household = await this.householdRepo.getHouseholdById(c.householdId);
-        if (household) {
-          members = await this.householdRepo.getMembers(household.id);
-          eligibilityResults = await this.eligibilityService.evaluateHouseholdForSchemes(
-            household,
-            members
-          );
-          guidance = await this.guidanceService.getCitizenGuidance(c.householdId);
-        }
+      if (!c) {
+        throw new AssistantServiceError(
+          "Case not found.",
+          HTTP_STATUS.NOT_FOUND,
+          "CASE_NOT_FOUND"
+        );
+      }
+      household = await this.householdRepo.getHouseholdById(c.householdId);
+      if (household) {
+        members = await this.householdRepo.getMembers(household.id);
+        eligibilityResults = await this.eligibilityService.evaluateHouseholdForSchemes(
+          household,
+          members
+        );
+        guidance = await this.guidanceService.getCitizenGuidance(c.householdId);
       }
     }
 

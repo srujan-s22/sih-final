@@ -384,4 +384,110 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
       })
     );
   });
+
+  it("10. Field Registration ignores spoofed assignedAshaUid and enforces caller's authenticated UID", async () => {
+    const maliciousPayload: any = {
+      headOfHouseholdName: "Spoof Test Family",
+      headAge: 40,
+      headGender: "male",
+      incomeCategory: "BPL",
+      state: "Karnataka",
+      district: "Bengaluru",
+      village: "Locality",
+      pincode: "560001",
+      assignedAshaUid: "evil-asha-attacker-999", // Client attempts to hijack assignment
+    };
+
+    const regResult = await caseService.createFieldEnrollmentCase(maliciousPayload, ashaProfileA);
+
+    // Invariant: Assignment must strictly match the authenticated ASHA worker
+    expect(regResult.case.assignedAshaUid).toBe(ashaProfileA.uid);
+    expect(regResult.case.assignedAshaUid).not.toBe("evil-asha-attacker-999");
+  });
+
+  it("11. Citizen is strictly rejected from performing field registrations", async () => {
+    await expect(
+      caseService.createFieldEnrollmentCase(
+        {
+          headOfHouseholdName: "Citizen Created",
+          incomeCategory: "BPL",
+          state: "Karnataka",
+          district: "Bengaluru",
+          village: "Locality",
+          pincode: "560001",
+        },
+        citizenProfile
+      )
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "FORBIDDEN_ROLE",
+        statusCode: 403,
+      })
+    );
+  });
+
+  it("12. IDOR: Cross-ASHA worker cannot read notes, follow-ups, or activities of unassigned case", async () => {
+    const testCase = await caseRepo.createCase({
+      id: "case-locked-A",
+      householdId: "hh-locked-A",
+      assignedAshaUid: ashaProfileA.uid,
+      headOfHouseholdName: "Locked Family",
+      district: "District 1",
+      state: "Karnataka",
+      incomeCategory: "BPL",
+      memberCount: 2,
+      status: "ACTIVE",
+      priority: "NORMAL",
+      detectedGapsCount: 0,
+      eligibleSchemesCount: 0,
+      lastContactAt: null,
+      nextFollowUpAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Worker B attempts to read notes
+    await expect(
+      caseService.getCaseNotes(testCase.id, ashaProfileB)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "CASE_NOT_FOUND",
+        statusCode: 404,
+      })
+    );
+
+    // Worker B attempts to read activities
+    await expect(
+      caseService.getCaseActivities(testCase.id, ashaProfileB)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "CASE_NOT_FOUND",
+        statusCode: 404,
+      })
+    );
+
+    // Worker B attempts to add note
+    await expect(
+      caseService.addCaseNote(testCase.id, { content: "Malicious note" }, ashaProfileB)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "CASE_NOT_FOUND",
+        statusCode: 404,
+      })
+    );
+
+    // Worker B attempts to schedule follow-up
+    await expect(
+      caseService.createFollowUp(
+        testCase.id,
+        { scheduledAt: "2026-09-01T00:00:00.000Z", reason: "Malicious follow-up" },
+        ashaProfileB
+      )
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "CASE_NOT_FOUND",
+        statusCode: 404,
+      })
+    );
+  });
 });
