@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import {
   getClientAuth,
@@ -27,7 +27,13 @@ export interface AuthContextType {
   error: string | null;
   clearError: () => void;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string, displayName?: string) => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    pass: string,
+    displayName?: string,
+    requestedRole?: UserRole,
+    registrationSecret?: string
+  ) => Promise<UserProfile>;
   signInWithGoogle: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   submitConsent: (accepted: boolean) => Promise<void>;
@@ -45,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [isConsentRequired, setIsConsentRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isExplicitRegistrationActiveRef = useRef(false);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -78,6 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        // If an explicit registration (signUpWithEmail) is in progress, skip generic sync
+        // because signUpWithEmail will authoritatively call /register with role and secrets.
+        if (isExplicitRegistrationActiveRef.current) {
+          return;
+        }
+
         try {
           // Sync user profile idempotently on the backend
           const syncRes = await authService.syncUser({
@@ -93,12 +106,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (syncErr) {
           console.error("User profile sync error:", syncErr);
+        } finally {
+          setIsLoading(false);
         }
       } else {
         setUserProfile(null);
         setIsConsentRequired(false);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     // Register 401 callback with api client
@@ -114,25 +129,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
-      await authSignInWithEmail(email, pass);
+      const firebaseUser = await authSignInWithEmail(email, pass);
+      setUser(firebaseUser);
+      const syncRes = await authService.syncUser({
+        displayName: firebaseUser.displayName,
+        phoneNumber: firebaseUser.phoneNumber,
+      });
+      if (syncRes.success) {
+        setUserProfile(syncRes.data.user);
+        setIsConsentRequired(syncRes.data.isConsentRequired);
+      }
     } catch (err: unknown) {
       setIsLoading(false);
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const signUpWithEmail = useCallback(async (email: string, pass: string, displayName?: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const newUser = await authSignUpWithEmail(email, pass);
-      await authService.syncUser({ displayName: displayName || null });
-      await refreshProfile();
-    } catch (err: unknown) {
-      setIsLoading(false);
-      throw err;
-    }
-  }, [refreshProfile]);
+  const signUpWithEmail = useCallback(
+    async (
+      email: string,
+      pass: string,
+      displayName?: string,
+      requestedRole: UserRole = "CITIZEN",
+      registrationSecret?: string
+    ) => {
+      setIsLoading(true);
+      setError(null);
+      isExplicitRegistrationActiveRef.current = true;
+      let createdFirebaseUser: User | null = null;
+      try {
+        // STEP 1: PRE-VALIDATE AUTHORIZATION BEFORE CREATING FIREBASE AUTH USER
+        if (requestedRole !== "CITIZEN") {
+          const prevalRes = await authService.prevalidateRole(
+            requestedRole,
+            registrationSecret || null
+          );
+          if (!prevalRes.success) {
+            throw new Error(
+              prevalRes.error?.message ||
+                "Staff registration could not be completed. Please verify your authorization code."
+            );
+          }
+        }
+
+        // STEP 2: ONLY AFTER AUTHORIZATION SUCCEEDS, CREATE FIREBASE ACCOUNT
+        createdFirebaseUser = await authSignUpWithEmail(email, pass);
+        setUser(createdFirebaseUser);
+
+        // STEP 3: SYNCHRONIZE & ATTACH AUTHORITATIVE ROLE ON BACKEND
+        const syncRes = await authService.registerUser({
+          displayName: displayName || null,
+          requestedRole,
+          registrationSecret: registrationSecret || null,
+        });
+
+        if (!syncRes.success) {
+          // If backend registration fails after Firebase user creation, roll back!
+          if (createdFirebaseUser) {
+            try {
+              await createdFirebaseUser.delete();
+            } catch (delErr) {
+              console.warn("Failed to roll back Firebase user after registration failure:", delErr);
+            }
+            setUser(null);
+            setUserProfile(null);
+          }
+          throw new Error(
+            syncRes.error?.message ||
+              "Staff registration could not be completed. Please verify your authorization code."
+          );
+        }
+
+        setUserProfile(syncRes.data.user);
+        setIsConsentRequired(syncRes.data.isConsentRequired);
+        return syncRes.data.user;
+      } catch (err: unknown) {
+        setIsLoading(false);
+        throw err;
+      } finally {
+        isExplicitRegistrationActiveRef.current = false;
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   const signInWithGoogle = useCallback(async () => {
     setIsLoading(true);
@@ -187,8 +269,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchDevIdentity = useCallback(async (devRole: UserRole) => {
     setIsLoading(true);
     try {
-      // In dev mode, configure test token provider
-      apiClient.setTokenProvider(async () => `test_token_devuser_${devRole.toLowerCase()}`);
+      const devUid = `dev-${devRole.toLowerCase()}-user`;
+      apiClient.setTokenProvider(async () => `test_token_${devUid}_${devRole.toLowerCase()}`);
       const syncRes = await authService.syncUser({
         displayName: `Test ${devRole} User`,
       });

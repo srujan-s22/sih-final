@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
-import { Shell } from "@/components/layout/shell";
+import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -23,7 +23,6 @@ import { householdService } from "@/services/household-service";
 import { eligibilityService } from "@/services/eligibility-service";
 import { guidanceService } from "@/services/guidance-service";
 import {
-  Home,
   Users,
   ShieldCheck,
   Plus,
@@ -38,10 +37,11 @@ import {
   HeartPulse,
   ChevronDown,
   ChevronUp,
-  Sparkles,
   FileCheck,
   ArrowRight,
   Info,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 
 const INCOME_OPTIONS: Array<{ value: IncomeCategory; label: string }> = [
@@ -76,13 +76,14 @@ export default function CitizenPage() {
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [eligibilityResults, setEligibilityResults] = useState<EligibilityResult[]>([]);
+  const [guidance, setGuidance] = useState<GuidanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Household Form State
-  const [isEditingHousehold, setIsEditingHousehold] = useState(false);
+  // Household Modal / Form State
+  const [isHouseholdModalOpen, setIsHouseholdModalOpen] = useState(false);
   const [householdForm, setHouseholdForm] = useState<CreateHouseholdInput>({
     headOfHouseholdName: "",
     rationCardNumber: "",
@@ -105,6 +106,7 @@ export default function CitizenPage() {
     gender: "female",
     relationship: "Spouse",
     disabilityStatus: false,
+    maternalStatus: "none",
     chronicConditions: [],
   });
   const [memberSubmitting, setMemberSubmitting] = useState(false);
@@ -114,11 +116,8 @@ export default function CitizenPage() {
   const [removingMember, setRemovingMember] = useState<Member | null>(null);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
 
-  // Scheme Details Disclosure State
+  // Expanded Accordion State
   const [expandedSchemeId, setExpandedSchemeId] = useState<string | null>(null);
-
-  // Healthcare Access Guidance State (Phase 5)
-  const [guidance, setGuidance] = useState<GuidanceResponse | null>(null);
 
   // Load Eligibility Evaluation & Guidance Plan
   const loadEligibility = useCallback(async () => {
@@ -136,7 +135,7 @@ export default function CitizenPage() {
         setGuidance(guideRes.data);
       }
     } catch {
-      // Non-blocking for portal view
+      // Non-blocking
     } finally {
       setIsEvaluating(false);
     }
@@ -163,7 +162,6 @@ export default function CitizenPage() {
             contactPhone: res.data.household.contactPhone || "",
           });
 
-          // Fetch deterministic scheme evaluations and guidance
           await loadEligibility();
         } else {
           setHousehold(null);
@@ -193,45 +191,43 @@ export default function CitizenPage() {
 
     try {
       if (household) {
-        // Update
         const res = await householdService.updateHousehold(householdForm);
         if (res.success) {
           setHousehold(res.data.household);
-          setIsEditingHousehold(false);
+          setIsHouseholdModalOpen(false);
           setSuccessMessage("Household details updated successfully.");
           await loadEligibility();
         } else {
           setHouseholdFormError(res.error.message);
         }
       } else {
-        // Create
         const res = await householdService.createHousehold(householdForm);
         if (res.success) {
           setHousehold(res.data.household);
-          setIsEditingHousehold(false);
+          setIsHouseholdModalOpen(false);
           setSuccessMessage("Household profile created successfully.");
           await loadEligibility();
         } else {
           setHouseholdFormError(res.error.message);
         }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save household.";
-      setHouseholdFormError(msg);
+    } catch {
+      setHouseholdFormError("Failed to save household details. Please try again.");
     } finally {
       setHouseholdSubmitting(false);
     }
   };
 
-  // Open Member Modal for Create
+  // Open Member Modal for Add
   const handleOpenAddMember = () => {
     setEditingMemberId(null);
     setMemberForm({
       fullName: "",
-      age: 18,
-      gender: "female",
+      age: 25,
+      gender: "male",
       relationship: "Spouse",
       disabilityStatus: false,
+      maternalStatus: "none",
       chronicConditions: [],
     });
     setMemberFormError(null);
@@ -239,65 +235,59 @@ export default function CitizenPage() {
   };
 
   // Open Member Modal for Edit
-  const handleOpenEditMember = (member: Member) => {
-    setEditingMemberId(member.id);
+  const handleOpenEditMember = (m: Member) => {
+    setEditingMemberId(m.id);
     setMemberForm({
-      fullName: member.fullName,
-      age: member.age,
-      gender: member.gender,
-      relationship: member.relationship,
-      disabilityStatus: member.disabilityStatus,
-      chronicConditions: member.chronicConditions,
+      fullName: m.fullName,
+      age: m.age,
+      gender: m.gender,
+      relationship: m.relationship,
+      disabilityStatus: m.disabilityStatus,
+      maternalStatus: m.maternalStatus || "none",
+      chronicConditions: m.chronicConditions || [],
     });
     setMemberFormError(null);
     setIsMemberModalOpen(true);
   };
 
-  // Handle Member Submit (Add or Edit)
+  // Handle Member Submit
   const handleMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMemberFormError(null);
     setMemberSubmitting(true);
 
-    const payload: CreateMemberInput = {
-      ...memberForm,
-      age: Number(memberForm.age),
-      chronicConditions: memberForm.chronicConditions || [],
-    };
-
     try {
       if (editingMemberId) {
-        const res = await householdService.updateMember(editingMemberId, payload);
+        const res = await householdService.updateMember(editingMemberId, memberForm);
         if (res.success) {
           setMembers((prev) =>
-            prev.map((m) => (m.id === editingMemberId ? res.data.member : m))
+            prev.map((item) => (item.id === editingMemberId ? res.data.member : item))
           );
           setIsMemberModalOpen(false);
-          setSuccessMessage("Member details updated.");
+          setSuccessMessage("Family member details updated.");
           await loadEligibility();
         } else {
           setMemberFormError(res.error.message);
         }
       } else {
-        const res = await householdService.addMember(payload);
+        const res = await householdService.addMember(memberForm);
         if (res.success) {
           setMembers((prev) => [...prev, res.data.member]);
           setIsMemberModalOpen(false);
-          setSuccessMessage("Family member added.");
+          setSuccessMessage("Family member added successfully.");
           await loadEligibility();
         } else {
           setMemberFormError(res.error.message);
         }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save member.";
-      setMemberFormError(msg);
+    } catch {
+      setMemberFormError("Failed to save family member. Please check fields.");
     } finally {
       setMemberSubmitting(false);
     }
   };
 
-  // Handle Member Delete
+  // Handle Remove Member
   const handleConfirmRemoveMember = async () => {
     if (!removingMember) return;
     setRemoveSubmitting(true);
@@ -306,883 +296,781 @@ export default function CitizenPage() {
       if (res.success) {
         setMembers((prev) => prev.filter((m) => m.id !== removingMember.id));
         setRemovingMember(null);
-        setSuccessMessage("Member removed from household.");
+        setSuccessMessage("Family member removed.");
         await loadEligibility();
+      } else {
+        setError(res.error.message);
       }
     } catch {
-      setError("Failed to remove member. Please try again.");
+      setError("Failed to delete member.");
     } finally {
       setRemoveSubmitting(false);
     }
   };
 
-  const citizenDisplayName =
-    userProfile?.displayName || userProfile?.email?.split("@")[0] || "Citizen";
-
-  const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
-
-  if (isLoading) {
-    return (
-      <ProtectedRoute allowedRoles={["CITIZEN", "ASHA", "ADMIN"]}>
-        <Shell className="py-12">
-          <LoadingState message="Loading your household information..." />
-        </Shell>
-      </ProtectedRoute>
-    );
-  }
+  const navTabs = [
+    { id: "overview", label: "Overview", icon: Users },
+    { id: "household", label: "My Household", icon: MapPin },
+    { id: "family", label: "Family Members", icon: Users },
+    { id: "support", label: "Healthcare Support", icon: ShieldCheck },
+    { id: "actions", label: "Next Steps", icon: FileCheck },
+  ];
 
   return (
-    <ProtectedRoute allowedRoles={["CITIZEN", "ASHA", "ADMIN"]}>
-      <Shell className="py-6 sm:py-8 space-y-6 sm:space-y-8 max-w-4xl">
-        {/* Top Greeting & Action Purpose */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                Welcome, {citizenDisplayName}
-              </h1>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">
-              Let&apos;s make sure your household can access the healthcare support it may be eligible for.
-            </p>
-          </div>
-
-          {/* Setup Progress Summary Chips */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                household
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  : "bg-amber-50 text-amber-800 border-amber-200"
-              }`}
-            >
-              {household ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Household Set Up</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Setup Needed</span>
-                </>
-              )}
-            </span>
-
+    <ProtectedRoute allowedRoles={["CITIZEN"]}>
+      <AuthenticatedShell
+        role="CITIZEN"
+        title={`Welcome, ${userProfile?.displayName || "Citizen"}`}
+        description="Let's check what official government healthcare schemes your family may be eligible for."
+        navTabs={navTabs}
+        actions={
+          <div className="flex items-center gap-2">
             {household && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
-                <Users className="w-3.5 h-3.5 text-teal-700" />
-                <span>
-                  {members.length} {members.length === 1 ? "Member" : "Members"}
-                </span>
-              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadEligibility}
+                disabled={isEvaluating}
+                className="text-xs"
+              >
+                {isEvaluating ? "Evaluating..." : "Re-check Eligibility"}
+              </Button>
             )}
-          </div>
-        </div>
-
-        {/* Global Feedback Notifications */}
-        {error && (
-          <div
-            role="alert"
-            className="p-3.5 text-xs sm:text-sm text-rose-800 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
-          >
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{error}</span>
-            </div>
             <Button
+              variant="primary"
               size="sm"
-              variant="outline"
-              onClick={loadHouseholdData}
-              className="h-7 text-xs shrink-0"
+              onClick={() => {
+                if (!household) {
+                  setHouseholdFormError(null);
+                  setIsHouseholdModalOpen(true);
+                } else {
+                  handleOpenAddMember();
+                }
+              }}
+              className="text-xs font-semibold"
             >
-              Try again
+              {!household ? "Set Up Household" : "+ Add Member"}
             </Button>
           </div>
-        )}
-
-        {successMessage && (
-          <div
-            role="status"
-            className="p-3.5 text-xs sm:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{successMessage}</span>
+        }
+      >
+        {/* Banner Alert Messages */}
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs sm:text-sm text-rose-800 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold">Error</p>
+              <p className="mt-0.5">{error}</p>
             </div>
             <button
-              type="button"
-              onClick={() => setSuccessMessage(null)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs shrink-0 p-1"
+              onClick={() => setError(null)}
+              className="text-xs text-rose-600 hover:text-rose-900 font-semibold"
             >
               Dismiss
             </button>
           </div>
         )}
 
-        {/* TASK 1: YOUR HOUSEHOLD */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
-                <Home className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                  Task 1
-                </span>
-                <h2 className="text-base font-bold text-slate-900">Your household</h2>
-              </div>
+        {successMessage && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-xs sm:text-sm text-emerald-800 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold">{successMessage}</p>
             </div>
-
-            {household && !isEditingHousehold && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditingHousehold(true)}
-                className="h-8 text-xs px-3 flex items-center gap-1.5"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Edit</span>
-              </Button>
-            )}
-          </div>
-
-          {!household && !isEditingHousehold ? (
-            /* Empty State */
-            <div className="py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <p className="text-xs sm:text-sm text-slate-600 max-w-md">
-                Add your household details to discover which healthcare schemes your family may qualify for.
-              </p>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setIsEditingHousehold(true)}
-                className="shrink-0 font-semibold"
-              >
-                Set up household
-              </Button>
-            </div>
-          ) : isEditingHousehold ? (
-            /* Form: Create or Edit */
-            <form onSubmit={handleHouseholdSubmit} className="space-y-4 pt-1">
-              {householdFormError && (
-                <div
-                  role="alert"
-                  className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md"
-                >
-                  {householdFormError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Head of Household"
-                  placeholder="e.g. Ramesh Kumar"
-                  value={householdForm.headOfHouseholdName}
-                  onChange={(e) =>
-                    setHouseholdForm({
-                      ...householdForm,
-                      headOfHouseholdName: e.target.value,
-                    })
-                  }
-                  required
-                />
-
-                <Input
-                  label="Ration Card Number"
-                  placeholder="e.g. RC-BR-2026-1002"
-                  value={householdForm.rationCardNumber}
-                  onChange={(e) =>
-                    setHouseholdForm({
-                      ...householdForm,
-                      rationCardNumber: e.target.value,
-                    })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Select
-                  label="Income Category"
-                  options={INCOME_OPTIONS}
-                  value={householdForm.incomeCategory}
-                  onChange={(e) =>
-                    setHouseholdForm({
-                      ...householdForm,
-                      incomeCategory: e.target.value as IncomeCategory,
-                    })
-                  }
-                  required
-                />
-
-                <Input
-                  label="Contact Phone (Optional)"
-                  type="tel"
-                  placeholder="10-digit mobile number"
-                  value={householdForm.contactPhone || ""}
-                  onChange={(e) =>
-                    setHouseholdForm({ ...householdForm, contactPhone: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="State"
-                  placeholder="e.g. Bihar"
-                  value={householdForm.state}
-                  onChange={(e) =>
-                    setHouseholdForm({ ...householdForm, state: e.target.value })
-                  }
-                  required
-                />
-
-                <Input
-                  label="District"
-                  placeholder="e.g. Patna"
-                  value={householdForm.district}
-                  onChange={(e) =>
-                    setHouseholdForm({ ...householdForm, district: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="Village / Town"
-                  placeholder="e.g. Bakhtiyarpur"
-                  value={householdForm.village}
-                  onChange={(e) =>
-                    setHouseholdForm({ ...householdForm, village: e.target.value })
-                  }
-                  required
-                />
-
-                <Input
-                  label="Pincode"
-                  placeholder="6-digit postal code"
-                  value={householdForm.pincode}
-                  onChange={(e) =>
-                    setHouseholdForm({ ...householdForm, pincode: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
-                {household && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditingHousehold(false)}
-                    disabled={householdSubmitting}
-                    className="w-full sm:w-auto"
-                  >
-                    Cancel
-                  </Button>
-                )}
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={householdSubmitting}
-                  className="w-full sm:w-auto font-semibold"
-                >
-                  {householdSubmitting ? "Saving..." : "Save details"}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            /* Summary Row */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-3.5 gap-x-6 text-xs sm:text-sm pt-1">
-              <div className="flex items-start gap-2.5">
-                <User className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="block text-slate-500 text-xs font-medium">Head of Household</span>
-                  <span className="font-semibold text-slate-900">{household?.headOfHouseholdName}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <CreditCard className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="block text-slate-500 text-xs font-medium">Ration Card</span>
-                  <span className="font-mono text-slate-900 font-medium">{household?.rationCardNumber}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="block text-slate-500 text-xs font-medium">Income Tier</span>
-                  <span className="font-semibold text-teal-800">{household?.incomeCategory}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 sm:col-span-2">
-                <MapPin className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="block text-slate-500 text-xs font-medium">Address</span>
-                  <span className="text-slate-800 font-medium">
-                    {household?.village}, {household?.district}, {household?.state} — {household?.pincode}
-                  </span>
-                </div>
-              </div>
-
-              {household?.contactPhone && (
-                <div className="flex items-start gap-2.5">
-                  <Phone className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                  <div>
-                    <span className="block text-slate-500 text-xs font-medium">Contact Phone</span>
-                    <span className="text-slate-800 font-medium">{household.contactPhone}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* TASK 2: FAMILY MEMBERS */}
-        {household && (
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                    Task 2
-                  </span>
-                  <h2 className="text-base font-bold text-slate-900">Family members</h2>
-                </div>
-              </div>
-
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleOpenAddMember}
-                className="h-8 text-xs px-3 font-semibold flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add member</span>
-              </Button>
-            </div>
-
-            {members.length === 0 ? (
-              <div className="py-6 text-center text-xs sm:text-sm text-slate-500 space-y-3">
-                <p>No family members added yet.</p>
-                <Button variant="outline" size="sm" onClick={handleOpenAddMember} className="font-semibold">
-                  Add first family member
-                </Button>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/50 rounded-lg px-2 transition-colors"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm">
-                          {member.fullName}
-                        </span>
-                        <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-100">
-                          {member.relationship}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600">
-                        {member.age} yrs •{" "}
-                        {member.gender.charAt(0).toUpperCase() + member.gender.slice(1)}
-                        {member.disabilityStatus && " • Person with disability"}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-auto pt-1 sm:pt-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs px-2.5 flex items-center gap-1"
-                        onClick={() => handleOpenEditMember(member)}
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Edit</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs px-2.5 text-rose-700 hover:text-rose-800 hover:bg-rose-50 flex items-center gap-1"
-                        onClick={() => setRemovingMember(member)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Remove</span>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-xs text-emerald-600 hover:text-emerald-900 font-semibold"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
-        {/* TASK 3: HEALTHCARE ACCESS GUIDANCE & ACTION PLAN (PHASE 5) */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
-                <HeartPulse className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                  Task 3 • Action Guidance
-                </span>
-                <h2 className="text-base font-bold text-slate-900">Healthcare access guidance</h2>
-              </div>
-            </div>
-
-            {household && guidance && (
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                    guidance.householdStatus === "ACTION_NEEDED"
-                      ? "text-emerald-800 bg-emerald-50 border-emerald-200"
-                      : guidance.householdStatus === "MORE_INFORMATION_NEEDED"
-                      ? "text-amber-800 bg-amber-50 border-amber-200"
-                      : "text-slate-700 bg-slate-100 border-slate-200"
+        {isLoading ? (
+          <div className="py-16">
+            <LoadingState message="Loading your household and healthcare records..." />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Status Indicator Banner */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                    household ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
                   }`}
                 >
-                  {isEvaluating
-                    ? "Evaluating..."
-                    : guidance.householdStatus === "ACTION_NEEDED"
-                    ? "Action Needed"
-                    : guidance.householdStatus === "MORE_INFORMATION_NEEDED"
-                    ? "Details Needed"
-                    : "No Current Match"}
-                </span>
+                  {household ? <CheckCircle2 className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Household Profile Status
+                  </p>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    {household
+                      ? `Profile Complete (${members.length} member${members.length === 1 ? "" : "s"})`
+                      : "Household Profile Needs Setup"}
+                  </h3>
+                </div>
               </div>
-            )}
-          </div>
 
-          {!household ? (
-            <div className="py-6 text-xs sm:text-sm text-slate-500 text-center">
-              Complete your household profile above to check applicable healthcare support.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* 1. TOP HIGHLIGHT: YOUR NEXT STEP */}
-              {guidance && guidance.actionPlan.length > 0 && (
-                <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-teal-50/90 to-emerald-50/70 border border-teal-200/80 space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-teal-800 shrink-0" />
-                    <span className="text-[11px] font-bold text-teal-900 uppercase tracking-wider">
-                      Your immediate next step
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                      {guidance.actionPlan[0].title}
-                    </h3>
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      {guidance.actionPlan[0].description}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-teal-900 font-medium">
-                    <span className="bg-white/80 px-2.5 py-0.5 rounded border border-teal-200 font-semibold">
-                      Reason: {guidance.actionPlan[0].reason}
-                    </span>
-                  </div>
+              {!household ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setHouseholdFormError(null);
+                    setIsHouseholdModalOpen(true);
+                  }}
+                  className="font-semibold shadow-xs"
+                >
+                  Set Up Household Now
+                </Button>
+              ) : (
+                <div className="inline-flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                  <span>Government Criteria Evaluated</span>
                 </div>
               )}
+            </div>
 
-              {/* 2. HEALTHCARE SUPPORT FOUND */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>Healthcare support matching your household</span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {guidance ? guidance.eligibleSchemes.length : eligibleCount} Eligible Pathway(s)
-                  </span>
+            {/* SECTION 1 — YOUR HOUSEHOLD */}
+            <section id="household" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    1. Your Household
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Location and ration tier information used to evaluate healthcare support.
+                  </p>
                 </div>
-
-                {eligibilityResults.length === 0 ? (
-                  <div className="p-4 rounded-xl border border-slate-200 text-xs text-slate-500 bg-slate-50">
-                    No active schemes evaluated yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {eligibilityResults.map((res) => {
-                      const isExpanded = expandedSchemeId === res.schemeId;
-                      const isEligible = res.status === "ELIGIBLE";
-                      const isNeedsInfo = res.status === "NEEDS_INFORMATION";
-
-                      return (
-                        <div
-                          key={res.schemeId}
-                          className={`rounded-xl border p-4 space-y-3 transition-colors ${
-                            isEligible
-                              ? "border-emerald-200 bg-emerald-50/20"
-                              : isNeedsInfo
-                              ? "border-amber-200 bg-amber-50/20"
-                              : "border-slate-200 bg-slate-50/40"
-                          }`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-sm font-bold text-slate-900">
-                                  {res.schemeShortName || res.schemeName}
-                                </h4>
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                    isEligible
-                                      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                      : isNeedsInfo
-                                      ? "text-amber-800 bg-amber-50 border-amber-200"
-                                      : "text-slate-600 bg-slate-100 border-slate-200"
-                                  }`}
-                                >
-                                  {isEligible
-                                    ? "May Qualify"
-                                    : isNeedsInfo
-                                    ? "Details Needed"
-                                    : "Not Applicable"}
-                                </span>
-                                {res.pathwayCode && (
-                                  <span className="text-[10px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                                    {res.pathwayCode}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-slate-600">{res.benefitSummary}</p>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs self-start sm:self-auto flex items-center gap-1 font-medium shrink-0"
-                              onClick={() =>
-                                setExpandedSchemeId(isExpanded ? null : res.schemeId)
-                              }
-                            >
-                              <span>{isExpanded ? "Hide details" : "View guidance"}</span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              ) : (
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              )}
-                            </Button>
-                          </div>
-
-                          {/* Progressive Disclosure Accordion */}
-                          {isExpanded && (
-                            <div className="pt-3 border-t border-slate-200/80 space-y-3 text-xs text-slate-600 animate-in fade-in duration-150">
-                              {/* Why this may apply */}
-                              {res.matchedRules.length > 0 && (
-                                <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
-                                  <span className="font-bold text-slate-900 block">
-                                    Why this may apply:
-                                  </span>
-                                  <ul className="space-y-1 text-slate-700">
-                                    {res.matchedRules.map((m, idx) => (
-                                      <li key={idx} className="flex items-start gap-1.5">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                        <span>{m.explanation}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Missing Information / Gaps */}
-                              {res.missingRequirements.length > 0 && (
-                                <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-1.5">
-                                  <span className="font-bold text-amber-900 block">
-                                    Information needed to confirm support:
-                                  </span>
-                                  <ul className="space-y-1 text-amber-800">
-                                    {res.missingRequirements.map((req, idx) => (
-                                      <li key={idx} className="flex items-start gap-1.5">
-                                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                                        <span>{req.actionPrompt}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Required Documents */}
-                              {res.requiredDocuments && res.requiredDocuments.length > 0 && (
-                                <div className="p-3 bg-white rounded-lg border border-slate-100 space-y-1.5">
-                                  <span className="font-bold text-slate-900 block">
-                                    Required documents:
-                                  </span>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                                    {res.requiredDocuments.map((doc) => (
-                                      <div
-                                        key={doc.id}
-                                        className="p-2 rounded bg-slate-50 border border-slate-200/80 flex items-start gap-2"
-                                      >
-                                        <FileCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                                        <div>
-                                          <p className="font-semibold text-slate-900">
-                                            {doc.name}
-                                          </p>
-                                          <p className="text-[11px] text-slate-500">
-                                            {doc.description}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                {household && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setHouseholdFormError(null);
+                      setIsHouseholdModalOpen(true);
+                    }}
+                    className="text-xs flex items-center gap-1.5"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Household</span>
+                  </Button>
                 )}
               </div>
 
-              {/* 3. STEP-BY-STEP ACTION PLAN */}
-              {guidance && guidance.actionPlan.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-teal-700" />
-                      <span>Step-by-step action plan</span>
-                    </h3>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {guidance.actionPlan.length} Step(s)
+              {!household ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-700 mx-auto flex items-center justify-center">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1">
+                    <h3 className="text-base font-bold text-slate-900">No household profile yet</h3>
+                    <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                      Add basic details about your family location and ration card category so we can discover available healthcare benefits.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setHouseholdFormError(null);
+                      setIsHouseholdModalOpen(true);
+                    }}
+                    className="font-semibold shadow-xs"
+                  >
+                    Set Up Household
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                      Head of Household
                     </span>
+                    <p className="text-sm font-bold text-slate-900 truncate">
+                      {household.headOfHouseholdName}
+                    </p>
                   </div>
 
-                  <div className="space-y-2">
-                    {guidance.actionPlan.map((act) => (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                      Location
+                    </span>
+                    <p className="text-sm font-bold text-slate-900 truncate">
+                      {household.district}, {household.state}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                      Ration Category
+                    </span>
+                    <p className="text-sm font-bold text-teal-800">
+                      {household.incomeCategory}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                      Ration Card
+                    </span>
+                    <p className="text-sm font-mono text-slate-700">
+                      {household.rationCardNumber ? household.rationCardNumber : "Not provided"}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* SECTION 2 — YOUR FAMILY MEMBERS */}
+            <section id="family" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    2. Your Family Members
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Each family member is evaluated for age, maternal, and senior-specific entitlements.
+                  </p>
+                </div>
+                {household && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenAddMember}
+                    className="text-xs flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Member</span>
+                  </Button>
+                )}
+              </div>
+
+              {!household ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-6 text-center text-xs sm:text-sm text-slate-500">
+                  Set up your household first to add family members.
+                </div>
+              ) : members.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-3">
+                  <p className="text-sm font-medium text-slate-700">No family members registered yet.</p>
+                  <Button variant="outline" size="sm" onClick={handleOpenAddMember}>
+                    + Add First Family Member
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {members.map((m) => {
+                    const isSenior = m.age >= 70;
+                    return (
                       <div
-                        key={act.id}
-                        className="p-3.5 rounded-xl border border-slate-200/90 bg-white flex items-start justify-between gap-3 shadow-2xs"
+                        key={m.id}
+                        className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col justify-between shadow-2xs hover:border-slate-300 transition-colors"
                       >
-                        <div className="flex items-start gap-3">
-                          <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-900 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                            {act.stepNumber}
-                          </span>
-                          <div className="space-y-0.5">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">
-                              {act.title}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">
+                              {m.fullName}
                             </h4>
-                            <p className="text-xs text-slate-600 leading-relaxed">
-                              {act.description}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleOpenEditMember(m)}
+                                aria-label={`Edit ${m.fullName}`}
+                                className="p-1 text-slate-400 hover:text-teal-800 rounded transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setRemovingMember(m)}
+                                aria-label={`Remove ${m.fullName}`}
+                                className="p-1 text-slate-400 hover:text-rose-700 rounded transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-slate-600 space-y-0.5">
+                            <p>
+                              <span className="text-slate-400">Relation:</span>{" "}
+                              <strong className="font-semibold text-slate-800">{m.relationship}</strong>
                             </p>
-                            <p className="text-[11px] text-slate-400 font-medium pt-0.5">
-                              {act.reason}
+                            <p>
+                              <span className="text-slate-400">Age:</span>{" "}
+                              <strong className="font-semibold text-slate-800">{m.age} years</strong> ({m.gender})
                             </p>
                           </div>
+
+                          {/* Member Badges */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {isSenior && (
+                              <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                Senior Citizen (70+)
+                              </span>
+                            )}
+                            {m.maternalStatus === "pregnant" && (
+                              <span className="text-[10px] font-semibold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                Pregnant Mother
+                              </span>
+                            )}
+                            {m.disabilityStatus && (
+                              <span className="text-[10px] font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                Person with Disability
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
-                            act.priority === "REQUIRED"
-                              ? "text-rose-800 bg-rose-50 border-rose-200"
-                              : "text-amber-800 bg-amber-50 border-amber-200"
-                          }`}
-                        >
-                          {act.priority}
-                        </span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
+            </section>
 
-              {/* 4. DOCUMENT READINESS CHECKLIST */}
-              {guidance && guidance.documentReadiness.items.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <FileCheck className="w-4 h-4 text-teal-700" />
-                      <span>Document readiness checklist</span>
-                    </h3>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {guidance.documentReadiness.readyCount} /{" "}
-                      {guidance.documentReadiness.totalRequired} Ready
-                    </span>
-                  </div>
+            {/* SECTION 3 — HEALTHCARE SUPPORT (MOST IMPORTANT) */}
+            <section id="support" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    3. Healthcare Support Identified
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Verified entitlement pathways based on official government rules.
+                  </p>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {guidance.documentReadiness.items.map((doc) => (
+              {!household ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-6 text-center text-xs sm:text-sm text-slate-500">
+                  Add household details to discover applicable healthcare schemes.
+                </div>
+              ) : isEvaluating ? (
+                <div className="py-8">
+                  <LoadingState message="Evaluating applicable healthcare schemes..." />
+                </div>
+              ) : eligibilityResults.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs sm:text-sm text-slate-500">
+                  No verified healthcare schemes evaluated yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {eligibilityResults.map((result) => {
+                    const isExpanded = expandedSchemeId === result.schemeId;
+                    const isEligible = result.status === "ELIGIBLE";
+                    const isNeedsInfo = result.status === "NEEDS_INFORMATION";
+
+                    return (
                       <div
-                        key={doc.id}
-                        className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-2"
+                        key={result.schemeId}
+                        className={`rounded-xl border transition-all ${
+                          isEligible
+                            ? "border-emerald-200/90 bg-emerald-50/20"
+                            : isNeedsInfo
+                            ? "border-amber-200/90 bg-amber-50/20"
+                            : "border-slate-200 bg-white"
+                        }`}
                       >
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-bold text-slate-900">{doc.name}</p>
-                          <p className="text-[11px] text-slate-500">{doc.description}</p>
-                        </div>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
-                            doc.status === "READY"
-                              ? "text-emerald-800 bg-emerald-50 border-emerald-200"
-                              : "text-amber-800 bg-amber-50 border-amber-200"
-                          }`}
+                        {/* Scheme Card Header */}
+                        <div
+                          onClick={() =>
+                            setExpandedSchemeId(isExpanded ? null : result.schemeId)
+                          }
+                          className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
                         >
-                          {doc.status === "READY" ? "Ready" : "Details Needed"}
-                        </span>
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                                isEligible
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : isNeedsInfo
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              <ShieldCheck className="w-5 h-5" />
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                                  {result.schemeName}
+                                </h3>
+                                {result.pathwayCode && (
+                                  <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {result.pathwayCode}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs sm:text-sm text-slate-600">
+                                {result.benefitSummary || "Official healthcare coverage."}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            <span
+                              className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                                isEligible
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : isNeedsInfo
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {isEligible
+                                ? "✓ Eligible Pathway Found"
+                                : isNeedsInfo
+                                ? "ℹ More Information Needed"
+                                : "Not Eligible"}
+                            </span>
+
+                            <button
+                              type="button"
+                              aria-label="Toggle details"
+                              className="text-slate-400 hover:text-slate-700 p-1"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Progressive Disclosure Details */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-2 border-t border-slate-100/80 space-y-3 text-xs sm:text-sm">
+                            {/* Why this applies */}
+                            <div className="rounded-lg bg-white p-3 border border-slate-200/80 space-y-1">
+                              <span className="font-bold text-slate-800 block text-xs uppercase tracking-wide">
+                                Why this applies:
+                              </span>
+                              <p className="text-slate-600 leading-relaxed">
+                                {isEligible
+                                  ? result.matchedRules.map((r) => r.explanation).filter(Boolean).join(". ") ||
+                                    "Household meets verified age and categorical criteria for this pathway."
+                                  : isNeedsInfo
+                                  ? result.missingRequirements
+                                      .map((m) => m.description || m.field)
+                                      .filter(Boolean)
+                                      .join(". ") ||
+                                    "SwasthyaSetu requires additional details (such as delivery facility or registration records) to evaluate this pathway."
+                                  : result.failedRules.map((r) => r.explanation).filter(Boolean).join(". ") ||
+                                    "Household criteria did not match the specific eligibility rules for this scheme."}
+                              </p>
+                            </div>
+
+                            {/* Required Documents / Next Action */}
+                            {result.missingRequirements && result.missingRequirements.length > 0 && (
+                              <div className="rounded-lg bg-amber-50/60 p-3 border border-amber-200 space-y-1">
+                                <span className="font-bold text-amber-900 block text-xs uppercase tracking-wide">
+                                  Missing details needed:
+                                </span>
+                                <ul className="list-disc list-inside text-amber-800 text-xs space-y-0.5">
+                                  {result.missingRequirements.map((req, idx) => (
+                                    <li key={idx}>{req.description || req.field}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
-            </div>
-          )}
-        </div>
+            </section>
 
-        {/* MODAL: ADD / EDIT MEMBER */}
+            {/* SECTION 4 — WHAT TO DO NEXT (ACTION PLAN) */}
+            <section id="actions" className="space-y-4 scroll-mt-24">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  4. What To Do Next
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500">
+                  Clear, prioritized steps to unlock and access your healthcare benefits.
+                </p>
+              </div>
+
+              {!household ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-6 text-center text-xs sm:text-sm text-slate-500">
+                  Complete household onboarding to generate your personalized action plan.
+                </div>
+              ) : !guidance || !guidance.actionPlan || guidance.actionPlan.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs sm:text-sm text-slate-500">
+                  No pending action steps. Your household entitlements are up to date.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs divide-y divide-slate-100">
+                  {guidance.actionPlan.map((action, index) => (
+                    <div key={action.id || index} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5">
+                      <div className="w-7 h-7 rounded-full bg-teal-50 text-teal-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        {action.stepNumber || index + 1}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h4 className="text-sm font-bold text-slate-900">
+                            {action.title}
+                          </h4>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              action.priority === "REQUIRED"
+                                ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                : action.priority === "IMPORTANT"
+                                ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {action.priority}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          {action.description}
+                        </p>
+                        {action.reason && (
+                          <p className="text-[11px] text-teal-800 font-medium">
+                            Why: {action.reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* Modal: Setup / Edit Household */}
+        <Modal
+          isOpen={isHouseholdModalOpen}
+          onClose={() => setIsHouseholdModalOpen(false)}
+          title={household ? "Edit Household Details" : "Set Up Household Profile"}
+          description="Provide your family location and ration category to evaluate healthcare entitlements."
+        >
+          <form onSubmit={handleHouseholdSubmit} className="space-y-4">
+            {householdFormError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                {householdFormError}
+              </div>
+            )}
+
+            <Input
+              label="Head of Household Name"
+              required
+              value={householdForm.headOfHouseholdName}
+              onChange={(e) =>
+                setHouseholdForm({ ...householdForm, headOfHouseholdName: e.target.value })
+              }
+              placeholder="e.g. Ramesh Kumar"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="State"
+                required
+                value={householdForm.state}
+                onChange={(e) => setHouseholdForm({ ...householdForm, state: e.target.value })}
+                placeholder="e.g. Bihar"
+              />
+              <Input
+                label="District"
+                required
+                value={householdForm.district}
+                onChange={(e) =>
+                  setHouseholdForm({ ...householdForm, district: e.target.value })
+                }
+                placeholder="e.g. Patna"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Village / Town"
+                required
+                value={householdForm.village}
+                onChange={(e) =>
+                  setHouseholdForm({ ...householdForm, village: e.target.value })
+                }
+                placeholder="e.g. Patna City"
+              />
+              <Input
+                label="Pincode"
+                required
+                value={householdForm.pincode}
+                onChange={(e) =>
+                  setHouseholdForm({ ...householdForm, pincode: e.target.value })
+                }
+                placeholder="e.g. 800001"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select
+                label="Ration Card Category"
+                value={householdForm.incomeCategory}
+                onChange={(e) =>
+                  setHouseholdForm({
+                    ...householdForm,
+                    incomeCategory: e.target.value as IncomeCategory,
+                  })
+                }
+                options={INCOME_OPTIONS}
+              />
+              <Input
+                label="Ration Card Number"
+                value={householdForm.rationCardNumber}
+                onChange={(e) =>
+                  setHouseholdForm({ ...householdForm, rationCardNumber: e.target.value })
+                }
+                placeholder="e.g. RC-10293847"
+              />
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsHouseholdModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={householdSubmitting}>
+                {householdSubmitting ? "Saving..." : "Save Household"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal: Add / Edit Family Member */}
         <Modal
           isOpen={isMemberModalOpen}
           onClose={() => setIsMemberModalOpen(false)}
-          title={editingMemberId ? "Edit member" : "Add family member"}
-          description="Enter your family member's information."
+          title={editingMemberId ? "Edit Family Member" : "Add Family Member"}
+          description="Enter member age and health profile details for entitlement checks."
         >
-          <form onSubmit={handleMemberSubmit} className="space-y-4 pt-2">
+          <form onSubmit={handleMemberSubmit} className="space-y-4">
             {memberFormError && (
-              <div
-                role="alert"
-                className="p-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-md"
-              >
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
                 {memberFormError}
               </div>
             )}
 
             <Input
               label="Full Name"
-              placeholder="e.g. Rahul Kumar"
+              required
               value={memberForm.fullName}
               onChange={(e) => setMemberForm({ ...memberForm, fullName: e.target.value })}
-              required
+              placeholder="e.g. Sita Devi"
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input
                 label="Age (Years)"
                 type="number"
                 min="0"
-                max="125"
-                value={memberForm.age.toString()}
-                onChange={(e) =>
-                  setMemberForm({ ...memberForm, age: parseInt(e.target.value) || 0 })
-                }
+                max="120"
                 required
+                value={memberForm.age}
+                onChange={(e) =>
+                  setMemberForm({ ...memberForm, age: parseInt(e.target.value, 10) || 0 })
+                }
               />
-
               <Select
                 label="Gender"
-                options={GENDER_OPTIONS}
                 value={memberForm.gender}
                 onChange={(e) =>
                   setMemberForm({ ...memberForm, gender: e.target.value as Gender })
                 }
-                required
+                options={GENDER_OPTIONS}
               />
-            </div>
-
-            <Select
-              label="Relationship to Head"
-              options={RELATIONSHIP_OPTIONS}
-              value={memberForm.relationship}
-              onChange={(e) =>
-                setMemberForm({ ...memberForm, relationship: e.target.value })
-              }
-              required
-            />
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="disabilityStatus"
-                checked={memberForm.disabilityStatus}
+              <Select
+                label="Relationship"
+                value={memberForm.relationship}
                 onChange={(e) =>
-                  setMemberForm({ ...memberForm, disabilityStatus: e.target.checked })
+                  setMemberForm({ ...memberForm, relationship: e.target.value })
                 }
-                className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-700"
+                options={RELATIONSHIP_OPTIONS}
               />
-              <label htmlFor="disabilityStatus" className="text-xs font-medium text-slate-700">
-                Person with recognized disability
-              </label>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3">
+            <div className="space-y-3 pt-2">
+              <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={memberForm.disabilityStatus}
+                  onChange={(e) =>
+                    setMemberForm({ ...memberForm, disabilityStatus: e.target.checked })
+                  }
+                  className="rounded text-teal-700 focus:ring-teal-700"
+                />
+                <span>Person with benchmark disability</span>
+              </label>
+
+              {memberForm.gender === "female" && (
+                <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={memberForm.maternalStatus === "pregnant"}
+                    onChange={(e) =>
+                      setMemberForm({
+                        ...memberForm,
+                        maternalStatus: e.target.checked ? "pregnant" : "none",
+                      })
+                    }
+                    className="rounded text-teal-700 focus:ring-teal-700"
+                  />
+                  <span>Currently pregnant or lactating mother</span>
+                </label>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => setIsMemberModalOpen(false)}
-                disabled={memberSubmitting}
-                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={memberSubmitting}
-                className="w-full sm:w-auto font-semibold"
-              >
-                {memberSubmitting ? "Saving..." : "Save member"}
+              <Button type="submit" variant="primary" disabled={memberSubmitting}>
+                {memberSubmitting ? "Saving..." : "Save Member"}
               </Button>
             </div>
           </form>
         </Modal>
 
-        {/* MODAL: REMOVE MEMBER CONFIRMATION */}
+        {/* Modal: Remove Member Confirmation */}
         <Modal
           isOpen={Boolean(removingMember)}
           onClose={() => setRemovingMember(null)}
-          title="Remove member"
-          description="Are you sure you want to remove this member?"
+          title="Remove Family Member"
+          description={`Are you sure you want to remove ${removingMember?.fullName} from your household?`}
         >
-          <div className="space-y-4 pt-2">
-            <p className="text-xs sm:text-sm text-slate-700">
-              Remove{" "}
-              <strong className="font-semibold text-slate-900">
-                {removingMember?.fullName}
-              </strong>{" "}
-              from your household records?
-            </p>
-
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setRemovingMember(null)}
-                disabled={removeSubmitting}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto font-semibold"
-                onClick={handleConfirmRemoveMember}
-                disabled={removeSubmitting}
-              >
-                {removeSubmitting ? "Removing..." : "Remove"}
-              </Button>
-            </div>
+          <div className="pt-4 flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRemovingMember(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleConfirmRemoveMember}
+              disabled={removeSubmitting}
+              className="bg-rose-600 text-white hover:bg-rose-700 border-rose-600"
+            >
+              {removeSubmitting ? "Removing..." : "Confirm Remove"}
+            </Button>
           </div>
         </Modal>
-      </Shell>
+      </AuthenticatedShell>
     </ProtectedRoute>
   );
 }

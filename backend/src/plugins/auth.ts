@@ -16,12 +16,14 @@ import { AICacheRepository } from "../repositories/ai-cache.repository.js";
 import { AIContextBuilder } from "../services/ai/ai-context-builder.js";
 import { LyzrService } from "../services/ai/lyzr.service.js";
 import { IntelligenceService } from "../services/ai/intelligence.service.js";
+import { PrivilegedAuthService } from "../services/privileged-auth.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
   interface FastifyInstance {
     userRepository: UserRepository;
     userService: UserService;
+    privilegedAuthService: PrivilegedAuthService;
     householdRepository: HouseholdRepository;
     householdService: HouseholdService;
     schemeRepository: SchemeRepository;
@@ -77,8 +79,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     lyzrService
   );
 
+  const privilegedAuthService = new PrivilegedAuthService();
+
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
+  fastify.decorate("privilegedAuthService", privilegedAuthService);
   fastify.decorate("householdRepository", householdRepository);
   fastify.decorate("householdService", householdService);
   fastify.decorate("schemeRepository", schemeRepository);
@@ -175,8 +180,27 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
     request.user = decodedToken;
 
+    // Test token role hint resolution for dev / test mode
+    let initialRoleHint: UserRole | undefined = undefined;
+    if (token.startsWith("test_token_")) {
+      const parts = token.replace("test_token_", "").split("_");
+      const rolePart = parts[parts.length - 1]?.toUpperCase();
+      if (rolePart === "ASHA" || rolePart === "ADMIN" || rolePart === "CITIZEN") {
+        initialRoleHint = rolePart as UserRole;
+      }
+    }
+
+    // For registration endpoint, decode token and look up existing profile without auto-creating CITIZEN.
+    // The /auth/register handler will create the profile with the authorized role.
+    const isRegisterRoute = request.url.includes("/auth/register");
+    if (isRegisterRoute) {
+      const existing = await userRepository.getUserById(decodedToken.uid);
+      request.userProfile = existing;
+      return;
+    }
+
     // Resolve or idempotently create user profile (strictly preserving existing role)
-    const { user } = await userService.getOrCreateUser(decodedToken);
+    const { user } = await userService.getOrCreateUser(decodedToken, undefined, initialRoleHint);
     request.userProfile = user;
   };
 

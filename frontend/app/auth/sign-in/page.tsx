@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { UserRole } from "@shared/types/auth";
 import { env } from "@/config/env";
-import { ShieldCheck, Lock, ArrowRight, User } from "lucide-react";
+import { ShieldCheck, Lock, ArrowRight, User, KeyRound, Building2, Users } from "lucide-react";
 
 export default function SignInPage() {
   const router = useRouter();
   const {
     isAuthenticated,
+    isLoading,
+    userProfile,
     isConsentRequired,
     isFirebaseReady,
     role,
@@ -29,6 +31,9 @@ export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [requestedRole, setRequestedRole] = useState<UserRole>("CITIZEN");
+  const [registrationSecret, setRegistrationSecret] = useState("");
+  const [showStaffOptions, setShowStaffOptions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -39,20 +44,22 @@ export default function SignInPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated with an authoritative role
   useEffect(() => {
-    if (isAuthenticated) {
-      if (isConsentRequired) {
-        router.replace("/auth/consent");
-      } else if (role === "ADMIN") {
-        router.replace("/admin");
-      } else if (role === "ASHA") {
-        router.replace("/asha");
-      } else {
-        router.replace("/citizen");
-      }
+    if (isLoading || !userProfile || !role) {
+      return;
     }
-  }, [isAuthenticated, isConsentRequired, role, router]);
+
+    if (isConsentRequired) {
+      router.replace("/auth/consent");
+    } else if (role === "ADMIN") {
+      router.replace("/admin");
+    } else if (role === "ASHA") {
+      router.replace("/asha");
+    } else if (role === "CITIZEN") {
+      router.replace("/citizen");
+    }
+  }, [isLoading, userProfile, role, isConsentRequired, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,10 +70,34 @@ export default function SignInPage() {
       return;
     }
 
+    if (mode === "signup" && requestedRole !== "CITIZEN" && !registrationSecret) {
+      setErrorMessage(
+        requestedRole === "ASHA"
+          ? "Please enter your ASHA registration code."
+          : "Please enter your Admin registration code."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUpWithEmail(email, password, displayName);
+        const user = await signUpWithEmail(
+          email,
+          password,
+          displayName,
+          requestedRole,
+          registrationSecret
+        );
+
+        // Immediate role-based routing
+        if (user.role === "ADMIN") {
+          router.push("/admin");
+        } else if (user.role === "ASHA") {
+          router.push("/asha");
+        } else {
+          router.push("/citizen");
+        }
       } else {
         await signInWithEmail(email, password);
       }
@@ -112,6 +143,13 @@ export default function SignInPage() {
       setLoading(true);
       await switchDevIdentity(devRole);
       setLoading(false);
+      if (devRole === "ADMIN") {
+        router.push("/admin");
+      } else if (devRole === "ASHA") {
+        router.push("/asha");
+      } else {
+        router.push("/citizen");
+      }
     }
   };
 
@@ -124,10 +162,22 @@ export default function SignInPage() {
             SS
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-            {mode === "signin" ? "Sign in to SwasthyaSetu" : "Create your citizen account"}
+            {mode === "signin"
+              ? "Sign in to SwasthyaSetu"
+              : requestedRole === "ASHA"
+              ? "Create ASHA worker account"
+              : requestedRole === "ADMIN"
+              ? "Create administrator account"
+              : "Create your citizen account"}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
-            Access healthcare benefits and manage your household records safely.
+            {mode === "signin"
+              ? "Access healthcare benefits and manage records safely."
+              : requestedRole === "ASHA"
+              ? "ASHA worker accounts require authorized staff registration code."
+              : requestedRole === "ADMIN"
+              ? "Administrator accounts require authorized registration code."
+              : "Discover verified government healthcare support for your family."}
           </p>
         </div>
 
@@ -165,6 +215,74 @@ export default function SignInPage() {
             </button>
           </div>
 
+          {/* Account Type Selector for Sign Up */}
+          {mode === "signup" && (
+            <div className="space-y-2 pt-1 border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                  Account Type:
+                </span>
+                {!showStaffOptions && requestedRole === "CITIZEN" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffOptions(true)}
+                    className="text-[11px] font-medium text-teal-700 hover:text-teal-900 underline underline-offset-2"
+                  >
+                    Register as Staff / Admin?
+                  </button>
+                )}
+              </div>
+
+              {(showStaffOptions || requestedRole !== "CITIZEN") && (
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-50 rounded-lg border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequestedRole("CITIZEN");
+                      setRegistrationSecret("");
+                      setErrorMessage(null);
+                    }}
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                      requestedRole === "CITIZEN"
+                        ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Citizen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequestedRole("ASHA");
+                      setErrorMessage(null);
+                    }}
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                      requestedRole === "ASHA"
+                        ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    ASHA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRequestedRole("ADMIN");
+                      setErrorMessage(null);
+                    }}
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                      requestedRole === "ADMIN"
+                        ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Admin
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {errorMessage && (
             <div
               role="alert"
@@ -178,7 +296,13 @@ export default function SignInPage() {
             {mode === "signup" && (
               <Input
                 label="Full Name"
-                placeholder="e.g. Ramesh Kumar"
+                placeholder={
+                  requestedRole === "ASHA"
+                    ? "e.g. Sunita Devi (ASHA)"
+                    : requestedRole === "ADMIN"
+                    ? "e.g. System Administrator"
+                    : "e.g. Ramesh Kumar"
+                }
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={loading}
@@ -224,6 +348,33 @@ export default function SignInPage() {
               )}
             </div>
 
+            {/* Privileged Registration Secret Field */}
+            {mode === "signup" && requestedRole !== "CITIZEN" && (
+              <div className="p-3.5 bg-teal-50/50 rounded-xl border border-teal-100 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
+                  <KeyRound className="w-3.5 h-3.5 text-teal-700" />
+                  <span>
+                    {requestedRole === "ASHA"
+                      ? "ASHA Staff Registration Code"
+                      : "Admin Authorization Code"}
+                  </span>
+                </div>
+                <Input
+                  type="password"
+                  placeholder="Enter authorized code"
+                  value={registrationSecret}
+                  onChange={(e) => setRegistrationSecret(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <p className="text-[11px] text-slate-500">
+                  {requestedRole === "ASHA"
+                    ? "Issued by your district health administration or team supervisor."
+                    : "Issued to verified platform infrastructure administrators."}
+                </p>
+              </div>
+            )}
+
             <Button
               type="submit"
               variant="primary"
@@ -235,11 +386,15 @@ export default function SignInPage() {
                 ? "Processing..."
                 : mode === "signin"
                 ? "Sign In"
+                : requestedRole === "ASHA"
+                ? "Create ASHA Account"
+                : requestedRole === "ADMIN"
+                ? "Create Admin Account"
                 : "Create Account"}
             </Button>
           </form>
 
-          {isFirebaseReady && (
+          {isFirebaseReady && mode === "signin" && (
             <div className="space-y-3 pt-1">
               <div className="relative flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />

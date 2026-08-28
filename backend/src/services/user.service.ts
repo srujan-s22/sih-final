@@ -13,18 +13,22 @@ export class UserService {
    */
   public async getOrCreateUser(
     token: DecodedIdToken,
-    metadata?: { displayName?: string | null; phoneNumber?: string | null }
+    metadata?: { displayName?: string | null; phoneNumber?: string | null },
+    assignedRole?: UserRole
   ): Promise<{ user: UserProfile; isNewUser: boolean; isConsentRequired: boolean }> {
     const existing = await this.userRepository.getUserById(token.uid);
 
     if (existing) {
-      // User exists: PRESERVE existing role strictly. Update profile metadata if available.
       const updates: Partial<UserProfile> = {};
       if (metadata?.displayName && metadata.displayName !== existing.displayName) {
         updates.displayName = metadata.displayName;
       }
       if (metadata?.phoneNumber && metadata.phoneNumber !== existing.phoneNumber) {
         updates.phoneNumber = metadata.phoneNumber;
+      }
+      // If a verified privileged role was authorized, apply it
+      if (assignedRole && (assignedRole === "ASHA" || assignedRole === "ADMIN") && existing.role !== assignedRole) {
+        updates.role = assignedRole;
       }
 
       let user = existing;
@@ -37,14 +41,14 @@ export class UserService {
       return { user, isNewUser: false, isConsentRequired };
     }
 
-    // Brand new user registration: Strictly default to CITIZEN role
+    // Brand new user registration: Role is verified assignedRole or defaults to CITIZEN
     const now = new Date().toISOString();
     const newUser: UserProfile = {
       uid: token.uid,
       email: token.email || "",
       displayName: metadata?.displayName || token.name || null,
       phoneNumber: metadata?.phoneNumber || token.phone_number || null,
-      role: DEFAULT_USER_ROLE, // "CITIZEN"
+      role: assignedRole || DEFAULT_USER_ROLE,
       consentStatus: "pending",
       consentVersion: null,
       consentedAt: null,

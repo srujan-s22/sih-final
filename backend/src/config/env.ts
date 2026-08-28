@@ -31,6 +31,10 @@ const envSchema = z.object({
   LYZR_TIMEOUT_MS: z.coerce.number().default(15000),
   LYZR_ANONYMIZATION_SECRET: z.string().default("swasthyasetu-default-anon-secret-key-2026"),
   AI_CACHE_TTL_HOURS: z.coerce.number().default(24),
+
+  // Privileged Staff/Admin Account Provisioning (Server-Side Only)
+  ASHA_REGISTRATION_SECRET_HASH: z.string().optional(),
+  ADMIN_REGISTRATION_SECRET_HASH: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

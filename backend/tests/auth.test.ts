@@ -134,6 +134,108 @@ describe("Phase 2: Authentication, Roles & Consent Tests", () => {
       // STRICT CHECK: Role MUST remain ADMIN!
       expect(syncData.user.role).toBe("ADMIN");
     });
+
+    it("Should PRESERVE existing ASHA role even when malicious requestedRole=CITIZEN is sent on sync", async () => {
+      const uid = `real-asha-test-${Date.now()}`;
+      await app.userRepository.createUserProfile({
+        uid,
+        email: "asha.worker@health.gov.in",
+        displayName: "Field ASHA Worker",
+        phoneNumber: null,
+        role: "ASHA",
+        consentStatus: "accepted",
+        consentVersion: "1.0",
+        consentedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const syncRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/sync",
+        headers: {
+          authorization: `Bearer test_token_${uid}`,
+        },
+        payload: {
+          displayName: "Field ASHA Worker",
+          requestedRole: "CITIZEN",
+        },
+      });
+
+      expect(syncRes.statusCode).toBe(200);
+      const syncData = JSON.parse(syncRes.payload).data as AuthSyncResponse;
+      expect(syncData.isNewUser).toBe(false);
+      expect(syncData.user.role).toBe("ASHA");
+    });
+
+    it("Should PRESERVE existing ADMIN role even when malicious requestedRole=CITIZEN is sent on sync", async () => {
+      const uid = `real-admin-test-${Date.now()}`;
+      await app.userRepository.createUserProfile({
+        uid,
+        email: "admin.director@health.gov.in",
+        displayName: "State Director Admin",
+        phoneNumber: null,
+        role: "ADMIN",
+        consentStatus: "accepted",
+        consentVersion: "1.0",
+        consentedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const syncRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/sync",
+        headers: {
+          authorization: `Bearer test_token_${uid}`,
+        },
+        payload: {
+          displayName: "State Director Admin",
+          requestedRole: "CITIZEN",
+        },
+      });
+
+      expect(syncRes.statusCode).toBe(200);
+      const syncData = JSON.parse(syncRes.payload).data as AuthSyncResponse;
+      expect(syncData.isNewUser).toBe(false);
+      expect(syncData.user.role).toBe("ADMIN");
+    });
+
+    it("Should PRESERVE existing CITIZEN role and prevent promotion without secrets on sync", async () => {
+      const uid = `citizen-nopromote-${Date.now()}`;
+      await app.userRepository.createUserProfile({
+        uid,
+        email: "citizen.user@example.com",
+        displayName: "Citizen User",
+        phoneNumber: null,
+        role: "CITIZEN",
+        consentStatus: "accepted",
+        consentVersion: "1.0",
+        consentedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Attempt to self-promote to ADMIN on sync without secret
+      const syncRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/auth/sync",
+        headers: {
+          authorization: `Bearer test_token_${uid}`,
+        },
+        payload: {
+          requestedRole: "ADMIN",
+        },
+      });
+
+      expect(syncRes.statusCode).toBe(403);
+      const body = JSON.parse(syncRes.payload);
+      expect(body.success).toBe(false);
+
+      // Verify user document in repository remains CITIZEN
+      const userInDb = await app.userRepository.getUserById(uid);
+      expect(userInDb?.role).toBe("CITIZEN");
+    });
   });
 
   describe("3. Consent Workflow & History Persistence", () => {

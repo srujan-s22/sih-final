@@ -4,11 +4,25 @@ import {
   AuthSyncResponse,
   ConsentSubmission,
   UserProfile,
+  UserRole,
   ConsentRecord,
 } from "@shared/types/auth";
 import { ApiResult } from "@shared/types/api";
 
 export const authService = {
+  /**
+   * Pre-validates privileged registration authorization BEFORE creating Firebase Auth user
+   */
+  async prevalidateRole(
+    requestedRole: UserRole,
+    registrationSecret?: string | null
+  ): Promise<ApiResult<{ allowed: boolean; role: UserRole }>> {
+    return apiClient.post<{ allowed: boolean; role: UserRole }>(
+      "/api/v1/auth/prevalidate",
+      { requestedRole, registrationSecret }
+    );
+  },
+
   /**
    * Fetches current authenticated user profile and consent state
    */
@@ -17,13 +31,27 @@ export const authService = {
   },
 
   /**
-   * Idempotently syncs user profile upon sign-in/registration
+   * Idempotently syncs user profile upon sign-in
    */
   async syncUser(metadata?: {
     displayName?: string | null;
     phoneNumber?: string | null;
+    requestedRole?: UserRole;
+    registrationSecret?: string | null;
   }): Promise<ApiResult<AuthSyncResponse>> {
     return apiClient.post<AuthSyncResponse>("/api/v1/auth/sync", metadata || {});
+  },
+
+  /**
+   * Explicitly registers user with optional privileged role verification
+   */
+  async registerUser(payload: {
+    displayName?: string | null;
+    phoneNumber?: string | null;
+    requestedRole?: UserRole;
+    registrationSecret?: string | null;
+  }): Promise<ApiResult<AuthSyncResponse>> {
+    return apiClient.post<AuthSyncResponse>("/api/v1/auth/register", payload);
   },
 
   /**
