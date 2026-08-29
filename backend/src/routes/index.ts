@@ -10,6 +10,7 @@ import { aiRoutes } from "./ai.js";
 import { assistantRoutes } from "./assistant.js";
 import { caseRoutes } from "./case.js";
 import { connectionRoutes } from "./connection.js";
+import { assistanceRoutes } from "./assistance.js";
 import { testAuthRoutes } from "./test-auth.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
@@ -46,6 +47,10 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Register Citizen <-> ASHA connection routes
   await fastify.register(connectionRoutes);
 
+  // Register Citizen <-> ASHA assistance request routes
+  await fastify.register(assistanceRoutes);
+
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);
 };
+

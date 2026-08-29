@@ -7,11 +7,12 @@ import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Scheme } from "@shared/types/eligibility";
 import { EvidenceRecord } from "@shared/types/evidence";
+import { AshaCase } from "@shared/types/case";
 import { schemeService } from "@/services/scheme-service";
 import { evidenceService } from "@/services/evidence-service";
+import { caseService } from "@/services/case-service";
 import {
   Building2,
   ShieldCheck,
@@ -25,6 +26,7 @@ import {
   Lock,
   RefreshCw,
   Bot,
+  Users,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -35,9 +37,11 @@ export default function AdminPage() {
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [evidenceList, setEvidenceList] = useState<EvidenceRecord[]>([]);
   const [conflictsCount, setConflictsCount] = useState(0);
+  const [adminCases, setAdminCases] = useState<AshaCase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("schemes");
   const [searchFilter, setSearchFilter] = useState("");
+  const [caseSearchFilter, setCaseSearchFilter] = useState("");
   const [selectedSchemeId, setSelectedSchemeId] = useState<string>("ab-pmjay");
   const [schemeEvidence, setSchemeEvidence] = useState<EvidenceRecord[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
@@ -47,9 +51,10 @@ export default function AdminPage() {
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [schemesRes, conflictsRes] = await Promise.all([
+      const [schemesRes, conflictsRes, casesRes] = await Promise.all([
         schemeService.getActiveSchemes(),
         evidenceService.getEvidenceConflicts(),
+        caseService.listAllCasesForAdmin(),
       ]);
 
       if (schemesRes.success && schemesRes.data) {
@@ -58,6 +63,9 @@ export default function AdminPage() {
       if (conflictsRes.success && conflictsRes.data) {
         setEvidenceList(conflictsRes.data.unverifiedEvidence || []);
         setConflictsCount(conflictsRes.data.count || 0);
+      }
+      if (casesRes.success && casesRes.data) {
+        setAdminCases(casesRes.data.cases || []);
       }
     } catch {
       // Non-blocking
@@ -95,6 +103,7 @@ export default function AdminPage() {
     { id: "overview", label: "Overview", icon: Building2 },
     { id: "schemes", label: "Schemes Registry", icon: Layers },
     { id: "evidence", label: "Evidence & Provenance", icon: ShieldCheck },
+    { id: "cases", label: `Platform Caseload (${adminCases.length})`, icon: Users },
     { id: "governance", label: "System Governance", icon: Lock },
   ];
 
@@ -108,12 +117,23 @@ export default function AdminPage() {
     );
   });
 
+  const filteredCases = adminCases.filter((c) => {
+    if (!caseSearchFilter) return true;
+    const q = caseSearchFilter.toLowerCase();
+    return (
+      c.headOfHouseholdName.toLowerCase().includes(q) ||
+      c.district.toLowerCase().includes(q) ||
+      c.assignedAshaUid.toLowerCase().includes(q) ||
+      c.id.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <ProtectedRoute allowedRoles={["ADMIN"]}>
       <AuthenticatedShell
         role="ADMIN"
         title="Platform Administration"
-        description="Monitor verified healthcare schemes, evidence provenance, conflict audits, and server-side governance."
+        description="Monitor verified healthcare schemes, evidence provenance, platform caseload, and server-side governance."
         navTabs={navTabs}
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId)}
@@ -169,13 +189,13 @@ export default function AdminPage() {
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
-                <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">
-                  Unverified Evidence Queue
+                <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
+                  Platform Caseload
                 </span>
-                <p className="text-2xl sm:text-3xl font-extrabold text-amber-800">
-                  {conflictsCount}
+                <p className="text-2xl sm:text-3xl font-extrabold text-blue-900">
+                  {adminCases.length}
                 </p>
-                <p className="text-[11px] text-slate-400">Isolated from Rule Engine</p>
+                <p className="text-[11px] text-slate-400">Total Enrolled Cases</p>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-1">
@@ -341,7 +361,78 @@ export default function AdminPage() {
               </section>
             )}
 
-            {/* 4. System Governance Tab */}
+            {/* 4. Platform Caseload Tab */}
+            {(activeTab === "overview" || activeTab === "cases") && (
+              <section className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                      Platform Caseload & Operational Oversight
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      Administrative visibility across all enrolled household cases and assigned ASHA workers.
+                    </p>
+                  </div>
+
+                  <div className="w-full sm:w-64">
+                    <Input
+                      placeholder="Search cases by name, district, or ASHA UID..."
+                      value={caseSearchFilter}
+                      onChange={(e) => setCaseSearchFilter(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {filteredCases.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
+                    No matching cases recorded across platform.
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                          <tr>
+                            <th className="py-3 px-4">Case ID</th>
+                            <th className="py-3 px-4">Head of Household</th>
+                            <th className="py-3 px-4">District</th>
+                            <th className="py-3 px-4">Assigned ASHA UID</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Priority</th>
+                            <th className="py-3 px-4">Gaps</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredCases.map((c) => (
+                            <tr key={c.id} className="hover:bg-slate-50">
+                              <td className="py-3 px-4 font-mono font-bold text-slate-900">{c.id}</td>
+                              <td className="py-3 px-4 font-bold text-slate-900">{c.headOfHouseholdName}</td>
+                              <td className="py-3 px-4 text-slate-600">{c.district}, {c.state}</td>
+                              <td className="py-3 px-4 font-mono text-slate-600">{c.assignedAshaUid}</td>
+                              <td className="py-3 px-4">
+                                <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-blue-50 text-blue-800 border border-blue-200">
+                                  {c.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-slate-100 text-slate-700">
+                                  {c.priority}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-slate-700 font-medium">
+                                {c.detectedGapsCount} gap(s)
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* 5. System Governance Tab */}
             {(activeTab === "overview" || activeTab === "governance") && (
               <section className="space-y-4">
                 <div>
@@ -372,13 +463,13 @@ export default function AdminPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3 shadow-2xs">
                     <div className="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
                       <ShieldCheck className="w-4 h-4 text-teal-700" />
-                      <span>Upcoming System Telemetry</span>
+                      <span>Platform Audit Integrity</span>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Real-time API error monitoring, automated load metric dashboards, and detailed audit log exporters are scheduled for subsequent platform releases.
+                      All critical workflow transitions (household connection, case assignment, notes, follow-ups, and assistance requests) generate immutable server-side activity records on Cloud Firestore.
                     </p>
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500">
-                      <em>No fabricated charts or simulated counters. Real data only.</em>
+                      <em>Immutable append-only operational history.</em>
                     </div>
                   </div>
                 </div>

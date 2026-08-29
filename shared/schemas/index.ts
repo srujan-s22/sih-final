@@ -8,3 +8,4 @@ export * from "./ai.schema.js";
 export * from "./assistant.schema.js";
 export * from "./case.schema.js";
 export * from "./connection.schema.js";
+export * from "./assistance.schema.js";

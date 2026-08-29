@@ -135,6 +135,14 @@ export class CaseServiceClient {
       input
     );
   }
+
+  /**
+   * Retrieves all platform cases for Administrative oversight
+   */
+  public async listAllCasesForAdmin(): Promise<ApiResult<{ cases: AshaCase[] }>> {
+    return apiClient.get<{ cases: AshaCase[] }>("/api/v1/admin/cases");
+  }
 }
 
 export const caseService = new CaseServiceClient();
+
