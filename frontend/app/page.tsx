@@ -20,6 +20,7 @@ import {
   HeartHandshake,
   ChevronRight,
   ExternalLink,
+  Info,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -377,6 +378,14 @@ export default function HomePage() {
               <span className="text-teal-700 font-semibold">State Portals</span>
             </div>
           </div>
+        </div>
+
+        {/* Informational Assessment Disclaimer */}
+        <div className="mt-6 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
+          <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+          <p>
+            <strong>Informational Notice:</strong> Eligibility shown is an informational assessment based on the registered scheme criteria. Final eligibility and enrollment are determined by the relevant government authority.
+          </p>
         </div>
       </Shell>
 

@@ -51,11 +51,37 @@ export class AssistanceService {
     input: UpdateAssistanceRequestInput
   ): Promise<ApiResult<AshaAssistanceRequest>> {
     return apiClient.patch<AshaAssistanceRequest>(
-      `/api/v1/asha/assistance-requests/${requestId}`,
+      `/api/v1/asha/assistance-requests/${encodeURIComponent(requestId)}`,
       input
+    );
+  }
+
+  /**
+   * ASHA accepts an incoming assistance request and initiates case workflow & tasks.
+   */
+  public async acceptAssistanceRequest(
+    requestId: string
+  ): Promise<ApiResult<{ request: AshaAssistanceRequest; caseId: string }>> {
+    return apiClient.post<{ request: AshaAssistanceRequest; caseId: string }>(
+      `/api/v1/asha/assistance-requests/${encodeURIComponent(requestId)}/accept`,
+      {}
+    );
+  }
+
+  /**
+   * ASHA declines an assistance request with a reason.
+   */
+  public async declineAssistanceRequest(
+    requestId: string,
+    reason: string
+  ): Promise<ApiResult<AshaAssistanceRequest>> {
+    return apiClient.post<AshaAssistanceRequest>(
+      `/api/v1/asha/assistance-requests/${encodeURIComponent(requestId)}/decline`,
+      { reason }
     );
   }
 }
 
 export const assistanceService = new AssistanceService();
+
 

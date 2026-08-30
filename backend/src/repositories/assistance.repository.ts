@@ -213,6 +213,18 @@ export class AssistanceRepository extends BaseFirestoreRepository<AshaAssistance
     }
   }
 
+  public async updateRequestStatus(
+    requestId: string,
+    status: AssistanceStatus,
+    responseNote?: string
+  ): Promise<AshaAssistanceRequest | null> {
+    const updates: Partial<AshaAssistanceRequest> = { status };
+    if (responseNote !== undefined) {
+      updates.responseNote = responseNote;
+    }
+    return this.updateRequest(requestId, updates);
+  }
+
   public async updateRequest(
     requestId: string,
     updates: Partial<AshaAssistanceRequest>

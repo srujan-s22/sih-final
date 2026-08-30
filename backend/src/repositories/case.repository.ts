@@ -4,6 +4,7 @@ import {
   CaseNote,
   CaseFollowUp,
   CaseActivity,
+  CaseTask,
   CaseStatus,
   CasePriority,
 } from "../../../shared/types/case.js";
@@ -15,6 +16,7 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
   private memoryNotes = new Map<string, Map<string, CaseNote>>(); // caseId -> (noteId -> CaseNote)
   private memoryFollowUps = new Map<string, Map<string, CaseFollowUp>>(); // caseId -> (followupId -> CaseFollowUp)
   private memoryActivities = new Map<string, Map<string, CaseActivity>>(); // caseId -> (activityId -> CaseActivity)
+  private memoryTasks = new Map<string, Map<string, CaseTask>>(); // caseId -> (taskId -> CaseTask)
 
   constructor(firestore: Firestore | null = null) {
     super("cases", firestore);
@@ -29,6 +31,7 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
     this.memoryNotes.clear();
     this.memoryFollowUps.clear();
     this.memoryActivities.clear();
+    this.memoryTasks.clear();
   }
 
   // ============================================================================
@@ -179,6 +182,7 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
       this.memoryNotes.delete(id);
       this.memoryFollowUps.delete(id);
       this.memoryActivities.delete(id);
+      this.memoryTasks.delete(id);
       return existed;
     }
 
@@ -195,6 +199,9 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
 
     const activitiesSnap = await docRef.collection("activities").get();
     for (const d of activitiesSnap.docs) await d.ref.delete();
+
+    const tasksSnap = await docRef.collection("tasks").get();
+    for (const d of tasksSnap.docs) await d.ref.delete();
 
     await docRef.delete();
     return true;
@@ -368,4 +375,102 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
       ...(doc.data() as Omit<CaseActivity, "id">),
     }));
   }
+
+  // ============================================================================
+  // CASE TASKS SUBCOLLECTION
+  // ============================================================================
+
+  public async createTask(caseId: string, task: CaseTask): Promise<CaseTask> {
+    if (this.isUnitTestMode()) {
+      let taskMap = this.memoryTasks.get(caseId);
+      if (!taskMap) {
+        taskMap = new Map();
+        this.memoryTasks.set(caseId, taskMap);
+      }
+      taskMap.set(task.id, { ...task });
+      return { ...task };
+    }
+
+    await this.getCollection()
+      .doc(caseId)
+      .collection("tasks")
+      .doc(task.id)
+      .set(task);
+
+    return { ...task };
+  }
+
+  public async getTasks(caseId: string): Promise<CaseTask[]> {
+    if (this.isUnitTestMode()) {
+      const taskMap = this.memoryTasks.get(caseId);
+      if (!taskMap) return [];
+      return Array.from(taskMap.values())
+        .map((t) => ({ ...t }))
+        .sort((a, b) => a.order - b.order || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+
+    const snapshot = await this.getCollection()
+      .doc(caseId)
+      .collection("tasks")
+      .orderBy("order", "asc")
+      .get();
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<CaseTask, "id">),
+    }));
+  }
+
+  public async getTaskById(caseId: string, taskId: string): Promise<CaseTask | null> {
+    if (this.isUnitTestMode()) {
+      const taskMap = this.memoryTasks.get(caseId);
+      if (!taskMap) return null;
+      const found = taskMap.get(taskId);
+      return found ? { ...found } : null;
+    }
+
+    const doc = await this.getCollection()
+      .doc(caseId)
+      .collection("tasks")
+      .doc(taskId)
+      .get();
+
+    if (!doc.exists) return null;
+    return { id: doc.id, ...(doc.data() as Omit<CaseTask, "id">) };
+  }
+
+  public async updateTask(
+    caseId: string,
+    taskId: string,
+    updates: Partial<CaseTask>
+  ): Promise<CaseTask | null> {
+    if (this.isUnitTestMode()) {
+      const taskMap = this.memoryTasks.get(caseId);
+      if (!taskMap) return null;
+      const existing = taskMap.get(taskId);
+      if (!existing) return null;
+
+      const updated: CaseTask = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      taskMap.set(taskId, updated);
+      return { ...updated };
+    }
+
+    const docRef = this.getCollection().doc(caseId).collection("tasks").doc(taskId);
+    const existing = await docRef.get();
+    if (!existing.exists) return null;
+
+    const updatedPayload = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.set(updatedPayload, { merge: true });
+    const fresh = await docRef.get();
+    return { id: fresh.id, ...(fresh.data() as Omit<CaseTask, "id">) };
+  }
 }
+

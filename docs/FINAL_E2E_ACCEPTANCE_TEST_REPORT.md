@@ -6,7 +6,9 @@
 
 This acceptance test was executed against the **live, running application** with zero code modifications, active browser interactions via Chrome DevTools, real HTTP request/response inspection, and direct Cloud Firestore verification.
 
-### System Readiness Breakdown
+> **Verification Notice**: This report documents successful internal end-to-end acceptance testing across all functional requirements and security invariants for SIH demonstration readiness. It does not represent formal external certification or official government validation.
+
+### System Verification Breakdown
 | Feature Category | Result | Score |
 | :--- | :---: | :---: |
 | **A. Citizen E2E Flow** | **PASS** | **100%** |
@@ -19,7 +21,7 @@ This acceptance test was executed against the **live, running application** with
 | **H. Security, RBAC & IDOR Boundaries** | **PASS** | **100%** |
 | **I. API / UI Consistency** | **PASS** | **100%** |
 | **J. Firestore Data Consistency** | **PASS** | **100%** |
-| **OVERALL PRODUCT READINESS** | **PASS** | **100%** |
+| **All Defined E2E Acceptance Tests** | **PASS** | **100% (24/24 Passed)** |
 
 ---
 
@@ -33,12 +35,12 @@ This acceptance test was executed against the **live, running application** with
 - **Verdict**: **PASS**
 
 ### Section B — ASHA Operational Workspace Result
-- **Registration with Staff Code**: Registered using authorized secret `AshaSecret2026!`, automatically assigned unique service code `ASHA-KA-9Q84`.
+- **Registration with Staff Code**: Registered using authorized ASHA staff code, automatically assigned unique service code `ASHA-KA-9Q84`.
 - **Live Caseload Counter**: Live dashboard metrics updated dynamically from database: Assigned Cases, Needs Attention, Citizen Requests, Upcoming Tasks, Resolved Cases.
 - **Verdict**: **PASS**
 
 ### Section C — Admin Platform Governance Result
-- **Registration with Admin Code**: Registered using authorized secret `AdminSecret2026!`, server-side role verified as `ADMIN`.
+- **Registration with Admin Code**: Registered using authorized administrator code, server-side role verified as `ADMIN`.
 - **Platform Caseload Visibility**: Admin dashboard reflects all platform cases (`case_1787931771029_l8a7n`, `case_1787983354699_vog09`, `case_1787983290913_f2xtb`, etc.) with assigned ASHA UIDs and gap counts.
 - **Scheme & Evidence Registry**: Verified 2 active national scheme rules (`ab-pmjay`, `jsy`) with official Ministry gazette citations.
 - **Verdict**: **PASS**
@@ -121,7 +123,7 @@ asha_assistance_requests/ast_req_1 (Category: "SCHEME_ENROLLMENT", Status: "RESO
 | # | Acceptance Test Case | Execution Layer | Status |
 | :---: | :--- | :--- | :---: |
 | **01** | Backend & Frontend Simultaneous Launch | Real Node / Next.js Server Processes | **PASS** |
-| **02** | ASHA Registration with Authorized Code (`AshaSecret2026!`) | Fastify API + Firebase Auth | **PASS** |
+| **02** | ASHA Registration with Authorized Staff Code | Fastify API + Firebase Auth | **PASS** |
 | **03** | ASHA Service Code Unique Generation (`ASHA-KA-9Q84`) | Firestore `users/{uid}` | **PASS** |
 | **04** | Citizen Registration & DPDP Digital Consent Acceptance | Fastify API + Firestore `users/{uid}` | **PASS** |
 | **05** | Role Routing Strictness (Citizen -> `/citizen`, ASHA -> `/asha`, Admin -> `/admin`) | Next.js Routing Guards | **PASS** |
@@ -138,7 +140,7 @@ asha_assistance_requests/ast_req_1 (Category: "SCHEME_ENROLLMENT", Status: "RESO
 | **16** | Citizen Submits Scheme Assistance Request (`category: SCHEME_ENROLLMENT`) | Firestore `/asha_assistance_requests` | **PASS** |
 | **17** | ASHA Receives Assistance Request in Queue & Resolves with Note | Fastify `/api/v1/asha/assistance-requests/:id` | **PASS** |
 | **18** | Citizen Views Resolved Status & ASHA Response Note | Fastify `/api/v1/citizen/assistance` | **PASS** |
-| **19** | Admin Logs In with Authorized Code (`AdminSecret2026!`) | Fastify API + Firebase Auth | **PASS** |
+| **19** | Admin Logs In with Authorized Administrator Code | Fastify API + Firebase Auth | **PASS** |
 | **20** | Admin Platform Caseload Displays All Household Cases | Fastify `/api/v1/admin/cases` | **PASS** |
 | **21** | Admin Scheme & Evidence Registry Verification | Fastify `/api/v1/schemes` & `/evidence` | **PASS** |
 | **22** | Server-Side RBAC Enforcement (Citizen/ASHA blocked from Admin) | Fastify Auth & Role Guards | **PASS** |
@@ -153,7 +155,7 @@ asha_assistance_requests/ast_req_1 (Category: "SCHEME_ENROLLMENT", Status: "RESO
 1. You open the website, create your account, and agree to the privacy consent form.
 2. You enter your basic family details: where you live, your ration card category (like BPL), and the names, ages, and health status of your family members (such as your elderly father or pregnant spouse).
 3. The system instantly shows you which government health schemes your family qualifies for (like free hospital treatment up to ₹5 lakh under Ayushman Bharat for seniors).
-4. If you have an ASHA healthcare worker in your village or ward, you type in her 4-letter service code to connect with her.
+4. If you have an ASHA healthcare worker in your village or ward, you type in her unique ASHA Service Code to connect with her.
 5. Whenever you need help getting an Ayushman Golden Card made, submitting documents, or going to the hospital, you click **"Get Help from ASHA Worker"**, select what you need, and send the request directly from your phone.
 6. When the ASHA worker completes the work or gives you advice, her reply appears right on your screen.
 

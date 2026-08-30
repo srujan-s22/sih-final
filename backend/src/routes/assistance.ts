@@ -157,6 +157,67 @@ export const assistanceRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
+
+  /**
+   * POST /api/v1/asha/assistance-requests/:requestId/accept
+   * ASHA accepts an incoming assistance request, linking or creating the case and initiating tasks.
+   */
+  fastify.post(
+    "/v1/asha/assistance-requests/:requestId/accept",
+    {
+      preHandler: [requireAuth, requireConsent],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const userProfile = request.userProfile!;
+      const { requestId } = request.params as { requestId: string };
+
+      try {
+        const result = await fastify.assistanceService.acceptAssistanceRequest(
+          requestId,
+          userProfile
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        return handleAssistanceError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/assistance-requests/:requestId/decline
+   * ASHA declines an incoming assistance request with a reason.
+   */
+  fastify.post(
+    "/v1/asha/assistance-requests/:requestId/decline",
+    {
+      preHandler: [requireAuth, requireConsent],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const userProfile = request.userProfile!;
+      const { requestId } = request.params as { requestId: string };
+      const body = request.body as { reason?: string } | undefined;
+      const reason = body?.reason?.trim() || "Declined by ASHA worker";
+
+      try {
+        const result = await fastify.assistanceService.declineAssistanceRequest(
+          requestId,
+          userProfile,
+          reason
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        return handleAssistanceError(err, reply);
+      }
+    }
+  );
 };
 
 function parseResultError(error: any): string {
@@ -165,3 +226,4 @@ function parseResultError(error: any): string {
   }
   return "Invalid payload";
 }
+

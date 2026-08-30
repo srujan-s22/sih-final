@@ -87,13 +87,15 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     schemeRepository
   );
   const connectionRepository = new ConnectionRepository(firestoreInstance);
+  const assistanceRepository = new AssistanceRepository(firestoreInstance);
   const caseService = new CaseService(
     caseRepository,
     householdRepository,
     eligibilityService,
     guidanceService,
     userRepository,
-    connectionRepository
+    connectionRepository,
+    assistanceRepository
   );
   const connectionService = new ConnectionService(
     connectionRepository,
@@ -101,12 +103,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     householdRepository,
     caseRepository
   );
-  const assistanceRepository = new AssistanceRepository(firestoreInstance);
   const assistanceService = new AssistanceService(
     assistanceRepository,
     connectionRepository,
     householdRepository,
-    caseRepository
+    caseRepository,
+    caseService
   );
   const evidenceRepository = new EvidenceRepository(firestoreInstance);
   const evidenceService = new EvidenceService(evidenceRepository, schemeRepository);

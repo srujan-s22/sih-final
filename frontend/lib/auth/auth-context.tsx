@@ -110,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
+        apiClient.clearTokenProvider();
         setUserProfile(null);
         setIsConsentRequired(false);
         setIsLoading(false);
@@ -118,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Register 401 callback with api client
     apiClient.setUnauthorizedHandler(() => {
+      apiClient.clearTokenProvider();
       setUserProfile(null);
       setIsConsentRequired(false);
     });
@@ -128,9 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(async (email: string, pass: string) => {
     setIsLoading(true);
     setError(null);
+    apiClient.clearTokenProvider();
     try {
       const firebaseUser = await authSignInWithEmail(email, pass);
       setUser(firebaseUser);
+      // Force token refresh on fresh sign-in to guarantee fresh role & claims
+      try {
+        await firebaseUser.getIdToken(true);
+      } catch {
+        // Non-blocking fallback
+      }
       const syncRes = await authService.syncUser({
         displayName: firebaseUser.displayName,
         phoneNumber: firebaseUser.phoneNumber,
@@ -157,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       setIsLoading(true);
       setError(null);
+      apiClient.clearTokenProvider();
       isExplicitRegistrationActiveRef.current = true;
       let createdFirebaseUser: User | null = null;
       try {
@@ -219,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    apiClient.clearTokenProvider();
     try {
       await authSignInWithGoogle();
     } catch (err: unknown) {
@@ -256,10 +267,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
+      apiClient.clearTokenProvider();
       await authSignOut();
       setUser(null);
       setUserProfile(null);
       setIsConsentRequired(false);
+      setError(null);
     } finally {
       setIsLoading(false);
     }

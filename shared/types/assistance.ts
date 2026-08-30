@@ -8,9 +8,17 @@ export type AssistanceCategory =
 
 export type AssistanceStatus =
   | "PENDING"
+  | "REQUESTED"
+  | "ACCEPTED"
   | "IN_PROGRESS"
+  | "FOLLOW_UP_REQUIRED"
+  | "BLOCKED"
+  | "ESCALATED"
   | "RESOLVED"
+  | "DECLINED"
   | "CLOSED";
+
+export type AssistancePriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 
 export interface AshaAssistanceRequest {
   id: string;
@@ -25,9 +33,17 @@ export interface AshaAssistanceRequest {
   category: AssistanceCategory;
   schemeId?: string | null;
   schemeName?: string | null;
+  beneficiaryMemberId?: string | null;
+  beneficiaryName?: string | null;
+  beneficiaryAge?: number | null;
+  beneficiaryRelationship?: string | null;
   message: string;
+  priority: AssistancePriority;
   status: AssistanceStatus;
+  initiatedBy?: "CITIZEN" | "ASHA";
   responseNote?: string | null;
+  declineReason?: string | null;
+  caseId?: string | null;
   resolvedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -35,12 +51,16 @@ export interface AshaAssistanceRequest {
 
 export interface CreateAssistanceRequestInput {
   category: AssistanceCategory;
-  schemeId?: string;
-  schemeName?: string;
+  schemeId?: string | null;
+  schemeName?: string | null;
+  beneficiaryMemberId?: string | null;
   message: string;
+  priority?: AssistancePriority;
 }
 
 export interface UpdateAssistanceRequestInput {
   status: AssistanceStatus;
-  responseNote?: string;
+  responseNote?: string | null;
+  declineReason?: string | null;
 }
+

@@ -89,7 +89,7 @@ sequenceDiagram
     {
       "displayName": "Sunita Devi",
       "requestedRole": "ASHA",
-      "registrationSecret": "AshaSecret2026!"
+      "registrationSecret": "<AUTHORIZED_STAFF_SECRET>"
     }
     ```
   - **Responses**:

@@ -3,24 +3,37 @@ import {
   CaseNote,
   CaseFollowUp,
   CaseActivity,
+  CaseTask,
+  SchemeJourneyStep,
   CaseStatus,
   CasePriority,
   CaseDetailResponse,
   CaseSummaryResponse,
   FieldRegistrationInput,
+  AshaAttentionSignal,
+  AshaAttentionPriority,
+  AshaAttentionSignalsResponse,
+  InitiateSchemeAssistanceInput,
+  InitiateSchemeAssistanceResponse,
 } from "../../../shared/types/case.js";
 import { UserProfile } from "../../../shared/types/auth.js";
 import { Household, Member } from "../../../shared/types/household.js";
+import { AshaAssistanceRequest } from "../../../shared/types/assistance.js";
 import {
   UpdateCaseInput,
+  CreateCaseTaskInput,
+  UpdateCaseTaskInput,
+  CompleteCaseTaskInput,
   CreateCaseNoteInput,
   CreateCaseFollowUpInput,
   UpdateCaseFollowUpInput,
 } from "../../../shared/schemas/case.schema.js";
+
 import { CaseRepository } from "../repositories/case.repository.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { ConnectionRepository } from "../repositories/connection.repository.js";
+import { AssistanceRepository } from "../repositories/assistance.repository.js";
 import { EligibilityService } from "./eligibility/eligibility.service.js";
 import { GuidanceService } from "./guidance/guidance.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
@@ -44,7 +57,8 @@ export class CaseService {
     private eligibilityService: EligibilityService,
     private guidanceService: GuidanceService,
     private userRepo?: UserRepository,
-    private connectionRepo?: ConnectionRepository
+    private connectionRepo?: ConnectionRepository,
+    private assistanceRepo?: AssistanceRepository
   ) {}
 
   /**
@@ -105,13 +119,20 @@ export class CaseService {
 
     const totalAssigned = cases.length;
     const needsAttentionCount = cases.filter(
-      (c) => c.status === "NEEDS_ATTENTION" || c.detectedGapsCount > 0
+      (c) =>
+        (c.status === "NEEDS_ATTENTION" || c.detectedGapsCount > 0) &&
+        !["RESOLVED", "CLOSED"].includes(c.status)
     ).length;
     const urgentCount = cases.filter(
-      (c) => c.priority === "URGENT" || c.priority === "HIGH"
+      (c) =>
+        (c.priority === "URGENT" || c.priority === "HIGH") &&
+        !["RESOLVED", "CLOSED"].includes(c.status)
     ).length;
     const upcomingFollowUpsCount = cases.filter(
-      (c) => c.nextFollowUpAt && new Date(c.nextFollowUpAt) >= now
+      (c) =>
+        c.nextFollowUpAt &&
+        new Date(c.nextFollowUpAt) >= now &&
+        !["RESOLVED", "CLOSED"].includes(c.status)
     ).length;
     const resolvedCount = cases.filter(
       (c) => c.status === "RESOLVED" || c.status === "CLOSED"
@@ -154,12 +175,13 @@ export class CaseService {
     const members = await this.householdRepo.getMembers(c.householdId);
 
     // Deterministic Level 1 & 2 Engine Evaluations
-    const [eligibilityResults, guidance, notes, followUps, activities] = await Promise.all([
+    const [eligibilityResults, guidance, notes, followUps, activities, tasks] = await Promise.all([
       this.eligibilityService.evaluateHouseholdForSchemes(household, members),
-      this.guidanceService.getCitizenGuidance(c.householdId),
+      this.guidanceService.getHouseholdGuidance(household, members),
       this.caseRepo.getNotes(caseId),
       this.caseRepo.getFollowUps(caseId),
       this.caseRepo.getActivities(caseId),
+      this.caseRepo.getTasks(caseId),
     ]);
 
     // Keep case gap and scheme counts in sync if changed
@@ -175,12 +197,24 @@ export class CaseService {
       c.eligibleSchemesCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
     }
 
+    // Default journey steps if case has a scheme but journeySteps not yet persisted
+    let journeySteps = c.journeySteps || [];
+    if (journeySteps.length === 0 && c.schemeId) {
+      if (c.schemeId === "ab-pmjay") {
+        journeySteps = CaseService.getPmjayDefaultJourney(c.beneficiaryName);
+      } else if (c.schemeId === "jsy") {
+        journeySteps = CaseService.getJsyDefaultJourney(c.beneficiaryName);
+      }
+    }
+
     return {
       case: c,
       household,
       members,
       eligibilityResults,
       guidance,
+      tasks,
+      journeySteps,
       notes,
       followUps,
       activities,
@@ -665,4 +699,977 @@ export class CaseService {
     }
     return this.caseRepo.listAllCases(filter);
   }
+
+  // ============================================================================
+  // SCHEME-SPECIFIC JOURNEYS & TASK SYSTEM (PHASES 8, 9, 10)
+  // ============================================================================
+
+  public static getPmjayDefaultJourney(beneficiaryName?: string | null): SchemeJourneyStep[] {
+    return [
+      {
+        stepId: "ELIGIBILITY_IDENTIFIED",
+        title: "Eligibility Identified",
+        description: `Senior citizen (70+) healthcare entitlement detected for ${beneficiaryName || "beneficiary"}.`,
+        status: "COMPLETED",
+      },
+      {
+        stepId: "BENEFICIARY_CONFIRMED",
+        title: "Beneficiary Identity Confirmed",
+        description: "ASHA confirmed senior beneficiary identity and age proof documentation.",
+        status: "CURRENT",
+      },
+      {
+        stepId: "ENROLLMENT_GUIDANCE",
+        title: "e-KYC & Enrollment Guidance",
+        description: "Official Aadhaar e-KYC and PM-JAY portal/CSC registration guidance provided.",
+        status: "PENDING",
+      },
+      {
+        stepId: "ENROLLMENT_COMPLETED",
+        title: "PM-JAY Enrollment Submission",
+        description: "Official enrollment application submitted and verified.",
+        status: "PENDING",
+      },
+      {
+        stepId: "CARD_STATUS_CONFIRMED",
+        title: "Ayushman Card Generated",
+        description: "Ayushman Card generation & digital/physical receipt confirmed.",
+        status: "PENDING",
+      },
+      {
+        stepId: "BENEFIT_ACCESS_GUIDANCE",
+        title: "Hospital Network & Benefit Access",
+        description: "Guidance provided on empaneled hospitals and ₹5 Lakh annual cashless care.",
+        status: "PENDING",
+      },
+      {
+        stepId: "CASE_RESOLVED",
+        title: "Assistance Journey Completed",
+        description: "All senior citizen healthcare support milestones completed.",
+        status: "PENDING",
+      },
+    ];
+  }
+
+  public static getJsyDefaultJourney(beneficiaryName?: string | null): SchemeJourneyStep[] {
+    return [
+      {
+        stepId: "PREGNANCY_INFORMATION",
+        title: "Pregnancy Information Confirmed",
+        description: `Maternal health status recorded for ${beneficiaryName || "beneficiary"}.`,
+        status: "COMPLETED",
+      },
+      {
+        stepId: "ELIGIBILITY_VERIFICATION",
+        title: "JSY Eligibility Verified",
+        description: "Verified institutional delivery and maternal care eligibility under NHM.",
+        status: "CURRENT",
+      },
+      {
+        stepId: "REGISTRATION_ANC",
+        title: "MCP Card & ANC Registration",
+        description: "Assisted with Mother and Child Protection card and Antenatal Care checkups.",
+        status: "PENDING",
+      },
+      {
+        stepId: "DELIVERY_FACILITY",
+        title: "Delivery Facility Mapping",
+        description: "Mapped accredited public health center / hospital and emergency transport.",
+        status: "PENDING",
+      },
+      {
+        stepId: "INSTITUTIONAL_DELIVERY",
+        title: "Institutional Delivery Coordination",
+        description: "Assisted with hospital admission and safe institutional delivery.",
+        status: "PENDING",
+      },
+      {
+        stepId: "POSTNATAL_FOLLOW_UP",
+        title: "Postnatal & Newborn Care",
+        description: "Conducted 48-hour and 14-day postnatal visit and infant immunization check.",
+        status: "PENDING",
+      },
+      {
+        stepId: "BENEFIT_PROCESSING",
+        title: "Direct Benefit Transfer Tracking",
+        description: "Tracked JSY cash assistance transfer and hospital discharge paperwork.",
+        status: "PENDING",
+      },
+      {
+        stepId: "CASE_RESOLVED",
+        title: "Maternal Care Journey Completed",
+        description: "Postpartum recovery and maternal health milestones fulfilled.",
+        status: "PENDING",
+      },
+    ];
+  }
+
+  /**
+   * Initializes scheme-specific journey steps and creates default ASHA tasks
+   */
+  public async initializeSchemeJourney(
+    caseId: string,
+    schemeId: string,
+    beneficiary?: Member | null,
+    userProfile?: UserProfile
+  ): Promise<CaseTask[]> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    if (userProfile) {
+      this.authorizeCaseAccess(c, userProfile);
+    }
+
+    const beneficiaryName = beneficiary ? beneficiary.fullName : c.beneficiaryName;
+    const now = new Date().toISOString();
+
+    let journeySteps: SchemeJourneyStep[] = [];
+    const generatedTasks: Array<{ type: string; title: string; description: string; order: number }> = [];
+
+    if (schemeId === "ab-pmjay") {
+      journeySteps = CaseService.getPmjayDefaultJourney(beneficiaryName);
+      generatedTasks.push(
+        {
+          type: "CONFIRM_BENEFICIARY",
+          title: "Confirm senior citizen identity & age documentation",
+          description: `Verify Aadhaar card and age proof (70+) for ${beneficiaryName || "beneficiary"}.`,
+          order: 1,
+        },
+        {
+          type: "ENROLLMENT_GUIDANCE",
+          title: "Provide Aadhaar e-KYC & official PM-JAY registration guidance",
+          description: "Guide the family to the nearest CSC center or official beneficiary.nha.gov.in portal.",
+          order: 2,
+        },
+        {
+          type: "VERIFY_ENROLLMENT",
+          title: "Record PM-JAY enrollment submission & reference number",
+          description: "Follow up with household to confirm enrollment application has been submitted.",
+          order: 3,
+        },
+        {
+          type: "CONFIRM_CARD",
+          title: "Confirm Ayushman Card generation status",
+          description: "Confirm whether physical or digital Ayushman Card has been downloaded or received.",
+          order: 4,
+        },
+        {
+          type: "BENEFIT_GUIDANCE",
+          title: "Provide empaneled hospital guidance & ₹5 Lakh cover details",
+          description: "Inform household about nearest empaneled public/private hospitals for cashless care.",
+          order: 5,
+        }
+      );
+    } else if (schemeId === "jsy") {
+      journeySteps = CaseService.getJsyDefaultJourney(beneficiaryName);
+      generatedTasks.push(
+        {
+          type: "CONFIRM_PREGNANCY",
+          title: "Verify pregnancy records & MCP Card documentation",
+          description: `Confirm maternal health status, LMP, and Mother and Child Protection Card for ${beneficiaryName || "beneficiary"}.`,
+          order: 1,
+        },
+        {
+          type: "ANC_COORDINATION",
+          title: "Coordinate Antenatal Care (ANC) checkup schedule",
+          description: "Ensure at least 4 ANC checkups, TT injections, and IFA tablets are scheduled.",
+          order: 2,
+        },
+        {
+          type: "FACILITY_MAPPING",
+          title: "Map accredited delivery hospital & emergency transport",
+          description: "Identify nearest accredited public facility and register 108/102 ambulance contact.",
+          order: 3,
+        },
+        {
+          type: "DELIVERY_SUPPORT",
+          title: "Institutional delivery coordination & admission support",
+          description: "Assist family during labor onset for timely hospital arrival and institutional delivery.",
+          order: 4,
+        },
+        {
+          type: "POSTNATAL_VISIT",
+          title: "Conduct 48-hour & 14-day postnatal visit and immunization",
+          description: "Check maternal recovery, infant breastfeeding, and zero-dose immunization (BCG, OPV, Hep B).",
+          order: 5,
+        },
+        {
+          type: "DBT_TRACKING",
+          title: "Track JSY cash incentive DBT bank transfer",
+          description: "Verify beneficiary bank account linkage and receipt of official JSY institutional delivery incentive.",
+          order: 6,
+        }
+      );
+    }
+
+    // Update case with scheme journey
+    await this.caseRepo.updateCase(caseId, {
+      schemeId,
+      schemeName: schemeId === "ab-pmjay" ? "Ayushman Bharat PM-JAY" : schemeId === "jsy" ? "Janani Suraksha Yojana" : schemeId,
+      beneficiaryMemberId: beneficiary ? beneficiary.id : c.beneficiaryMemberId,
+      beneficiaryName: beneficiaryName || c.beneficiaryName,
+      journeySteps,
+      currentJourneyStep: journeySteps[1]?.stepId || journeySteps[0]?.stepId || null,
+      status: "IN_PROGRESS",
+    });
+
+    // Create tasks in subcollection
+    const createdTasks: CaseTask[] = [];
+    for (const t of generatedTasks) {
+      const task: CaseTask = {
+        id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        caseId,
+        schemeId,
+        beneficiaryMemberId: beneficiary ? beneficiary.id : c.beneficiaryMemberId,
+        beneficiaryName,
+        type: t.type,
+        title: t.title,
+        description: t.description,
+        status: "PENDING",
+        order: t.order,
+        dueDate: null,
+        completedAt: null,
+        completedBy: null,
+        notes: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const savedTask = await this.caseRepo.createTask(caseId, task);
+      createdTasks.push(savedTask);
+    }
+
+    // Audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile ? userProfile.uid : "system",
+      actorRole: userProfile ? userProfile.role : "ASHA",
+      actorName: userProfile ? (userProfile.displayName || "ASHA Worker") : "System",
+      type: "TASK_CREATED",
+      description: `Scheme journey initialized for '${schemeId}' with ${createdTasks.length} field tasks`,
+      metadata: { schemeId, taskCount: createdTasks.length },
+      timestamp: now,
+    });
+
+    return createdTasks;
+  }
+
+  /**
+   * Retrieves tasks for an authorized case
+   */
+  public async getCaseTasks(caseId: string, userProfile: UserProfile): Promise<CaseTask[]> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+    this.authorizeCaseAccess(c, userProfile);
+    return this.caseRepo.getTasks(caseId);
+  }
+
+  /**
+   * Creates a custom field task for a case
+   */
+  public async createCaseTask(
+    caseId: string,
+    input: CreateCaseTaskInput,
+    userProfile: UserProfile
+  ): Promise<CaseTask> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const existingTasks = await this.caseRepo.getTasks(caseId);
+
+    const task: CaseTask = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      schemeId: input.schemeId || c.schemeId,
+      beneficiaryMemberId: input.beneficiaryMemberId || c.beneficiaryMemberId,
+      beneficiaryName: input.beneficiaryName || c.beneficiaryName,
+      type: input.type || "GENERAL",
+      title: input.title.trim(),
+      description: input.description.trim(),
+      status: input.status || "PENDING",
+      order: existingTasks.length + 1,
+      dueDate: input.dueDate || null,
+      completedAt: input.status === "COMPLETED" ? now : null,
+      completedBy: input.status === "COMPLETED" ? (userProfile.displayName || "ASHA Worker") : null,
+      notes: input.notes ? input.notes.trim() : null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const savedTask = await this.caseRepo.createTask(caseId, task);
+
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "TASK_CREATED",
+      description: `Task created: ${task.title}`,
+      metadata: { taskId: task.id, title: task.title },
+      timestamp: now,
+    });
+
+    return savedTask;
+  }
+
+  /**
+   * Updates an existing task
+   */
+  public async updateCaseTask(
+    caseId: string,
+    taskId: string,
+    updates: UpdateCaseTaskInput,
+    userProfile: UserProfile
+  ): Promise<CaseTask> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const updated = await this.caseRepo.updateTask(caseId, taskId, {
+      ...updates,
+      completedAt: updates.status === "COMPLETED" ? now : undefined,
+      completedBy: updates.status === "COMPLETED" ? (userProfile.displayName || "ASHA Worker") : undefined,
+    });
+
+    if (!updated) {
+      throw new CaseServiceError("Task not found.", HTTP_STATUS.NOT_FOUND, "TASK_NOT_FOUND");
+    }
+
+    // Record audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: updates.status === "COMPLETED" ? "TASK_COMPLETED" : "TASK_STATUS_CHANGED",
+      description: `Task '${updated.title}' updated to status '${updated.status}'`,
+      metadata: { taskId, newStatus: updated.status },
+      timestamp: now,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Completes a task and advances the scheme journey step
+   */
+  public async completeCaseTask(
+    caseId: string,
+    taskId: string,
+    input: CompleteCaseTaskInput,
+    userProfile: UserProfile
+  ): Promise<CaseTask> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const updated = await this.caseRepo.updateTask(caseId, taskId, {
+      status: "COMPLETED",
+      completedAt: now,
+      completedBy: userProfile.displayName || "ASHA Worker",
+      notes: input.notes ? input.notes.trim() : undefined,
+    });
+
+    if (!updated) {
+      throw new CaseServiceError("Task not found.", HTTP_STATUS.NOT_FOUND, "TASK_NOT_FOUND");
+    }
+
+    // Re-evaluate journey progress
+    const allTasks = await this.caseRepo.getTasks(caseId);
+    const completedTasksCount = allTasks.filter((t) => t.status === "COMPLETED").length;
+    const totalTasksCount = allTasks.length;
+
+    let journeySteps = c.journeySteps || [];
+    if (journeySteps.length === 0 && c.schemeId) {
+      if (c.schemeId === "ab-pmjay") {
+        journeySteps = CaseService.getPmjayDefaultJourney(c.beneficiaryName);
+      } else if (c.schemeId === "jsy") {
+        journeySteps = CaseService.getJsyDefaultJourney(c.beneficiaryName);
+      }
+    }
+
+    if (journeySteps.length > 0) {
+      // Map task completion to journey step advancement
+      const progressFraction = totalTasksCount > 0 ? completedTasksCount / totalTasksCount : 0;
+      const stepIndex = Math.min(
+        Math.floor(progressFraction * (journeySteps.length - 1)) + 1,
+        journeySteps.length - 1
+      );
+
+      const updatedJourneySteps = journeySteps.map((step, idx) => {
+        if (idx < stepIndex) {
+          return { ...step, status: "COMPLETED" as const, completedAt: step.completedAt || now };
+        } else if (idx === stepIndex) {
+          return { ...step, status: (completedTasksCount === totalTasksCount ? "COMPLETED" : "CURRENT") as "COMPLETED" | "CURRENT" };
+        } else {
+          return { ...step, status: "PENDING" as const };
+        }
+      });
+
+      const nextStep = updatedJourneySteps[stepIndex]?.stepId || null;
+      const isAllDone = completedTasksCount === totalTasksCount;
+
+      await this.caseRepo.updateCase(caseId, {
+        journeySteps: updatedJourneySteps,
+        currentJourneyStep: nextStep,
+        status: isAllDone ? "RESOLVED" : "IN_PROGRESS",
+      });
+
+      // Synchronize linked AshaAssistanceRequest in assistanceRepository if present
+      if (c.assistanceRequestId && this.assistanceRepo) {
+        if (isAllDone) {
+          await this.assistanceRepo.updateRequestStatus(
+            c.assistanceRequestId,
+            "RESOLVED",
+            "All scheme journey tasks completed and resolved by ASHA worker."
+          );
+        } else {
+          await this.assistanceRepo.updateRequestStatus(
+            c.assistanceRequestId,
+            "IN_PROGRESS",
+            `Assistance in progress: ${completedTasksCount}/${totalTasksCount} tasks completed.`
+          );
+        }
+      }
+    }
+
+    // Log immutable audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "TASK_COMPLETED",
+      description: `Task completed: '${updated.title}' (${completedTasksCount}/${totalTasksCount} tasks complete)`,
+      metadata: { taskId, title: updated.title, completedTasksCount, totalTasksCount },
+      timestamp: now,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Generates deterministic proactive attention signals across an ASHA worker's assigned caseload.
+   * Evaluates authoritative household demographics, deterministic scheme eligibility,
+   * healthcare gaps, active task states, and scheduled follow-ups server-side on demand.
+   * Filters out completed and active scheme journeys so resolved cases do not generate stale Start Assistance signals.
+   */
+  public async getAshaAttentionSignals(
+    ashaUid: string
+  ): Promise<AshaAttentionSignalsResponse> {
+    const cases = await this.caseRepo.listCasesByAsha(ashaUid);
+    const now = new Date();
+    const signals: AshaAttentionSignal[] = [];
+
+    for (const c of cases) {
+      try {
+        const household = await this.householdRepo.getHouseholdById(c.householdId);
+        if (!household) continue;
+
+        const members = await this.householdRepo.getMembers(c.householdId);
+
+        // Fetch case sub-collections and evaluate deterministic intelligence on the fly
+        const [eligibilityResults, guidance, tasks, followUps, householdRequests] = await Promise.all([
+          this.eligibilityService.evaluateHouseholdForSchemes(household, members),
+          this.guidanceService.getHouseholdGuidance(household, members),
+          this.caseRepo.getTasks(c.id),
+          this.caseRepo.getFollowUps(c.id),
+          this.assistanceRepo ? this.assistanceRepo.listRequestsByHouseholdId(c.householdId) : Promise.resolve([]),
+        ]);
+
+        const isCaseResolved = ["RESOLVED", "CLOSED"].includes(c.status);
+        const hasActiveJourney = Boolean(
+          c.schemeId && ["IN_PROGRESS", "ACCEPTED", "REQUESTED", "NEW"].includes(c.status)
+        );
+
+        // 1. OVERDUE FOLLOW-UP SIGNALS (URGENT)
+        const overdueFollowUp = followUps.find(
+          (f) => f.status === "PENDING" && new Date(f.scheduledAt).getTime() < now.getTime()
+        );
+        const isCaseNextFollowUpOverdue =
+          c.nextFollowUpAt && new Date(c.nextFollowUpAt).getTime() < now.getTime();
+
+        if (overdueFollowUp || isCaseNextFollowUpOverdue) {
+          signals.push({
+            id: `sig_overdue_${c.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "URGENT",
+            category: "OVERDUE_FOLLOWUP",
+            title: `Overdue Follow-up: ${overdueFollowUp?.reason || "Scheduled Home Visit"}`,
+            subtitle: `Visit was scheduled for ${new Date(
+              overdueFollowUp?.scheduledAt || c.nextFollowUpAt!
+            ).toLocaleDateString()}`,
+            beneficiaryName: overdueFollowUp?.beneficiaryName || c.beneficiaryName || null,
+            beneficiaryMemberId: overdueFollowUp?.beneficiaryMemberId || c.beneficiaryMemberId || null,
+            schemeId: c.schemeId || null,
+            schemeName: c.schemeName || null,
+            recommendedAction: "Conduct doorstep follow-up visit immediately",
+            actionType: "COMPLETE_FOLLOWUP",
+          });
+        }
+
+        // 2. BLOCKED FIELD TASK SIGNALS (URGENT)
+        const blockedTask = tasks.find((t) => t.status === "BLOCKED");
+        if (blockedTask) {
+          signals.push({
+            id: `sig_blocked_${c.id}_${blockedTask.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "URGENT",
+            category: "BLOCKED_TASK",
+            title: `Blocked Field Task: ${blockedTask.title}`,
+            subtitle: blockedTask.notes || "Field assistance task is blocked and requires attention.",
+            beneficiaryName: blockedTask.beneficiaryName || c.beneficiaryName || null,
+            beneficiaryMemberId: blockedTask.beneficiaryMemberId || c.beneficiaryMemberId || null,
+            schemeId: blockedTask.schemeId || c.schemeId || null,
+            schemeName: c.schemeName || null,
+            recommendedAction: "Review task notes and unblock scheme journey",
+            actionType: "UNBLOCK_TASK",
+          });
+        }
+
+        // 3. PREGNANCY CARE & JSY SIGNALS (HIGH)
+        const jsyResult = eligibilityResults.find((r) => r.schemeId === "jsy");
+        const pregnantMember =
+          members.find((m) => m.maternalStatus === "pregnant") ||
+          (jsyResult?.status === "ELIGIBLE"
+            ? members.find((m) => m.gender === "female" && m.age >= 18 && m.age <= 49)
+            : null);
+
+        const jsyRequest = householdRequests.find(
+          (r) => r.schemeId === "jsy" && (pregnantMember ? r.beneficiaryMemberId === pregnantMember.id : true)
+        );
+        const isJsyCompleted =
+          (c.schemeId === "jsy" && ["RESOLVED", "CLOSED"].includes(c.status)) ||
+          (jsyRequest && ["RESOLVED", "CLOSED"].includes(jsyRequest.status));
+        const isJsyActive =
+          (c.schemeId === "jsy" && !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(c.status)) ||
+          (jsyRequest && !["RESOLVED", "CLOSED", "DECLINED"].includes(jsyRequest.status));
+
+        // Only generate START_ASSISTANCE signal if JSY has neither an active nor completed journey
+        if (
+          pregnantMember &&
+          !isJsyActive &&
+          !isJsyCompleted &&
+          (jsyResult?.status === "ELIGIBLE" || jsyResult?.status === "NEEDS_INFORMATION")
+        ) {
+          signals.push({
+            id: `sig_jsy_${c.id}_${pregnantMember.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "HIGH",
+            category: "PREGNANCY_CARE",
+            title: `${pregnantMember.fullName} — Maternal Care & JSY Eligible`,
+            subtitle:
+              "Antenatal care registration, institutional delivery mapping, and ₹1,400 benefit recommended.",
+            beneficiaryName: pregnantMember.fullName,
+            beneficiaryMemberId: pregnantMember.id,
+            beneficiaryAge: pregnantMember.age,
+            beneficiaryRelationship: pregnantMember.relationship,
+            schemeId: "jsy",
+            schemeName: "Janani Suraksha Yojana (JSY)",
+            recommendedAction: "Start JSY Doorstep Assistance",
+            actionType: "INITIATE_SCHEME",
+          });
+        }
+
+        // 4. SENIOR CITIZEN PM-JAY SIGNALS (HIGH)
+        const pmjayResult = eligibilityResults.find((r) => r.schemeId === "ab-pmjay");
+        const seniorMember = members.find((m) => m.age >= 70);
+
+        const pmjayRequest = householdRequests.find(
+          (r) => r.schemeId === "ab-pmjay" && (seniorMember ? r.beneficiaryMemberId === seniorMember.id : true)
+        );
+        const isPmjayCompleted =
+          (c.schemeId === "ab-pmjay" && ["RESOLVED", "CLOSED"].includes(c.status)) ||
+          (pmjayRequest && ["RESOLVED", "CLOSED"].includes(pmjayRequest.status));
+        const isPmjayActive =
+          (c.schemeId === "ab-pmjay" && !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(c.status)) ||
+          (pmjayRequest && !["RESOLVED", "CLOSED", "DECLINED"].includes(pmjayRequest.status));
+
+        // Only generate START_ASSISTANCE signal if PM-JAY has neither an active nor completed journey
+        if (
+          seniorMember &&
+          !isPmjayActive &&
+          !isPmjayCompleted &&
+          pmjayResult?.status === "ELIGIBLE"
+        ) {
+          signals.push({
+            id: `sig_pmjay_${c.id}_${seniorMember.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "HIGH",
+            category: "SENIOR_CITIZEN_PMJAY",
+            title: `${seniorMember.fullName} (Age ${seniorMember.age}) — Senior Citizen PM-JAY Eligible`,
+            subtitle:
+              "Doorstep Aadhaar e-KYC guidance and ₹5 Lakh Ayushman Vay Vandana Card issuance recommended.",
+            beneficiaryName: seniorMember.fullName,
+            beneficiaryMemberId: seniorMember.id,
+            beneficiaryAge: seniorMember.age,
+            beneficiaryRelationship: seniorMember.relationship,
+            schemeId: "ab-pmjay",
+            schemeName: "Ayushman Bharat — PM-JAY (Senior 70+)",
+            recommendedAction: "Start PM-JAY Doorstep Assistance",
+            actionType: "INITIATE_SCHEME",
+          });
+        }
+
+        // 5. INCOMPLETE INFORMATION SIGNALS (MEDIUM)
+        if (
+          !hasActiveJourney &&
+          !isCaseResolved &&
+          (guidance.householdStatus === "MORE_INFORMATION_NEEDED" ||
+            guidance.gaps.some((g) => g.type === "MISSING_INFORMATION"))
+        ) {
+          signals.push({
+            id: `sig_missing_info_${c.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "MEDIUM",
+            category: "MISSING_DOCUMENTS",
+            title: `Incomplete Details: ${c.headOfHouseholdName}'s Household`,
+            subtitle:
+              guidance.statusSummary ||
+              "Additional household verification details needed for entitlement matching.",
+            beneficiaryName: null,
+            beneficiaryMemberId: null,
+            schemeId: null,
+            schemeName: null,
+            recommendedAction: "Review household record and collect missing details",
+            actionType: "REVIEW_CASE",
+          });
+        }
+
+        // 6. UPCOMING SCHEDULED FOLLOW-UP (LOW)
+        const upcomingFollowUp = followUps.find(
+          (f) =>
+            f.status === "PENDING" &&
+            new Date(f.scheduledAt).getTime() >= now.getTime() &&
+            new Date(f.scheduledAt).getTime() <= now.getTime() + 48 * 3600 * 1000
+        );
+
+        if (upcomingFollowUp && !overdueFollowUp) {
+          signals.push({
+            id: `sig_upcoming_${c.id}_${upcomingFollowUp.id}`,
+            householdId: c.householdId,
+            caseId: c.id,
+            headOfHouseholdName: c.headOfHouseholdName,
+            district: c.district,
+            state: c.state,
+            priority: "LOW",
+            category: "UPCOMING_FOLLOWUP",
+            title: `Upcoming Visit: ${upcomingFollowUp.reason}`,
+            subtitle: `Scheduled for ${new Date(upcomingFollowUp.scheduledAt).toLocaleDateString()}`,
+            beneficiaryName: upcomingFollowUp.beneficiaryName || c.beneficiaryName || null,
+            beneficiaryMemberId: upcomingFollowUp.beneficiaryMemberId || c.beneficiaryMemberId || null,
+            schemeId: c.schemeId || null,
+            schemeName: c.schemeName || null,
+            recommendedAction: "Prepare materials for upcoming home visit",
+            actionType: "COMPLETE_FOLLOWUP",
+          });
+        }
+      } catch (err) {
+        // Continue processing remaining households gracefully
+      }
+    }
+
+    // Priority ordering: URGENT (4) -> HIGH (3) -> MEDIUM (2) -> LOW (1)
+    const priorityWeight: Record<AshaAttentionPriority, number> = {
+      URGENT: 4,
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+
+    signals.sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
+
+    const activeSchemeJourneys = cases.filter(
+      (c) => c.schemeId && ["IN_PROGRESS", "ACCEPTED", "REQUESTED"].includes(c.status)
+    ).length;
+
+    const overdueFollowUps = cases.filter(
+      (c) => c.nextFollowUpAt && new Date(c.nextFollowUpAt).getTime() < now.getTime()
+    ).length;
+
+    return {
+      summary: {
+        totalAssignedHouseholds: cases.length,
+        needsAttentionCount: signals.length,
+        activeSchemeJourneys,
+        overdueFollowUps,
+      },
+      signals,
+    };
+  }
+
+  /**
+   * Proactively initiates scheme assistance directly from an ASHA worker's caseload.
+   * Validates server-side case ownership, verifies deterministic eligibility, creates synchronized
+   * AshaAssistanceRequest (initiatedBy: "ASHA"), seeds the 5 PM-JAY / 6 JSY tasks, and logs immutable audit activity.
+   */
+  public async initiateSchemeAssistance(
+    caseId: string,
+    input: InitiateSchemeAssistanceInput,
+    ashaProfile: UserProfile
+  ): Promise<InitiateSchemeAssistanceResponse> {
+    if (ashaProfile.role !== "ASHA" && ashaProfile.role !== "ADMIN") {
+      throw new CaseServiceError(
+        "Only ASHA workers and Administrators can initiate proactive scheme assistance.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_ROLE"
+      );
+    }
+
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    // IDOR boundary
+    this.authorizeCaseAccess(c, ashaProfile);
+
+    // Validate scheme ID
+    const schemeId = input.schemeId.trim();
+    if (schemeId !== "ab-pmjay" && schemeId !== "jsy") {
+      throw new CaseServiceError(
+        `Scheme '${schemeId}' is not supported for automated field assistance.`,
+        HTTP_STATUS.BAD_REQUEST,
+        "UNSUPPORTED_SCHEME"
+      );
+    }
+
+    const household = await this.householdRepo.getHouseholdById(c.householdId);
+    if (!household) {
+      throw new CaseServiceError(
+        "Associated household record not found.",
+        HTTP_STATUS.NOT_FOUND,
+        "HOUSEHOLD_NOT_FOUND"
+      );
+    }
+
+    const members = await this.householdRepo.getMembers(c.householdId);
+
+    // Validate or determine beneficiary member
+    let beneficiary: Member | null = null;
+    if (input.beneficiaryMemberId) {
+      beneficiary = members.find((m) => m.id === input.beneficiaryMemberId) || null;
+      if (!beneficiary) {
+        throw new CaseServiceError(
+          "Selected beneficiary member was not found in this household.",
+          HTTP_STATUS.BAD_REQUEST,
+          "BENEFICIARY_NOT_FOUND"
+        );
+      }
+    } else {
+      if (schemeId === "ab-pmjay") {
+        beneficiary = members.find((m) => m.age >= 70) || null;
+      } else if (schemeId === "jsy") {
+        beneficiary =
+          members.find((m) => m.maternalStatus === "pregnant") ||
+          members.find((m) => m.gender === "female" && m.age >= 18) ||
+          null;
+      }
+    }
+
+    // Evaluate deterministic eligibility on the fly
+    const eligibilityResults = await this.eligibilityService.evaluateHouseholdForSchemes(
+      household,
+      members
+    );
+    const schemeResult = eligibilityResults.find((r) => r.schemeId === schemeId);
+    if (!schemeResult || schemeResult.status === "NOT_ELIGIBLE") {
+      throw new CaseServiceError(
+        `Household does not meet verified eligibility criteria for ${
+          schemeId === "ab-pmjay" ? "Ayushman Bharat PM-JAY" : "Janani Suraksha Yojana (JSY)"
+        }.`,
+        HTTP_STATUS.BAD_REQUEST,
+        "NOT_ELIGIBLE"
+      );
+    }
+
+    if (schemeId === "ab-pmjay") {
+      if (schemeResult.status !== "ELIGIBLE" || !beneficiary || beneficiary.age < 70) {
+        throw new CaseServiceError(
+          "Beneficiary does not meet the 70+ age requirement for Ayushman Bharat PM-JAY.",
+          HTTP_STATUS.BAD_REQUEST,
+          "NOT_ELIGIBLE"
+        );
+      }
+    } else if (schemeId === "jsy") {
+      const isMaternalEligible =
+        beneficiary?.maternalStatus === "pregnant" ||
+        members.some((m) => m.maternalStatus === "pregnant");
+      if (!isMaternalEligible) {
+        throw new CaseServiceError(
+          "Household does not meet pregnancy criteria for Janani Suraksha Yojana (JSY).",
+          HTTP_STATUS.BAD_REQUEST,
+          "NOT_ELIGIBLE"
+        );
+      }
+    }
+
+    // Check duplicate or completed scheme journey on this case
+    if (
+      c.schemeId === schemeId &&
+      (!beneficiary || c.beneficiaryMemberId === beneficiary.id)
+    ) {
+      if (["RESOLVED", "CLOSED"].includes(c.status)) {
+        throw new CaseServiceError(
+          "An assistance journey has already been completed for this scheme and beneficiary.",
+          HTTP_STATUS.CONFLICT,
+          "DUPLICATE_ACTIVE_REQUEST"
+        );
+      }
+      if (c.status !== "CITIZEN_DECLINED") {
+        throw new CaseServiceError(
+          "An active scheme journey already exists for this scheme and beneficiary.",
+          HTTP_STATUS.CONFLICT,
+          "DUPLICATE_ACTIVE_REQUEST"
+        );
+      }
+    }
+
+    // Check duplicate or completed request in assistance repository
+    if (this.assistanceRepo) {
+      const existingRequests = await this.assistanceRepo.listRequestsByHouseholdId(c.householdId);
+      const duplicateOrCompleted = existingRequests.find(
+        (r) =>
+          r.schemeId === schemeId &&
+          (beneficiary ? r.beneficiaryMemberId === beneficiary.id : true) &&
+          r.status !== "DECLINED"
+      );
+      if (duplicateOrCompleted) {
+        if (["RESOLVED", "CLOSED"].includes(duplicateOrCompleted.status)) {
+          throw new CaseServiceError(
+            "An assistance request has already been completed for this scheme and beneficiary.",
+            HTTP_STATUS.CONFLICT,
+            "DUPLICATE_ACTIVE_REQUEST"
+          );
+        } else {
+          throw new CaseServiceError(
+            "An active assistance request already exists for this scheme and beneficiary.",
+            HTTP_STATUS.CONFLICT,
+            "DUPLICATE_ACTIVE_REQUEST"
+          );
+        }
+      }
+    }
+
+    const now = new Date().toISOString();
+    const schemeName =
+      schemeId === "ab-pmjay"
+        ? "Ayushman Bharat — PM-JAY (Senior 70+)"
+        : "Janani Suraksha Yojana (JSY)";
+
+    // Create synchronized AshaAssistanceRequest stamped with initiatedBy: "ASHA"
+    let assistanceRequestId: string | null = null;
+    if (this.assistanceRepo) {
+      const requestId = `ast_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      assistanceRequestId = requestId;
+      const ashaRequest: AshaAssistanceRequest = {
+        id: requestId,
+        householdId: c.householdId,
+        citizenUid: household.ownerUid || c.householdId,
+        headOfHouseholdName: c.headOfHouseholdName,
+        district: c.district,
+        state: c.state,
+        ashaUid: ashaProfile.uid,
+        ashaServiceCode: ashaProfile.ashaServiceCode || "ASHA-WORKER",
+        ashaName: ashaProfile.displayName || "ASHA Worker",
+        category: "SCHEME_ENROLLMENT",
+        schemeId,
+        schemeName,
+        beneficiaryMemberId: beneficiary ? beneficiary.id : null,
+        beneficiaryName: beneficiary ? beneficiary.fullName : null,
+        beneficiaryAge: beneficiary ? beneficiary.age : null,
+        beneficiaryRelationship: beneficiary ? beneficiary.relationship : null,
+        message:
+          input.notes ||
+          `ASHA worker proactively initiated doorstep assistance for ${schemeName}.`,
+        priority: input.priority || "HIGH",
+        status: "ACCEPTED",
+        initiatedBy: "ASHA",
+        caseId: c.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await this.assistanceRepo.createRequest(ashaRequest);
+    }
+
+    // Initialize Scheme Journey and seed the 5 PM-JAY or 6 JSY tasks
+    const tasks = await this.initializeSchemeJourney(
+      caseId,
+      schemeId,
+      beneficiary,
+      ashaProfile
+    );
+
+    // Update case with assistanceRequestId & priority
+    await this.caseRepo.updateCase(caseId, {
+      assistanceRequestId: assistanceRequestId || undefined,
+      priority: input.priority || "HIGH",
+      status: "IN_PROGRESS",
+    });
+
+    const freshCase = await this.caseRepo.getCaseById(caseId);
+
+    // Record immutable audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: ashaProfile.uid,
+      actorRole: ashaProfile.role,
+      actorName: ashaProfile.displayName || "ASHA Worker",
+      type: "CASE_SCHEME_INITIATED",
+      description: `ASHA proactively initiated scheme assistance for '${schemeName}' for ${
+        beneficiary?.fullName || "household"
+      }`,
+      metadata: {
+        schemeId,
+        beneficiaryMemberId: beneficiary?.id,
+        initiationSource: "ASHA",
+      },
+      timestamp: now,
+    });
+
+    return {
+      case: freshCase || c,
+      tasks,
+      journeySteps: freshCase?.journeySteps || [],
+    };
+  }
 }
+

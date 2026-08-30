@@ -12,9 +12,16 @@ export interface FieldRegistrationInput extends Omit<CreateHouseholdInput, "rati
 export type CaseStatus =
   | "NEW"
   | "ACTIVE"
+  | "REQUESTED"
+  | "ACCEPTED"
+  | "IN_PROGRESS"
   | "NEEDS_ATTENTION"
   | "FOLLOW_UP"
+  | "FOLLOW_UP_REQUIRED"
+  | "BLOCKED"
+  | "ESCALATED"
   | "RESOLVED"
+  | "CITIZEN_DECLINED"
   | "CLOSED";
 
 export type CasePriority =
@@ -31,7 +38,50 @@ export type CaseActivityType =
   | "NOTE_ADDED"
   | "FOLLOWUP_SCHEDULED"
   | "FOLLOWUP_COMPLETED"
-  | "CONTACT_RECORDED";
+  | "CONTACT_RECORDED"
+  | "TASK_CREATED"
+  | "TASK_COMPLETED"
+  | "TASK_STATUS_CHANGED"
+  | "ASSISTANCE_REQUESTED"
+  | "REQUEST_ACCEPTED"
+  | "REQUEST_DECLINED"
+  | "CASE_SCHEME_INITIATED"
+  | "CASE_ESCALATED"
+  | "CASE_RESOLVED";
+
+export type CaseTaskStatus =
+  | "PENDING"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "SKIPPED"
+  | "BLOCKED";
+
+export interface CaseTask {
+  id: string;
+  caseId: string;
+  schemeId?: string | null;
+  beneficiaryMemberId?: string | null;
+  beneficiaryName?: string | null;
+  type: string;
+  title: string;
+  description: string;
+  status: CaseTaskStatus;
+  order: number;
+  dueDate?: string | null;
+  completedAt?: string | null;
+  completedBy?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchemeJourneyStep {
+  stepId: string;
+  title: string;
+  description: string;
+  status: "PENDING" | "CURRENT" | "COMPLETED" | "BLOCKED";
+  completedAt?: string | null;
+}
 
 export interface AshaCase {
   id: string;
@@ -44,6 +94,13 @@ export interface AshaCase {
   memberCount: number;
   status: CaseStatus;
   priority: CasePriority;
+  schemeId?: string | null;
+  schemeName?: string | null;
+  beneficiaryMemberId?: string | null;
+  beneficiaryName?: string | null;
+  assistanceRequestId?: string | null;
+  currentJourneyStep?: string | null;
+  journeySteps?: SchemeJourneyStep[];
   detectedGapsCount: number;
   eligibleSchemesCount: number;
   lastContactAt: string | null;
@@ -67,6 +124,8 @@ export interface CaseFollowUp {
   scheduledAt: string;
   reason: string;
   status: "PENDING" | "COMPLETED" | "CANCELLED";
+  beneficiaryMemberId?: string | null;
+  beneficiaryName?: string | null;
   completedAt?: string | null;
   notes?: string | null;
   createdAt: string;
@@ -91,6 +150,8 @@ export interface CaseDetailResponse {
   members: Member[];
   eligibilityResults: EligibilityResult[];
   guidance: GuidanceResponse;
+  tasks: CaseTask[];
+  journeySteps: SchemeJourneyStep[];
   notes: CaseNote[];
   followUps: CaseFollowUp[];
   activities: CaseActivity[];
@@ -103,3 +164,64 @@ export interface CaseSummaryResponse {
   upcomingFollowUpsCount: number;
   resolvedCount: number;
 }
+
+export type AshaAttentionCategory =
+  | "OVERDUE_FOLLOWUP"
+  | "BLOCKED_TASK"
+  | "PREGNANCY_CARE"
+  | "SENIOR_CITIZEN_PMJAY"
+  | "MISSING_DOCUMENTS"
+  | "UPCOMING_FOLLOWUP";
+
+export type AshaAttentionActionType =
+  | "INITIATE_SCHEME"
+  | "COMPLETE_FOLLOWUP"
+  | "UNBLOCK_TASK"
+  | "REVIEW_CASE";
+
+export type AshaAttentionPriority = "URGENT" | "HIGH" | "MEDIUM" | "LOW";
+
+export interface AshaAttentionSignal {
+  id: string;
+  householdId: string;
+  caseId: string;
+  headOfHouseholdName: string;
+  district: string;
+  state: string;
+  priority: AshaAttentionPriority;
+  category: AshaAttentionCategory;
+  title: string;
+  subtitle: string;
+  beneficiaryName?: string | null;
+  beneficiaryMemberId?: string | null;
+  beneficiaryAge?: number | null;
+  beneficiaryRelationship?: string | null;
+  schemeId?: string | null;
+  schemeName?: string | null;
+  recommendedAction: string;
+  actionType: AshaAttentionActionType;
+}
+
+export interface AshaAttentionSignalsResponse {
+  summary: {
+    totalAssignedHouseholds: number;
+    needsAttentionCount: number;
+    activeSchemeJourneys: number;
+    overdueFollowUps: number;
+  };
+  signals: AshaAttentionSignal[];
+}
+
+export interface InitiateSchemeAssistanceInput {
+  schemeId: string;
+  beneficiaryMemberId?: string | null;
+  priority?: CasePriority;
+  notes?: string | null;
+}
+
+export interface InitiateSchemeAssistanceResponse {
+  case: AshaCase;
+  tasks: CaseTask[];
+  journeySteps: SchemeJourneyStep[];
+}
+

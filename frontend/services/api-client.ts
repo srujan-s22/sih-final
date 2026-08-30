@@ -21,6 +21,10 @@ class ApiClient {
     this.customTokenProvider = provider;
   }
 
+  public clearTokenProvider(): void {
+    this.customTokenProvider = null;
+  }
+
   private generateCorrelationId(): string {
     return `req_${Math.random().toString(36).substring(2, 11)}_${Date.now().toString(36)}`;
   }

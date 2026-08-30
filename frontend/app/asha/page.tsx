@@ -28,6 +28,11 @@ import {
   HelpCircle,
   FileText,
   History,
+  CheckSquare,
+  ArrowRight,
+  UserCheck,
+  User,
+  ShieldAlert,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
 import { connectionService } from "@/services/connection-service";
@@ -38,7 +43,11 @@ import {
   CaseSummaryResponse,
   CaseStatus,
   CasePriority,
+  CaseTask,
+  CaseTaskStatus,
+  SchemeJourneyStep,
   FieldRegistrationInput,
+  AshaAttentionSignal,
 } from "@shared/types/case";
 import { AshaConnectionRequest } from "@shared/types/connection";
 import {
@@ -53,10 +62,16 @@ export default function AshaWorkspacePage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   // Caseload Data
   const [cases, setCases] = useState<AshaCase[]>([]);
   const [summary, setSummary] = useState<CaseSummaryResponse | null>(null);
+
+  // Proactive Attention Signals Data
+  const [attentionSignals, setAttentionSignals] = useState<AshaAttentionSignal[]>([]);
+  const [isSignalsLoading, setIsSignalsLoading] = useState(false);
+  const [initiatingSchemeId, setInitiatingSchemeId] = useState<string | null>(null);
 
   // Connection Requests Data
   const [connectionRequests, setConnectionRequests] = useState<AshaConnectionRequest[]>([]);
@@ -68,6 +83,8 @@ export default function AshaWorkspacePage() {
   const [requestsSubTab, setRequestsSubTab] = useState<"assistance" | "connections">("assistance");
   const [assistanceResponseNotes, setAssistanceResponseNotes] = useState<Record<string, string>>({});
   const [isUpdatingAssistance, setIsUpdatingAssistance] = useState<string | null>(null);
+  const [decliningRequestId, setDecliningRequestId] = useState<string | null>(null);
+  const [declineReasonText, setDeclineReasonText] = useState("");
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,7 +95,12 @@ export default function AshaWorkspacePage() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseDetail, setCaseDetail] = useState<CaseDetailResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [detailTab, setDetailTab] = useState<"overview" | "gaps" | "schemes" | "notes" | "followups" | "history">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "journey" | "gaps" | "schemes" | "notes" | "followups" | "history">("overview");
+
+  // Tasks & Journey State
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDesc, setNewTaskDesc] = useState("");
+  const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
 
   // New Note / Follow-up inputs
   const [newNoteContent, setNewNoteContent] = useState("");
@@ -133,6 +155,21 @@ export default function AshaWorkspacePage() {
     }
   }, []);
 
+  // Load Proactive Attention Signals
+  const loadAttentionSignals = useCallback(async () => {
+    setIsSignalsLoading(true);
+    try {
+      const res = await caseService.getAttentionSignals();
+      if (res.success && res.data) {
+        setAttentionSignals(res.data.signals);
+      }
+    } catch {
+      // Non-blocking
+    } finally {
+      setIsSignalsLoading(false);
+    }
+  }, []);
+
   // Load Pending Connection Requests
   const loadPendingRequests = useCallback(async () => {
     setIsRequestsLoading(true);
@@ -162,9 +199,49 @@ export default function AshaWorkspacePage() {
 
   useEffect(() => {
     loadCaseload();
+    loadAttentionSignals();
     loadPendingRequests();
     loadAssistanceRequests();
-  }, [loadCaseload, loadPendingRequests, loadAssistanceRequests]);
+  }, [loadCaseload, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
+
+  // Handle Proactive Scheme Initiation
+  const handleInitiateScheme = async (
+    caseId: string,
+    schemeId: string,
+    beneficiaryMemberId?: string | null
+  ) => {
+    setInitiatingSchemeId(`${caseId}_${schemeId}`);
+    setErrorMessage(null);
+    try {
+      const res = await caseService.initiateScheme(caseId, {
+        schemeId,
+        beneficiaryMemberId,
+        priority: "HIGH",
+        notes: `ASHA worker initiated doorstep facilitation for ${
+          schemeId === "ab-pmjay" ? "PM-JAY Senior 70+" : "JSY Maternal Care"
+        }.`,
+      });
+
+      if (res.success && res.data) {
+        setSuccessBanner(
+          `Successfully initiated ${
+            schemeId === "ab-pmjay" ? "PM-JAY Senior 70+" : "JSY Maternal Care"
+          } doorstep assistance journey.`
+        );
+        await Promise.all([loadCaseload(), loadAttentionSignals(), loadAssistanceRequests()]);
+        if (selectedCaseId === caseId) {
+          await openCaseDetail(caseId);
+          setDetailTab("journey");
+        }
+      } else {
+        setErrorMessage((res as any).error?.message || "Failed to initiate scheme assistance.");
+      }
+    } catch {
+      setErrorMessage("Failed to initiate scheme assistance.");
+    } finally {
+      setInitiatingSchemeId(null);
+    }
+  };
 
   // Handle Accept Connection Request
   const handleAcceptRequest = async (requestId: string) => {
@@ -357,6 +434,105 @@ export default function AshaWorkspacePage() {
     }
   };
 
+  // Accept Assistance Request -> Opens & Initializes Scheme Case Workflow
+  const handleAcceptAssistance = async (requestId: string) => {
+    setIsUpdatingAssistance(requestId);
+    try {
+      const res = await assistanceService.acceptAssistanceRequest(requestId);
+      if (res.success && res.data) {
+        setSuccessBanner("Assistance request accepted! Scheme journey & tasks have been initialized.");
+        await loadAssistanceRequests();
+        await loadCaseload();
+        if (res.data.caseId) {
+          openCaseDetail(res.data.caseId);
+          setDetailTab("journey");
+        }
+      }
+    } catch {
+      // Quiet fail
+    } finally {
+      setIsUpdatingAssistance(null);
+    }
+  };
+
+  // Decline Assistance Request
+  const handleDeclineAssistance = async (requestId: string) => {
+    if (!declineReasonText.trim()) return;
+    setIsUpdatingAssistance(requestId);
+    try {
+      const res = await assistanceService.declineAssistanceRequest(requestId, declineReasonText.trim());
+      if (res.success) {
+        setDecliningRequestId(null);
+        setDeclineReasonText("");
+        await loadAssistanceRequests();
+      }
+    } catch {
+      // Quiet fail
+    } finally {
+      setIsUpdatingAssistance(null);
+    }
+  };
+
+  // Complete Task in Case Drawer
+  const handleCompleteTask = async (taskId: string, notes?: string) => {
+    if (!selectedCaseId) return;
+    try {
+      const res = await caseService.completeTask(selectedCaseId, taskId, notes);
+      if (res.success) {
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+        await loadCaseload();
+      }
+    } catch {
+      // Quiet fail
+    }
+  };
+
+  // Update Task Status
+  const handleUpdateTaskStatus = async (taskId: string, status: CaseTaskStatus) => {
+    if (!selectedCaseId) return;
+    try {
+      const res = await caseService.updateTask(selectedCaseId, taskId, { status });
+      if (res.success) {
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+        await loadCaseload();
+      }
+    } catch {
+      // Quiet fail
+    }
+  };
+
+  // Add Custom Task to Case
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCaseId || !newTaskTitle.trim()) return;
+    setIsTaskSubmitting(true);
+    try {
+      const res = await caseService.createTask(selectedCaseId, {
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim() || newTaskTitle.trim(),
+        type: "CUSTOM_FIELD_TASK",
+      });
+      if (res.success) {
+        setNewTaskTitle("");
+        setNewTaskDesc("");
+        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+        if (freshDetail.success && freshDetail.data) {
+          setCaseDetail(freshDetail.data);
+        }
+      }
+    } catch {
+      // Quiet fail
+    } finally {
+      setIsTaskSubmitting(false);
+    }
+  };
+
   // Handle Field Registration
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -494,6 +670,22 @@ export default function AshaWorkspacePage() {
           </div>
         )}
 
+        {/* Success Banner */}
+        {successBanner && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <p>{successBanner}</p>
+            </div>
+            <button
+              onClick={() => setSuccessBanner(null)}
+              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="py-16 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mb-3" />
@@ -559,7 +751,7 @@ export default function AshaWorkspacePage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-amber-600" />
-                        <span>High-Priority Cases</span>
+                        <span>Action Opportunities & Attention Queue</span>
                       </h3>
                       <Button
                         variant="outline"
@@ -567,35 +759,72 @@ export default function AshaWorkspacePage() {
                         onClick={() => setActiveTab("attention")}
                         className="text-xs font-semibold text-amber-800 border-amber-200 hover:bg-amber-50"
                       >
-                        View All
+                        View All ({attentionSignals.length})
                       </Button>
                     </div>
 
-                    {needsAttentionCases.length === 0 ? (
+                    {attentionSignals.length === 0 ? (
                       <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500">
                         <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
-                        <span>No cases currently flagged with high-severity access gaps.</span>
+                        <span>No households currently require attention.</span>
                       </div>
                     ) : (
                       <div className="space-y-2.5">
-                        {needsAttentionCases.slice(0, 3).map((c) => (
+                        {attentionSignals.slice(0, 3).map((sig) => (
                           <div
-                            key={c.id}
-                            onClick={() => openCaseDetail(c.id)}
-                            className="p-3 bg-slate-50 hover:bg-amber-50/50 rounded-lg border border-slate-200/80 flex items-center justify-between cursor-pointer transition-colors"
+                            key={sig.id}
+                            className="p-3 bg-slate-50 hover:bg-amber-50/50 rounded-lg border border-slate-200/80 space-y-2 transition-colors"
                           >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-xs font-bold text-slate-900">{c.headOfHouseholdName}</h4>
-                                <span className="text-[10px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded">
-                                  {c.priority}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {c.district} • {c.detectedGapsCount} Gap(s) Identified
-                              </p>
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  sig.priority === "URGENT"
+                                    ? "bg-red-100 text-red-800"
+                                    : sig.priority === "HIGH"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-blue-100 text-blue-800"
+                                }`}
+                              >
+                                {sig.priority}
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-400">
+                                {sig.category.replace(/_/g, " ")}
+                              </span>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-slate-400" />
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900">{sig.title}</h4>
+                              <p className="text-[11px] text-slate-600 mt-0.5">{sig.subtitle}</p>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                              <span className="text-[10px] text-emerald-800 font-medium">
+                                {sig.headOfHouseholdName} • {sig.district}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    disabled={initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`}
+                                    onClick={() =>
+                                      handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
+                                    }
+                                    className="text-[11px] font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  >
+                                    {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
+                                      ? "Starting..."
+                                      : "Start Assistance"}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openCaseDetail(sig.caseId)}
+                                  className="text-[11px] font-semibold py-1 px-2.5"
+                                >
+                                  Open Household
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -874,19 +1103,41 @@ export default function AshaWorkspacePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {assistanceRequests.map((req) => {
                           const isResolved = req.status === "RESOLVED" || req.status === "CLOSED";
+                          const isDeclined = req.status === "DECLINED";
+                          const isPending = req.status === "PENDING" || req.status === "REQUESTED";
+
                           return (
                             <div
                               key={req.id}
-                              className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between"
+                              className={`rounded-xl border p-5 shadow-2xs space-y-4 flex flex-col justify-between transition-all ${
+                                isResolved
+                                  ? "border-emerald-200 bg-emerald-50/15"
+                                  : isDeclined
+                                  ? "border-rose-200 bg-rose-50/20"
+                                  : isPending
+                                  ? "border-teal-300 bg-teal-50/15 ring-2 ring-teal-200/50"
+                                  : "border-slate-200 bg-white"
+                              }`}
                             >
                               <div className="space-y-3">
                                 <div className="flex items-start justify-between gap-2">
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <h4 className="text-sm font-bold text-slate-900">{req.headOfHouseholdName}</h4>
                                       <span className="text-[10px] font-bold text-teal-900 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                                         {req.category.replace(/_/g, " ")}
                                       </span>
+                                      {req.priority && req.priority !== "NORMAL" && (
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                            req.priority === "URGENT"
+                                              ? "bg-rose-100 text-rose-800 border border-rose-300 animate-pulse"
+                                              : "bg-amber-100 text-amber-800 border border-amber-300"
+                                          }`}
+                                        >
+                                          {req.priority} PRIORITY
+                                        </span>
+                                      )}
                                     </div>
                                     <p className="text-xs text-slate-500 mt-0.5">
                                       {req.district}, {req.state} • {new Date(req.createdAt).toLocaleDateString()}
@@ -896,7 +1147,9 @@ export default function AshaWorkspacePage() {
                                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                                       isResolved
                                         ? "bg-emerald-100 text-emerald-800"
-                                        : req.status === "IN_PROGRESS"
+                                        : isDeclined
+                                        ? "bg-rose-100 text-rose-800"
+                                        : req.status === "IN_PROGRESS" || req.status === "ACCEPTED"
                                         ? "bg-blue-100 text-blue-800"
                                         : "bg-amber-100 text-amber-800"
                                     }`}
@@ -905,6 +1158,19 @@ export default function AshaWorkspacePage() {
                                   </span>
                                 </div>
 
+                                {/* Beneficiary Member Tag */}
+                                {req.beneficiaryName && (
+                                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 flex items-center justify-between text-xs text-emerald-950">
+                                    <div className="flex items-center gap-1.5 font-semibold">
+                                      <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                                      <span>Target Beneficiary: {req.beneficiaryName}</span>
+                                    </div>
+                                    <span className="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded font-mono">
+                                      {req.beneficiaryRelationship || "Member"}{req.beneficiaryAge ? `, ${req.beneficiaryAge} yrs` : ""}
+                                    </span>
+                                  </div>
+                                )}
+
                                 {req.schemeName && (
                                   <div className="p-2 bg-slate-50 rounded border border-slate-200 text-xs text-slate-700 font-medium">
                                     Associated Scheme: <strong>{req.schemeName}</strong>
@@ -912,7 +1178,7 @@ export default function AshaWorkspacePage() {
                                 )}
 
                                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-800">
-                                  <span className="font-semibold block text-[10px] text-slate-400 uppercase">Citizen Message:</span>
+                                  <span className="font-semibold block text-[10px] text-slate-400 uppercase">Citizen Request Message:</span>
                                   <p className="mt-0.5 leading-relaxed">&ldquo;{req.message}&rdquo;</p>
                                 </div>
 
@@ -923,14 +1189,59 @@ export default function AshaWorkspacePage() {
                                   </div>
                                 )}
 
-                                {!isResolved && (
-                                  <div className="space-y-1.5 pt-1">
-                                    <label className="text-[11px] font-semibold text-slate-600 block">
-                                      Add ASHA Update / Note:
+                                {isDeclined && req.declineReason && (
+                                  <div className="p-2.5 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-900">
+                                    <span className="font-semibold block text-[10px] uppercase">Decline Reason:</span>
+                                    <p className="mt-0.5">{req.declineReason}</p>
+                                  </div>
+                                )}
+
+                                {/* Decline reason input if active */}
+                                {decliningRequestId === req.id && (
+                                  <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 space-y-2">
+                                    <label className="text-xs font-semibold text-rose-900 block">
+                                      Reason for declining this request:
                                     </label>
                                     <input
                                       type="text"
-                                      placeholder="e.g. Visited family. Document submitted to PHC."
+                                      value={declineReasonText}
+                                      onChange={(e) => setDeclineReasonText(e.target.value)}
+                                      placeholder="e.g. Beneficiary outside jurisdiction / Invalid documents"
+                                      className="w-full text-xs p-2 rounded border border-rose-300 bg-white"
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setDecliningRequestId(null);
+                                          setDeclineReasonText("");
+                                        }}
+                                        className="text-xs"
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleDeclineAssistance(req.id)}
+                                        disabled={!declineReasonText.trim()}
+                                        className="text-xs bg-rose-600 text-white hover:bg-rose-700 border-rose-600"
+                                      >
+                                        Confirm Decline
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {!isResolved && !isDeclined && (
+                                  <div className="space-y-1.5 pt-1">
+                                    <label className="text-[11px] font-semibold text-slate-600 block">
+                                      Add ASHA Progress Note:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. Visited family. Aadhaar e-KYC in progress."
                                       value={assistanceResponseNotes[req.id] || ""}
                                       onChange={(e) =>
                                         setAssistanceResponseNotes({
@@ -944,42 +1255,61 @@ export default function AshaWorkspacePage() {
                                 )}
                               </div>
 
-                              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => openCaseDetailByHousehold(req.householdId)}
+                                  onClick={() => {
+                                    openCaseDetailByHousehold(req.householdId);
+                                    setDetailTab("journey");
+                                  }}
                                   className="text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50"
                                 >
-                                  Open Case
+                                  Open Case & Tasks
                                 </Button>
 
-                                {!isResolved ? (
+                                {!isResolved && !isDeclined ? (
                                   <div className="flex items-center gap-2">
-                                    {req.status === "PENDING" && (
+                                    {isPending && (
+                                      <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setDecliningRequestId(req.id)}
+                                          className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50"
+                                        >
+                                          Decline
+                                        </Button>
+                                        <Button
+                                          variant="primary"
+                                          size="sm"
+                                          disabled={isUpdatingAssistance === req.id}
+                                          onClick={() => handleAcceptAssistance(req.id)}
+                                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1"
+                                        >
+                                          <Check className="w-3.5 h-3.5" /> Accept & Open Case
+                                        </Button>
+                                      </>
+                                    )}
+                                    {!isPending && (
                                       <Button
-                                        variant="outline"
+                                        variant="primary"
                                         size="sm"
                                         disabled={isUpdatingAssistance === req.id}
-                                        onClick={() => handleUpdateAssistance(req.id, "IN_PROGRESS")}
-                                        className="text-xs border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold"
+                                        onClick={() => handleUpdateAssistance(req.id, "RESOLVED")}
+                                        className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold"
                                       >
-                                        Mark In Progress
+                                        Resolve Request
                                       </Button>
                                     )}
-                                    <Button
-                                      variant="primary"
-                                      size="sm"
-                                      disabled={isUpdatingAssistance === req.id}
-                                      onClick={() => handleUpdateAssistance(req.id, "RESOLVED")}
-                                      className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold"
-                                    >
-                                      Resolve Request
-                                    </Button>
                                   </div>
-                                ) : (
+                                ) : isResolved ? (
                                   <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Resolved
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-rose-700 font-semibold flex items-center gap-1">
+                                    <X className="w-3.5 h-3.5" /> Declined
                                   </span>
                                 )}
                               </div>
@@ -1097,50 +1427,94 @@ export default function AshaWorkspacePage() {
                 <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold">Healthcare Access Gap Prioritization</p>
+                    <p className="font-bold">Proactive Healthcare Access Intelligence</p>
                     <p className="mt-0.5 text-amber-800">
-                      These households have deterministically identified healthcare access gaps (e.g. missing maternal coverage, elder health support, or unverified documents).
+                      These signals are deterministically calculated across your assigned households to highlight senior citizens eligible for PM-JAY, pregnant mothers needing maternal care (JSY), overdue home visits, and blocked tasks.
                     </p>
                   </div>
                 </div>
 
-                {needsAttentionCases.length === 0 ? (
-                  <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
+                {isSignalsLoading ? (
+                  <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="inline-block animate-spin rounded-full h-7 w-7 border-3 border-amber-600 border-t-transparent mb-2" />
+                    <p className="text-xs text-slate-500 font-medium">Evaluating proactive household signals...</p>
+                  </div>
+                ) : attentionSignals.length === 0 ? (
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2 opacity-80" />
-                    <p className="text-sm font-bold text-slate-800">No Families Currently Require Escalation</p>
+                    <p className="text-sm font-bold text-slate-800">No households currently require attention.</p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      All assigned households have addressed current healthcare access gaps.
+                      All assigned households have active, addressed entitlements and up-to-date follow-ups.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {needsAttentionCases.map((c) => (
+                    {attentionSignals.map((sig) => (
                       <div
-                        key={c.id}
-                        onClick={() => openCaseDetail(c.id)}
-                        className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs hover:border-amber-400 cursor-pointer transition-colors space-y-3"
+                        key={sig.id}
+                        className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs hover:border-amber-400 transition-colors space-y-3.5 flex flex-col justify-between"
                       >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">{c.headOfHouseholdName}</h4>
-                            <p className="text-xs text-slate-400 font-mono">{c.district}, {c.state}</p>
+                        <div className="space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                {sig.headOfHouseholdName} • {sig.district}, {sig.state}
+                              </span>
+                              <h4 className="font-bold text-slate-900 text-sm mt-0.5">{sig.title}</h4>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                sig.priority === "URGENT"
+                                  ? "bg-red-100 text-red-800"
+                                  : sig.priority === "HIGH"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {sig.priority}
+                            </span>
                           </div>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              c.priority === "URGENT" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
-                            }`}
-                          >
-                            {c.priority}
-                          </span>
+
+                          <p className="text-xs text-slate-600 leading-relaxed">{sig.subtitle}</p>
+
+                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 block mb-0.5">
+                              Recommended Field Action
+                            </span>
+                            <p className="text-slate-800 font-medium">{sig.recommendedAction}</p>
+                          </div>
                         </div>
-                        <div className="p-2.5 bg-amber-50/50 rounded-lg border border-amber-100 text-xs text-amber-900">
-                          <strong>{c.detectedGapsCount} Access Gap{c.detectedGapsCount === 1 ? "" : "s"}</strong> requiring field assistance
-                        </div>
-                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                          <span className="text-slate-400">Status: {c.status}</span>
-                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                            Inspect Case <ChevronRight className="w-3 h-3" />
-                          </span>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <span className="text-[11px] text-slate-400 font-mono">Case ID: {sig.caseId}</span>
+                          <div className="flex items-center gap-2">
+                            {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                disabled={initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`}
+                                onClick={() =>
+                                  handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
+                                }
+                                className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>
+                                  {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
+                                    ? "Initiating..."
+                                    : "Start Assistance"}
+                                </span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openCaseDetail(sig.caseId)}
+                              className="text-xs font-semibold py-1.5 px-3"
+                            >
+                              Open Household
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1283,8 +1657,24 @@ export default function AshaWorkspacePage() {
               {/* Sub-Tabs */}
               <div className="flex border-b border-slate-200 bg-white px-6 text-xs font-semibold overflow-x-auto">
                 <button
+                  onClick={() => setDetailTab("journey")}
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    detailTab === "journey"
+                      ? "border-teal-700 text-teal-900 font-bold bg-teal-50/50"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-teal-700" />
+                  <span>Scheme Journey & Tasks</span>
+                  {caseDetail && caseDetail.tasks && caseDetail.tasks.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-teal-100 text-teal-900 text-[10px] font-bold">
+                      {caseDetail.tasks.filter((t) => t.status === "COMPLETED").length}/{caseDetail.tasks.length}
+                    </span>
+                  )}
+                </button>
+                <button
                   onClick={() => setDetailTab("overview")}
-                  className={`py-3 px-3 border-b-2 transition-colors ${
+                  className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
                     detailTab === "overview"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1373,6 +1763,304 @@ export default function AshaWorkspacePage() {
                   </div>
                 ) : (
                   <div>
+                    {/* TAB 0: SCHEME JOURNEY & FIELD TASKS */}
+                    {detailTab === "journey" && (
+                      <div className="space-y-6">
+                        {/* Scheme & Beneficiary Summary Card */}
+                        <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:p-5 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-100 pb-3">
+                            <div>
+                              <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
+                                Active Healthcare Scheme:
+                              </span>
+                              <h3 className="text-base font-bold text-teal-950">
+                                {caseDetail.case.schemeName || caseDetail.case.schemeId || "Ayushman Bharat / National Health Scheme"}
+                              </h3>
+                            </div>
+                            <span className="text-xs font-bold text-teal-900 bg-teal-100 px-3 py-1 rounded-full border border-teal-300 self-start sm:self-auto">
+                              Case Status: {caseDetail.case.status}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-white p-3 rounded-lg border border-teal-100">
+                              <span className="text-slate-400 font-semibold block text-[10px] uppercase">Target Beneficiary</span>
+                              <span className="font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
+                                <UserCheck className="w-3.5 h-3.5 text-teal-700" />
+                                <span>{caseDetail.case.beneficiaryName || caseDetail.household.headOfHouseholdName}</span>
+                              </span>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border border-teal-100">
+                              <span className="text-slate-400 font-semibold block text-[10px] uppercase">Household Head</span>
+                              <span className="font-semibold text-slate-800 mt-0.5 block">{caseDetail.household.headOfHouseholdName}</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border border-teal-100">
+                              <span className="text-slate-400 font-semibold block text-[10px] uppercase">Location</span>
+                              <span className="text-slate-800 mt-0.5 block">{caseDetail.household.district}, {caseDetail.household.state}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Scheme Journey Milestones */}
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-teal-700" />
+                            <span>Entitlement Journey Milestones</span>
+                          </h4>
+
+                          {caseDetail.journeySteps && caseDetail.journeySteps.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                              {caseDetail.journeySteps.map((step, sIdx) => {
+                                const isDone = step.status === "COMPLETED";
+                                const isCurrent = step.status === "CURRENT";
+
+                                return (
+                                  <div
+                                    key={step.stepId || sIdx}
+                                    className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                                      isDone
+                                        ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold"
+                                        : isCurrent
+                                        ? "bg-blue-50 border-blue-400 text-blue-950 font-bold ring-2 ring-blue-300/70"
+                                        : "bg-slate-50 border-slate-200 text-slate-500"
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
+                                          Step {sIdx + 1}
+                                        </span>
+                                        {isDone ? (
+                                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                        ) : isCurrent ? (
+                                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                                        ) : (
+                                          <span className="w-2.5 h-2.5 rounded-full border border-slate-300" />
+                                        )}
+                                      </div>
+                                      <h5 className="font-bold text-xs">{step.title}</h5>
+                                      <p className="text-[11px] font-normal text-slate-600 mt-1 line-clamp-2">
+                                        {step.description}
+                                      </p>
+                                    </div>
+                                    {isDone && (
+                                      <span className="text-[10px] text-emerald-700 mt-2 font-mono">
+                                        ✓ Completed
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 text-center">
+                              No predefined journey steps for this case. Custom tasks can be tracked below.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Field Tasks Checklist */}
+                        <div className="space-y-4 pt-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                <CheckSquare className="w-4 h-4 text-teal-700" />
+                                <span>Field Action Tasks</span>
+                                {caseDetail.tasks && (
+                                  <span className="text-xs font-bold px-2 py-0.5 bg-teal-100 text-teal-800 rounded-full">
+                                    {caseDetail.tasks.filter((t) => t.status === "COMPLETED").length} of {caseDetail.tasks.length} Completed
+                                  </span>
+                                )}
+                              </h4>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Complete tasks to advance the scheme journey and achieve official benefit resolution.
+                              </p>
+                            </div>
+
+                            {/* Progress bar */}
+                            {caseDetail.tasks && caseDetail.tasks.length > 0 && (
+                              <div className="w-full sm:w-44 space-y-1">
+                                <div className="flex justify-between text-[11px] font-mono text-slate-600">
+                                  <span>Progress</span>
+                                  <span>
+                                    {Math.round(
+                                      (caseDetail.tasks.filter((t) => t.status === "COMPLETED").length /
+                                        caseDetail.tasks.length) *
+                                        100
+                                    )}
+                                    %
+                                  </span>
+                                </div>
+                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+                                    style={{
+                                      width: `${(caseDetail.tasks.filter((t) => t.status === "COMPLETED").length /
+                                        caseDetail.tasks.length) *
+                                        100}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Task List */}
+                          {caseDetail.tasks && caseDetail.tasks.length > 0 ? (
+                            <div className="space-y-2.5">
+                              {caseDetail.tasks.map((task, tIdx) => {
+                                const isDone = task.status === "COMPLETED";
+                                const isBlocked = task.status === "BLOCKED";
+                                const isInProgress = task.status === "IN_PROGRESS";
+
+                                return (
+                                  <div
+                                    key={task.id}
+                                    className={`p-4 rounded-xl border transition-all space-y-2 ${
+                                      isDone
+                                        ? "bg-emerald-50/40 border-emerald-200 text-slate-700"
+                                        : isBlocked
+                                        ? "bg-rose-50/40 border-rose-200"
+                                        : isInProgress
+                                        ? "bg-blue-50/40 border-blue-200 ring-1 ring-blue-300/50"
+                                        : "bg-white border-slate-200 shadow-2xs"
+                                    }`}
+                                  >
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                      <div className="flex items-start gap-2.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => !isDone && handleCompleteTask(task.id)}
+                                          disabled={isDone}
+                                          className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                                            isDone
+                                              ? "bg-emerald-600 border-emerald-600 text-white cursor-default"
+                                              : "border-slate-300 hover:border-emerald-600 hover:bg-emerald-50 text-transparent hover:text-emerald-700 cursor-pointer"
+                                          }`}
+                                          title={isDone ? "Task Completed" : "Click to mark done"}
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+
+                                        <div className="space-y-0.5">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-bold text-xs sm:text-sm text-slate-900">
+                                              {tIdx + 1}. {task.title}
+                                            </span>
+                                            <span
+                                              className={`text-[10px] font-bold px-2 py-0.2 rounded-full uppercase ${
+                                                isDone
+                                                  ? "bg-emerald-100 text-emerald-800"
+                                                  : isBlocked
+                                                  ? "bg-rose-100 text-rose-800"
+                                                  : isInProgress
+                                                  ? "bg-blue-100 text-blue-800"
+                                                  : "bg-slate-100 text-slate-700"
+                                              }`}
+                                            >
+                                              {task.status.replace(/_/g, " ")}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-600 leading-relaxed">
+                                            {task.description}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      {/* Quick Status Buttons */}
+                                      <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                                        {!isDone ? (
+                                          <>
+                                            {!isInProgress && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleUpdateTaskStatus(task.id, "IN_PROGRESS")}
+                                                className="text-[11px] py-1 px-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                                              >
+                                                Start
+                                              </Button>
+                                            )}
+                                            {!isBlocked && (
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleUpdateTaskStatus(task.id, "BLOCKED")}
+                                                className="text-[11px] py-1 px-2 border-rose-200 text-rose-700 hover:bg-rose-50"
+                                              >
+                                                Block
+                                              </Button>
+                                            )}
+                                            <Button
+                                              variant="primary"
+                                              size="sm"
+                                              onClick={() => handleCompleteTask(task.id)}
+                                              className="text-[11px] py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1"
+                                            >
+                                              <Check className="w-3 h-3" /> Mark Done
+                                            </Button>
+                                          </>
+                                        ) : (
+                                          <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {task.notes && (
+                                      <div className="pl-7 text-[11px] text-slate-500 italic">
+                                        Notes: {task.notes}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 text-center">
+                              No tasks created for this case yet. Add custom tasks below.
+                            </div>
+                          )}
+
+                          {/* Add Custom Field Task Form */}
+                          <form onSubmit={handleCreateTask} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                            <span className="text-xs font-bold text-slate-800 block">
+                              + Add Custom Field Task for this Family
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                required
+                                value={newTaskTitle}
+                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                placeholder="Task title (e.g. Collect Ration Card Copy)"
+                                className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
+                              />
+                              <input
+                                type="text"
+                                value={newTaskDesc}
+                                onChange={(e) => setNewTaskDesc(e.target.value)}
+                                placeholder="Details or instructions..."
+                                className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={isTaskSubmitting || !newTaskTitle.trim()}
+                                className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white border-teal-800"
+                              >
+                                {isTaskSubmitting ? "Adding..." : "+ Add Task"}
+                              </Button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+
                     {/* TAB 1: HOUSEHOLD OVERVIEW */}
                     {detailTab === "overview" && (
                       <div className="space-y-5">
@@ -1463,6 +2151,74 @@ export default function AshaWorkspacePage() {
                               {g.reason && (
                                 <p className="text-[11px] text-teal-800 font-medium">Why: {g.reason}</p>
                               )}
+                              {g.schemeId &&
+                                (g.schemeId === "ab-pmjay" || g.schemeId === "jsy") && (
+                                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                                    {g.schemeId === caseDetail.case.schemeId &&
+                                    ["RESOLVED", "CLOSED"].includes(caseDetail.case.status) ? (
+                                      <>
+                                        <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>Assistance Completed for this Entitlement</span>
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDetailTab("journey");
+                                          }}
+                                          className="text-xs font-semibold"
+                                        >
+                                          View Completed Journey
+                                        </Button>
+                                      </>
+                                    ) : g.schemeId === caseDetail.case.schemeId &&
+                                      !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(
+                                        caseDetail.case.status
+                                      ) ? (
+                                      <>
+                                        <span className="text-[11px] font-bold text-blue-800">
+                                          ● Doorstep Assistance In Progress
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDetailTab("journey");
+                                          }}
+                                          className="text-xs font-semibold"
+                                        >
+                                          Continue Journey
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[11px] font-medium text-emerald-800">
+                                          Actionable entitlement gap identified
+                                        </span>
+                                        <Button
+                                          variant="primary"
+                                          size="sm"
+                                          disabled={initiatingSchemeId === `${caseDetail.case.id}_${g.schemeId}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleInitiateScheme(caseDetail.case.id, g.schemeId);
+                                          }}
+                                          className="text-xs font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1"
+                                        >
+                                          <Send className="w-3 h-3" />
+                                          <span>
+                                            {initiatingSchemeId === `${caseDetail.case.id}_${g.schemeId}`
+                                              ? "Starting..."
+                                              : "Start Assistance"}
+                                          </span>
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           ))
                         )}
@@ -1472,39 +2228,116 @@ export default function AshaWorkspacePage() {
                     {/* TAB 3: ELIGIBLE SCHEMES */}
                     {detailTab === "schemes" && (
                       <div className="space-y-3">
-                        {caseDetail.eligibilityResults?.map((r) => (
-                          <div
-                            key={r.schemeId}
-                            className={`p-4 rounded-xl border space-y-2 text-xs ${
-                              r.status === "ELIGIBLE"
-                                ? "bg-emerald-50/30 border-emerald-200"
-                                : r.status === "NEEDS_INFORMATION"
-                                ? "bg-amber-50/30 border-amber-200"
-                                : "bg-slate-50 border-slate-200"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <h5 className="font-bold text-slate-900 text-sm">{r.schemeName}</h5>
-                              <span
-                                className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                                  r.status === "ELIGIBLE"
-                                    ? "bg-emerald-100 text-emerald-800"
-                                    : r.status === "NEEDS_INFORMATION"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-slate-200 text-slate-700"
-                                }`}
-                              >
-                                {r.status}
-                              </span>
-                            </div>
-                            <p className="text-slate-600">{r.benefitSummary}</p>
-                            {r.matchedRules && r.matchedRules.length > 0 && (
-                              <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-900">
-                                <strong>Matched Rules:</strong> {r.matchedRules.map((m: any) => m.explanation).join(". ")}
+                        {caseDetail.eligibilityResults?.map((r) => {
+                          const isSameScheme = caseDetail.case.schemeId === r.schemeId;
+                          const isJourneyActive =
+                            isSameScheme &&
+                            !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(
+                              caseDetail.case.status
+                            );
+                          const isJourneyCompleted =
+                            isSameScheme && ["RESOLVED", "CLOSED"].includes(caseDetail.case.status);
+
+                          return (
+                            <div
+                              key={r.schemeId}
+                              className={`p-4 rounded-xl border space-y-2.5 text-xs ${
+                                r.status === "ELIGIBLE"
+                                  ? "bg-emerald-50/30 border-emerald-200"
+                                  : r.status === "NEEDS_INFORMATION"
+                                  ? "bg-amber-50/30 border-amber-200"
+                                  : "bg-slate-50 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <h5 className="font-bold text-slate-900 text-sm">{r.schemeName}</h5>
+                                <span
+                                  className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                                    r.status === "ELIGIBLE"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : r.status === "NEEDS_INFORMATION"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-slate-200 text-slate-700"
+                                  }`}
+                                >
+                                  {r.status}
+                                </span>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <p className="text-slate-600">{r.benefitSummary}</p>
+                              {r.matchedRules && r.matchedRules.length > 0 && (
+                                <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-900">
+                                  <strong>Matched Rules:</strong> {r.matchedRules.map((m: any) => m.explanation).join(". ")}
+                                </div>
+                              )}
+
+                              {(r.status === "ELIGIBLE" ||
+                                (r.schemeId === "jsy" &&
+                                  caseDetail.members.some((m) => m.maternalStatus === "pregnant"))) && (
+                                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                                  {isJourneyCompleted ? (
+                                    <>
+                                      <span className="text-[11px] text-emerald-800 font-bold flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>ASHA Assistance Journey Completed & Resolved</span>
+                                      </span>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDetailTab("journey");
+                                        }}
+                                        className="text-xs font-semibold"
+                                      >
+                                        View Completed Journey
+                                      </Button>
+                                    </>
+                                  ) : isJourneyActive ? (
+                                    <>
+                                      <span className="text-[11px] text-blue-800 font-bold">
+                                        ● Active Doorstep Assistance Journey in Progress
+                                      </span>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDetailTab("journey");
+                                        }}
+                                        className="text-xs font-semibold"
+                                      >
+                                        Continue Journey
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[11px] text-emerald-800 font-medium">
+                                        Verified opportunity: Ready for doorstep assistance
+                                      </span>
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        disabled={initiatingSchemeId === `${caseDetail.case.id}_${r.schemeId}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleInitiateScheme(caseDetail.case.id, r.schemeId);
+                                        }}
+                                        className="text-xs font-bold py-1 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
+                                      >
+                                        <Send className="w-3.5 h-3.5" />
+                                        <span>
+                                          {initiatingSchemeId === `${caseDetail.case.id}_${r.schemeId}`
+                                            ? "Starting..."
+                                            : "Start Assistance"}
+                                        </span>
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 

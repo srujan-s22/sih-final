@@ -519,7 +519,7 @@ Follow this exact manual test walkthrough in your browser:
 2. **Open `http://localhost:3000/auth/sign-in`**:
    - Switch to **Create Account**.
    - Click "Register as Staff / Admin?", choose **ASHA Worker**.
-   - Enter email, password, and staff code `ASHA-REG-2026`.
+   - Enter email, password, and the authorized ASHA staff code.
    - Submit registration. You are routed to `/auth/consent` -> accept consent -> redirected to `/asha`.
    - Look at the top right header: note your unique **ASHA Service Code** (e.g., `ASHA-KA-VE2G`). Click to copy it.
 3. **Open an Incognito window (or sign out) and go to `http://localhost:3000/auth/sign-in`**:

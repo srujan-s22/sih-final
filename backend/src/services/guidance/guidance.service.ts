@@ -7,6 +7,7 @@ import {
   GuidanceResponse,
   HouseholdGuidanceStatus,
 } from "../../../../shared/types/guidance.js";
+import { Household, Member } from "../../../../shared/types/household.js";
 import { GapDetectionService } from "./gap-detection.service.js";
 import { DocumentReadinessService } from "./document-readiness.service.js";
 import { ActionPlanService } from "./action-plan.service.js";
@@ -29,7 +30,7 @@ export class GuidanceService {
   }
 
   /**
-   * Evaluates complete citizen guidance pipeline
+   * Evaluates complete citizen guidance pipeline by citizen owner UID
    */
   public async getCitizenGuidance(ownerUid: string): Promise<GuidanceResponse> {
     const household = await this.householdRepo.getHouseholdByOwnerUid(ownerUid);
@@ -70,14 +71,23 @@ export class GuidanceService {
     }
 
     const members = await this.householdRepo.getMembers(household.id);
+    return this.getHouseholdGuidance(household, members);
+  }
 
-    // 2. Evaluate against all active verified schemes
+  /**
+   * Evaluates complete guidance pipeline directly for a household and its member roster
+   */
+  public async getHouseholdGuidance(
+    household: Household,
+    members: Member[]
+  ): Promise<GuidanceResponse> {
+    // 1. Evaluate against all active verified schemes
     const results = await this.eligibilityService.evaluateHouseholdForSchemes(
       household,
       members
     );
 
-    // 3. Collect scheme version metadata
+    // 2. Collect scheme version metadata
     const versionsMap = new Map<string, SchemeVersion>();
     for (const res of results) {
       const version = await this.schemeRepo.getActiveVersion(res.schemeId);
@@ -86,16 +96,16 @@ export class GuidanceService {
       }
     }
 
-    // 4. Run Gap Detection
+    // 3. Run Gap Detection
     const gaps = this.gapDetectionService.detectGaps(results, versionsMap);
 
-    // 5. Run Document Readiness Evaluation
+    // 4. Run Document Readiness Evaluation
     const documentReadiness = this.documentReadinessService.evaluateReadiness(
       results,
       household
     );
 
-    // 6. Generate Action Plan
+    // 5. Generate Action Plan
     const actionPlan = this.actionPlanService.generateActionPlan(
       results,
       gaps,
@@ -103,12 +113,12 @@ export class GuidanceService {
       versionsMap
     );
 
-    // 7. Group Results
+    // 6. Group Results
     const eligibleSchemes = results.filter((r) => r.status === "ELIGIBLE");
     const informationNeededSchemes = results.filter((r) => r.status === "NEEDS_INFORMATION");
     const notEligibleSchemes = results.filter((r) => r.status === "NOT_ELIGIBLE");
 
-    // 8. Determine Overall Household Status
+    // 7. Determine Overall Household Status
     let householdStatus: HouseholdGuidanceStatus = "NO_CURRENT_MATCH";
     let statusSummary = "No currently verified national healthcare scheme matched your household profile.";
 

@@ -3,10 +3,14 @@ import { requireAuth, requireConsent } from "../plugins/guards.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import {
   UpdateCaseInputSchema,
+  CreateCaseTaskInputSchema,
+  UpdateCaseTaskInputSchema,
+  CompleteCaseTaskInputSchema,
   CreateCaseNoteInputSchema,
   CreateCaseFollowUpInputSchema,
   UpdateCaseFollowUpInputSchema,
   AssignCaseInputSchema,
+  InitiateSchemeAssistanceInputSchema,
 } from "../../../shared/schemas/case.schema.js";
 import { CreateHouseholdSchema } from "../../../shared/schemas/household.schema.js";
 import { CaseServiceError } from "../services/case.service.js";
@@ -30,8 +34,83 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
   };
 
   // ============================================================================
-  // ASHA WORKSPACE CASE ENDPOINTS (/api/v1/asha/cases)
+  // ASHA WORKSPACE CASE ENDPOINTS (/api/v1/asha/cases & intelligence)
   // ============================================================================
+
+  /**
+   * GET /api/v1/asha/intelligence/attention-signals
+   * Computes deterministic proactive attention signals across the authenticated ASHA's assigned caseload
+   */
+  fastify.get(
+    "/v1/asha/intelligence/attention-signals",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const userProfile = request.userProfile;
+        if (!userProfile || (userProfile.role !== "ASHA" && userProfile.role !== "ADMIN")) {
+          return reply.status(HTTP_STATUS.FORBIDDEN).send({
+            success: false,
+            code: "FORBIDDEN_ROLE",
+            message: "Only ASHA workers and Administrators can access proactive intelligence.",
+          });
+        }
+
+        const data = await fastify.caseService.getAshaAttentionSignals(request.user!.uid);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/cases/:caseId/initiate-scheme
+   * Proactively initiates a verified scheme journey from ASHA caseload
+   */
+  fastify.post(
+    "/v1/asha/cases/:caseId/initiate-scheme",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId } = request.params as { caseId: string };
+        const userProfile = request.userProfile;
+        if (!userProfile || (userProfile.role !== "ASHA" && userProfile.role !== "ADMIN")) {
+          return reply.status(HTTP_STATUS.FORBIDDEN).send({
+            success: false,
+            code: "FORBIDDEN_ROLE",
+            message: "Only ASHA workers and Administrators can initiate proactive scheme assistance.",
+          });
+        }
+
+        const parseResult = InitiateSchemeAssistanceInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid scheme initiation payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const result = await fastify.caseService.initiateSchemeAssistance(
+          caseId,
+          parseResult.data,
+          userProfile
+        );
+
+        return reply.status(HTTP_STATUS.CREATED).send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
 
   /**
    * GET /api/v1/asha/cases
@@ -289,6 +368,138 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(HTTP_STATUS.OK).send({
           success: true,
           data: { followUp },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/asha/cases/:caseId/tasks
+   * Lists tasks for an authorized case
+   */
+  fastify.get(
+    "/v1/asha/cases/:caseId/tasks",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId } = request.params as { caseId: string };
+        const tasks = await fastify.caseService.getCaseTasks(caseId, request.userProfile!);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { tasks },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/cases/:caseId/tasks
+   * Creates a custom task for the case
+   */
+  fastify.post(
+    "/v1/asha/cases/:caseId/tasks",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId } = request.params as { caseId: string };
+        const parseResult = CreateCaseTaskInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid task creation payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const task = await fastify.caseService.createCaseTask(
+          caseId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.CREATED).send({
+          success: true,
+          data: { task },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/v1/asha/cases/:caseId/tasks/:taskId
+   * Updates an existing task
+   */
+  fastify.patch(
+    "/v1/asha/cases/:caseId/tasks/:taskId",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, taskId } = request.params as { caseId: string; taskId: string };
+        const parseResult = UpdateCaseTaskInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid task update payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const task = await fastify.caseService.updateCaseTask(
+          caseId,
+          taskId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { task },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/v1/asha/cases/:caseId/tasks/:taskId/complete
+   * Marks a task completed and advances journey steps
+   */
+  fastify.patch(
+    "/v1/asha/cases/:caseId/tasks/:taskId/complete",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, taskId } = request.params as { caseId: string; taskId: string };
+        const parseResult = CompleteCaseTaskInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid task completion payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const task = await fastify.caseService.completeCaseTask(
+          caseId,
+          taskId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { task },
         });
       } catch (err) {
         return handleCaseError(err, reply);
