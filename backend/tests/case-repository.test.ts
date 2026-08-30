@@ -190,6 +190,7 @@ describe("Phase 9: CaseRepository Unit Tests", () => {
     const followUp: CaseFollowUp = {
       id: "fu-1",
       caseId,
+      dueAt: "2026-09-01T09:00:00.000Z",
       scheduledAt: "2026-09-01T09:00:00.000Z",
       reason: "Follow up on e-KYC document submission",
       status: "PENDING",

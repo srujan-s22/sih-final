@@ -9,6 +9,7 @@ import {
   CasePriority,
   CaseDetailResponse,
   CaseSummaryResponse,
+  FollowUpSummaryResponse,
   FieldRegistrationInput,
   AshaAttentionSignal,
   AshaAttentionPriority,
@@ -27,6 +28,8 @@ import {
   CreateCaseNoteInput,
   CreateCaseFollowUpInput,
   UpdateCaseFollowUpInput,
+  CompleteCaseFollowUpInput,
+  RescheduleCaseFollowUpInput,
 } from "../../../shared/schemas/case.schema.js";
 
 import { CaseRepository } from "../repositories/case.repository.js";
@@ -36,6 +39,7 @@ import { ConnectionRepository } from "../repositories/connection.repository.js";
 import { AssistanceRepository } from "../repositories/assistance.repository.js";
 import { EligibilityService } from "./eligibility/eligibility.service.js";
 import { GuidanceService } from "./guidance/guidance.service.js";
+import { AutomationService } from "./automation/automation.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 export class CaseServiceError extends Error {
@@ -58,7 +62,8 @@ export class CaseService {
     private guidanceService: GuidanceService,
     private userRepo?: UserRepository,
     private connectionRepo?: ConnectionRepository,
-    private assistanceRepo?: AssistanceRepository
+    private assistanceRepo?: AssistanceRepository,
+    private automationService?: AutomationService
   ) {}
 
   /**
@@ -365,11 +370,22 @@ export class CaseService {
     this.authorizeCaseAccess(c, userProfile);
 
     const now = new Date().toISOString();
+    const scheduledDate = input.dueAt || input.scheduledAt || now;
+
     const followUp: CaseFollowUp = {
       id: `fu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       caseId,
-      scheduledAt: input.scheduledAt,
+      householdId: c.householdId,
+      headOfHouseholdName: c.headOfHouseholdName,
+      assignedAshaUid: c.assignedAshaUid,
+      schemeId: input.schemeId || c.schemeId || null,
+      schemeName: c.schemeName || null,
+      beneficiaryMemberId: input.beneficiaryMemberId || c.beneficiaryMemberId || null,
+      beneficiaryName: input.beneficiaryName || c.beneficiaryName || null,
+      title: input.title ? input.title.trim() : input.reason.trim(),
       reason: input.reason.trim(),
+      dueAt: scheduledDate,
+      scheduledAt: scheduledDate,
       status: "PENDING",
       notes: input.notes ? input.notes.trim() : null,
       createdAt: now,
@@ -380,7 +396,7 @@ export class CaseService {
 
     // Update next follow-up pointer on case
     await this.caseRepo.updateCase(caseId, {
-      nextFollowUpAt: input.scheduledAt,
+      nextFollowUpAt: scheduledDate,
     });
 
     // Record audit activity
@@ -391,10 +407,28 @@ export class CaseService {
       actorRole: userProfile.role,
       actorName: userProfile.displayName || "ASHA Worker",
       type: "FOLLOWUP_SCHEDULED",
-      description: `Follow-up scheduled for ${input.scheduledAt}: ${input.reason}`,
-      metadata: { scheduledAt: input.scheduledAt, reason: input.reason },
+      description: `Follow-up scheduled for ${scheduledDate}: ${input.reason}`,
+      metadata: { dueAt: scheduledDate, reason: input.reason },
       timestamp: now,
     });
+
+    // Emit domain event to automation service
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("FOLLOWUP_CREATED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId: c.schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          followUpId: savedFollowUp.id,
+          title: savedFollowUp.title,
+          reason: savedFollowUp.reason,
+          dueAt: scheduledDate,
+        },
+      }).catch(() => {});
+    }
 
     return savedFollowUp;
   }
@@ -418,8 +452,11 @@ export class CaseService {
     const now = new Date().toISOString();
     const updated = await this.caseRepo.updateFollowUp(caseId, followUpId, {
       status: updates.status,
+      dueAt: updates.dueAt,
+      outcome: updates.outcome,
       notes: updates.notes,
       completedAt: updates.status === "COMPLETED" ? now : null,
+      completedBy: updates.status === "COMPLETED" ? (userProfile.displayName || "ASHA Worker") : undefined,
     });
 
     if (!updated) {
@@ -434,7 +471,7 @@ export class CaseService {
     const allFollowUps = await this.caseRepo.getFollowUps(caseId);
     const nextPending = allFollowUps.find((f) => f.status === "PENDING");
     await this.caseRepo.updateCase(caseId, {
-      nextFollowUpAt: nextPending ? nextPending.scheduledAt : null,
+      nextFollowUpAt: nextPending ? (nextPending.dueAt || nextPending.scheduledAt) : null,
     });
 
     // Record audit activity
@@ -449,9 +486,242 @@ export class CaseService {
         description: `Follow-up task marked completed by ${userProfile.displayName || "ASHA Worker"}`,
         timestamp: now,
       });
+
+      if (this.automationService) {
+        this.automationService.emitDomainEvent("FOLLOWUP_COMPLETED", {
+          caseId,
+          householdId: c.householdId,
+          assignedAshaUid: c.assignedAshaUid,
+          schemeId: c.schemeId,
+          beneficiaryMemberId: c.beneficiaryMemberId,
+          beneficiaryName: c.beneficiaryName,
+          payload: {
+            followUpId,
+            outcome: updates.outcome || null,
+            notes: updates.notes || null,
+          },
+        }).catch(() => {});
+      }
     }
 
     return updated;
+  }
+
+  /**
+   * Completes a follow-up with structured outcome and resolution notes
+   */
+  public async completeFollowUp(
+    caseId: string,
+    followUpId: string,
+    input: CompleteCaseFollowUpInput,
+    userProfile: UserProfile
+  ): Promise<CaseFollowUp> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const updated = await this.caseRepo.updateFollowUp(caseId, followUpId, {
+      status: "COMPLETED",
+      outcome: input.outcome.trim(),
+      notes: input.notes ? input.notes.trim() : null,
+      completedAt: now,
+      completedBy: userProfile.displayName || "ASHA Worker",
+    });
+
+    if (!updated) {
+      throw new CaseServiceError(
+        "Follow-up task not found.",
+        HTTP_STATUS.NOT_FOUND,
+        "FOLLOWUP_NOT_FOUND"
+      );
+    }
+
+    // Recalculate next upcoming follow-up on case
+    const allFollowUps = await this.caseRepo.getFollowUps(caseId);
+    const nextPending = allFollowUps.find((f) => f.status === "PENDING");
+    await this.caseRepo.updateCase(caseId, {
+      nextFollowUpAt: nextPending ? (nextPending.dueAt || nextPending.scheduledAt) : null,
+    });
+
+    // Record audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "FOLLOWUP_COMPLETED",
+      description: `Follow-up completed by ${userProfile.displayName || "ASHA Worker"}: ${input.outcome}`,
+      metadata: { followUpId, outcome: input.outcome },
+      timestamp: now,
+    });
+
+    // Emit domain event to automation service
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("FOLLOWUP_COMPLETED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId: c.schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          followUpId,
+          outcome: input.outcome,
+          notes: input.notes || null,
+        },
+      }).catch(() => {});
+    }
+
+    return updated;
+  }
+
+  /**
+   * Reschedules a follow-up with reason
+   */
+  public async rescheduleFollowUp(
+    caseId: string,
+    followUpId: string,
+    input: RescheduleCaseFollowUpInput,
+    userProfile: UserProfile
+  ): Promise<CaseFollowUp> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const updated = await this.caseRepo.updateFollowUp(caseId, followUpId, {
+      dueAt: input.dueAt,
+      scheduledAt: input.dueAt,
+      rescheduledAt: now,
+      rescheduleReason: input.reason.trim(),
+    });
+
+    if (!updated) {
+      throw new CaseServiceError(
+        "Follow-up task not found.",
+        HTTP_STATUS.NOT_FOUND,
+        "FOLLOWUP_NOT_FOUND"
+      );
+    }
+
+    // Recalculate next upcoming follow-up on case
+    const allFollowUps = await this.caseRepo.getFollowUps(caseId);
+    const nextPending = allFollowUps.find((f) => f.status === "PENDING");
+    await this.caseRepo.updateCase(caseId, {
+      nextFollowUpAt: nextPending ? (nextPending.dueAt || nextPending.scheduledAt) : null,
+    });
+
+    // Record audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "FOLLOWUP_RESCHEDULED",
+      description: `Follow-up rescheduled to ${input.dueAt} by ${userProfile.displayName || "ASHA Worker"}: ${input.reason}`,
+      metadata: { followUpId, newDueAt: input.dueAt, reason: input.reason },
+      timestamp: now,
+    });
+
+    // Emit domain event to automation service
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("FOLLOWUP_RESCHEDULED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId: c.schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          followUpId,
+          newDueAt: input.dueAt,
+          reason: input.reason,
+        },
+      }).catch(() => {});
+    }
+
+    return updated;
+  }
+
+  /**
+   * Retrieves all follow-up tasks assigned to an ASHA with calculated status metrics
+   */
+  public async listAshaFollowUps(
+    ashaUid: string,
+    userProfile: UserProfile
+  ): Promise<FollowUpSummaryResponse> {
+    if (userProfile.role !== "ADMIN" && userProfile.role !== "ASHA") {
+      throw new CaseServiceError(
+        "Access denied. Only ASHA workers and Administrators can access follow-up roster.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_RESOURCE"
+      );
+    }
+
+    if (userProfile.role === "ASHA" && userProfile.uid !== ashaUid) {
+      throw new CaseServiceError(
+        "Access denied. You can only view your own assigned follow-up roster.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_RESOURCE"
+      );
+    }
+
+    const followUps = await this.caseRepo.listFollowUpsByAsha(ashaUid);
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    let dueToday = 0;
+    let upcoming = 0;
+    let overdue = 0;
+    let completed = 0;
+
+    const enrichedFollowUps = followUps.map((f) => {
+      const dueDateStr = f.dueAt || f.scheduledAt;
+      const dueDate = new Date(dueDateStr);
+      const isPending = f.status === "PENDING";
+      const isPast = dueDate.getTime() < now.getTime();
+      const dateOnlyStr = dueDate.toISOString().split("T")[0];
+      const isToday = dateOnlyStr === todayStr;
+
+      const isOverdue = isPending && isPast && !isToday;
+
+      if (f.status === "COMPLETED") {
+        completed++;
+      } else if (isPending) {
+        if (isToday) {
+          dueToday++;
+        } else if (isOverdue) {
+          overdue++;
+        } else {
+          upcoming++;
+        }
+      }
+
+      return {
+        ...f,
+        dueAt: dueDateStr,
+        scheduledAt: dueDateStr,
+        isOverdue,
+      };
+    });
+
+    return {
+      total: enrichedFollowUps.length,
+      dueToday,
+      upcoming,
+      overdue,
+      completed,
+      followUps: enrichedFollowUps,
+    };
   }
 
   /**
@@ -1129,7 +1399,23 @@ export class CaseService {
         journeySteps: updatedJourneySteps,
         currentJourneyStep: nextStep,
         status: isAllDone ? "RESOLVED" : "IN_PROGRESS",
+        nextFollowUpAt: isAllDone ? null : undefined,
       });
+
+      // When case reaches complete resolution, mark any lingering intermediate follow-ups COMPLETED
+      if (isAllDone) {
+        const caseFollowUps = await this.caseRepo.getFollowUps(caseId);
+        for (const pf of caseFollowUps) {
+          if (pf.status === "PENDING") {
+            await this.caseRepo.updateFollowUp(caseId, pf.id, {
+              status: "COMPLETED",
+              outcome: "Resolved with final scheme journey milestone.",
+              completedAt: now,
+              completedBy: userProfile.displayName || "ASHA Worker",
+            });
+          }
+        }
+      }
 
       // Synchronize linked AshaAssistanceRequest in assistanceRepository if present
       if (c.assistanceRequestId && this.assistanceRepo) {
@@ -1149,6 +1435,139 @@ export class CaseService {
       }
     }
 
+    // Helper to calculate relative ISO date
+    const addDays = (d: Date, days: number) => {
+      const target = new Date(d);
+      target.setDate(target.getDate() + days);
+      return target.toISOString();
+    };
+
+    // Deterministic Next Follow-Up Generation based on Scheme and Task Type
+    let nextFollowUpPayload: { title: string; reason: string; dueAt: string } | null = null;
+
+    if (c.schemeId === "ab-pmjay") {
+      if (updated.type === "CONFIRM_BENEFICIARY") {
+        nextFollowUpPayload = {
+          title: "PM-JAY e-KYC & Registration Assistance",
+          reason: `Assist ${c.beneficiaryName || "senior citizen"} with official Aadhaar e-KYC and PM-JAY registration at CSC/portal`,
+          dueAt: addDays(new Date(), 3),
+        };
+      } else if (updated.type === "ENROLLMENT_GUIDANCE") {
+        nextFollowUpPayload = {
+          title: "Verify PM-JAY Application Submission",
+          reason: `Verify PM-JAY application submission and record reference number for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 7),
+        };
+      } else if (updated.type === "VERIFY_ENROLLMENT") {
+        nextFollowUpPayload = {
+          title: "Check Ayushman Card Generation Status",
+          reason: `Check Ayushman Card generation and digital/physical receipt for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 5),
+        };
+      } else if (updated.type === "CONFIRM_CARD") {
+        nextFollowUpPayload = {
+          title: "Deliver Ayushman Card & Hospital Network Guidance",
+          reason: `Deliver Ayushman Card to ${c.beneficiaryName || "beneficiary"} and inform family of nearest empaneled hospitals for ₹5 Lakh cashless care`,
+          dueAt: addDays(new Date(), 3),
+        };
+      }
+    } else if (c.schemeId === "jsy") {
+      if (updated.type === "CONFIRM_PREGNANCY") {
+        nextFollowUpPayload = {
+          title: "Antenatal Care (ANC) & MCP Card Follow-up",
+          reason: `Ensure Mother and Child Protection (MCP) card issuance and schedule Antenatal Care checkups for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 7),
+        };
+      } else if (updated.type === "ANC_COORDINATION") {
+        nextFollowUpPayload = {
+          title: "Map Institutional Delivery Hospital & Ambulance",
+          reason: `Map accredited public hospital and confirm 108/102 emergency ambulance contact for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 14),
+        };
+      } else if (updated.type === "FACILITY_MAPPING") {
+        nextFollowUpPayload = {
+          title: "Birth Preparedness & Delivery Readiness Check",
+          reason: `Review birth preparedness plan and hospital admission readiness before Expected Date of Delivery for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 14),
+        };
+      } else if (updated.type === "DELIVERY_SUPPORT") {
+        nextFollowUpPayload = {
+          title: "48-Hour Postnatal Visit & Newborn Vaccines",
+          reason: `Conduct 48-hour postpartum home visit for ${c.beneficiaryName || "beneficiary"} to check maternal recovery, newborn breastfeeding, and zero-dose vaccines`,
+          dueAt: addDays(new Date(), 2),
+        };
+      } else if (updated.type === "POSTNATAL_VISIT") {
+        nextFollowUpPayload = {
+          title: "Track JSY Cash Incentive DBT Transfer",
+          reason: `Verify beneficiary bank account linkage and receipt of official JSY institutional delivery cash assistance for ${c.beneficiaryName || "beneficiary"}`,
+          dueAt: addDays(new Date(), 10),
+        };
+      }
+    }
+
+    if (nextFollowUpPayload) {
+      const existingFollowUps = await this.caseRepo.getFollowUps(caseId);
+      const isDuplicate = existingFollowUps.some(
+        (f) => f.sourceTaskId === taskId && f.status === "PENDING"
+      );
+
+      if (!isDuplicate) {
+        const autoFollowUp: CaseFollowUp = {
+          id: `fu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          caseId,
+          householdId: c.householdId,
+          headOfHouseholdName: c.headOfHouseholdName,
+          assignedAshaUid: c.assignedAshaUid,
+          schemeId: c.schemeId,
+          schemeName: c.schemeName,
+          beneficiaryMemberId: c.beneficiaryMemberId,
+          beneficiaryName: c.beneficiaryName,
+          title: nextFollowUpPayload.title,
+          reason: nextFollowUpPayload.reason,
+          dueAt: nextFollowUpPayload.dueAt,
+          scheduledAt: nextFollowUpPayload.dueAt,
+          status: "PENDING",
+          sourceTaskId: taskId,
+          notes: `Automatically generated following completion of task '${updated.title}'.`,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await this.caseRepo.createFollowUp(caseId, autoFollowUp);
+        await this.caseRepo.updateCase(caseId, { nextFollowUpAt: nextFollowUpPayload.dueAt });
+
+        await this.caseRepo.createActivity(caseId, {
+          id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          caseId,
+          actorUid: userProfile.uid,
+          actorRole: userProfile.role,
+          actorName: userProfile.displayName || "ASHA Worker",
+          type: "FOLLOWUP_SCHEDULED",
+          description: `Automatic follow-up scheduled for ${nextFollowUpPayload.dueAt}: ${nextFollowUpPayload.title}`,
+          metadata: { dueAt: nextFollowUpPayload.dueAt, sourceTaskId: taskId },
+          timestamp: now,
+        });
+
+        if (this.automationService) {
+          this.automationService.emitDomainEvent("FOLLOWUP_CREATED", {
+            caseId,
+            householdId: c.householdId,
+            assignedAshaUid: c.assignedAshaUid,
+            schemeId: c.schemeId,
+            beneficiaryMemberId: c.beneficiaryMemberId,
+            beneficiaryName: c.beneficiaryName,
+            payload: {
+              followUpId: autoFollowUp.id,
+              title: autoFollowUp.title,
+              reason: autoFollowUp.reason,
+              dueAt: autoFollowUp.dueAt,
+              sourceTaskId: taskId,
+            },
+          }).catch(() => {});
+        }
+      }
+    }
+
     // Log immutable audit activity
     await this.caseRepo.createActivity(caseId, {
       id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -1161,6 +1580,41 @@ export class CaseService {
       metadata: { taskId, title: updated.title, completedTasksCount, totalTasksCount },
       timestamp: now,
     });
+
+    // Emit domain events
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("TASK_COMPLETED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId: c.schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          taskId: updated.id,
+          taskTitle: updated.title,
+          taskType: updated.type,
+          completedTasksCount,
+          totalTasksCount,
+        },
+      }).catch(() => {});
+
+      const isAllDone = completedTasksCount === totalTasksCount;
+      if (isAllDone) {
+        this.automationService.emitDomainEvent("CASE_RESOLVED", {
+          caseId,
+          householdId: c.householdId,
+          assignedAshaUid: c.assignedAshaUid,
+          schemeId: c.schemeId,
+          beneficiaryMemberId: c.beneficiaryMemberId,
+          beneficiaryName: c.beneficiaryName,
+          payload: {
+            resolvedAt: now,
+            schemeId: c.schemeId,
+          },
+        }).catch(() => {});
+      }
+    }
 
     return updated;
   }
@@ -1200,11 +1654,13 @@ export class CaseService {
         );
 
         // 1. OVERDUE FOLLOW-UP SIGNALS (URGENT)
-        const overdueFollowUp = followUps.find(
-          (f) => f.status === "PENDING" && new Date(f.scheduledAt).getTime() < now.getTime()
-        );
+        const overdueFollowUp = !isCaseResolved
+          ? followUps.find(
+              (f) => f.status === "PENDING" && new Date(f.scheduledAt).getTime() < now.getTime()
+            )
+          : null;
         const isCaseNextFollowUpOverdue =
-          c.nextFollowUpAt && new Date(c.nextFollowUpAt).getTime() < now.getTime();
+          !isCaseResolved && c.nextFollowUpAt && new Date(c.nextFollowUpAt).getTime() < now.getTime();
 
         if (overdueFollowUp || isCaseNextFollowUpOverdue) {
           signals.push({
@@ -1374,12 +1830,14 @@ export class CaseService {
         }
 
         // 6. UPCOMING SCHEDULED FOLLOW-UP (LOW)
-        const upcomingFollowUp = followUps.find(
-          (f) =>
-            f.status === "PENDING" &&
-            new Date(f.scheduledAt).getTime() >= now.getTime() &&
-            new Date(f.scheduledAt).getTime() <= now.getTime() + 48 * 3600 * 1000
-        );
+        const upcomingFollowUp = !isCaseResolved
+          ? followUps.find(
+              (f) =>
+                f.status === "PENDING" &&
+                new Date(f.scheduledAt).getTime() >= now.getTime() &&
+                new Date(f.scheduledAt).getTime() <= now.getTime() + 48 * 3600 * 1000
+            )
+          : null;
 
         if (upcomingFollowUp && !overdueFollowUp) {
           signals.push({
@@ -1664,6 +2122,22 @@ export class CaseService {
       },
       timestamp: now,
     });
+
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("CASE_SCHEME_INITIATED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId,
+        beneficiaryMemberId: beneficiary?.id,
+        beneficiaryName: beneficiary?.fullName,
+        payload: {
+          schemeName,
+          tasksCount: tasks.length,
+          initiatedBy: ashaProfile.displayName || "ASHA Worker",
+        },
+      }).catch(() => {});
+    }
 
     return {
       case: freshCase || c,

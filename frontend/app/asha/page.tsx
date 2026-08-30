@@ -33,6 +33,9 @@ import {
   UserCheck,
   User,
   ShieldAlert,
+  AlertTriangle,
+  CalendarDays,
+  FileCheck,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
 import { connectionService } from "@/services/connection-service";
@@ -41,6 +44,8 @@ import {
   AshaCase,
   CaseDetailResponse,
   CaseSummaryResponse,
+  CaseFollowUp,
+  FollowUpSummaryResponse,
   CaseStatus,
   CasePriority,
   CaseTask,
@@ -110,6 +115,23 @@ export default function AshaWorkspacePage() {
   const [followUpReason, setFollowUpReason] = useState("");
   const [isFollowUpSubmitting, setIsFollowUpSubmitting] = useState(false);
 
+  // Phase 10 Follow-ups State
+  const [followUpSummary, setFollowUpSummary] = useState<FollowUpSummaryResponse | null>(null);
+  const [isFollowUpsLoading, setIsFollowUpsLoading] = useState(false);
+  const [followUpFilter, setFollowUpFilter] = useState<"ALL" | "DUE_TODAY" | "OVERDUE" | "UPCOMING" | "COMPLETED">("ALL");
+
+  // Complete Follow-up Modal State
+  const [completingFollowUp, setCompletingFollowUp] = useState<CaseFollowUp | null>(null);
+  const [completeOutcome, setCompleteOutcome] = useState("");
+  const [completeNotes, setCompleteNotes] = useState("");
+  const [isCompletingSubmitting, setIsCompletingSubmitting] = useState(false);
+
+  // Reschedule Follow-up Modal State
+  const [reschedulingFollowUp, setReschedulingFollowUp] = useState<CaseFollowUp | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [isReschedulingSubmitting, setIsReschedulingSubmitting] = useState(false);
+
   // Field Registration Modal
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
@@ -152,6 +174,21 @@ export default function AshaWorkspacePage() {
       setErrorMessage("Could not load assigned caseload data.");
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  // Load Phase 10 Follow-ups Roster
+  const loadFollowUps = useCallback(async () => {
+    setIsFollowUpsLoading(true);
+    try {
+      const res = await caseService.listAshaFollowUps();
+      if (res.success && res.data) {
+        setFollowUpSummary(res.data);
+      }
+    } catch {
+      // Non-blocking
+    } finally {
+      setIsFollowUpsLoading(false);
     }
   }, []);
 
@@ -199,10 +236,11 @@ export default function AshaWorkspacePage() {
 
   useEffect(() => {
     loadCaseload();
+    loadFollowUps();
     loadAttentionSignals();
     loadPendingRequests();
     loadAssistanceRequests();
-  }, [loadCaseload, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
+  }, [loadCaseload, loadFollowUps, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
 
   // Handle Proactive Scheme Initiation
   const handleInitiateScheme = async (
@@ -396,6 +434,7 @@ export default function AshaWorkspacePage() {
     setIsFollowUpSubmitting(true);
     try {
       const res = await caseService.createFollowUp(selectedCaseId, {
+        dueAt: followUpDate,
         scheduledAt: followUpDate,
         reason: followUpReason.trim(),
       });
@@ -406,7 +445,7 @@ export default function AshaWorkspacePage() {
         if (freshDetail.success && freshDetail.data) {
           setCaseDetail(freshDetail.data);
         }
-        await loadCaseload();
+        await Promise.all([loadFollowUps(), loadCaseload()]);
       }
     } catch {
       // Error handled quietly
@@ -415,19 +454,99 @@ export default function AshaWorkspacePage() {
     }
   };
 
-  // Complete Follow-Up
+  // Open Complete Follow-Up Modal
+  const handleOpenCompleteModal = (followUp: CaseFollowUp) => {
+    setCompletingFollowUp(followUp);
+    setCompleteOutcome("");
+    setCompleteNotes("");
+  };
+
+  // Submit Complete Follow-Up
+  const handleCompleteFollowUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completingFollowUp || !completeOutcome.trim()) return;
+    setIsCompletingSubmitting(true);
+    try {
+      const res = await caseService.completeFollowUp(
+        completingFollowUp.caseId,
+        completingFollowUp.id,
+        completeOutcome.trim(),
+        completeNotes.trim() || null
+      );
+      if (res.success) {
+        setCompletingFollowUp(null);
+        setCompleteOutcome("");
+        setCompleteNotes("");
+        setSuccessBanner(`Follow-up marked completed: "${completingFollowUp.reason}"`);
+        await Promise.all([loadFollowUps(), loadCaseload(), loadAttentionSignals()]);
+        if (selectedCaseId === completingFollowUp.caseId) {
+          const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+          if (freshDetail.success && freshDetail.data) {
+            setCaseDetail(freshDetail.data);
+          }
+        }
+      }
+    } catch {
+      setErrorMessage("Failed to complete follow-up.");
+    } finally {
+      setIsCompletingSubmitting(false);
+    }
+  };
+
+  // Open Reschedule Follow-Up Modal
+  const handleOpenRescheduleModal = (followUp: CaseFollowUp) => {
+    setReschedulingFollowUp(followUp);
+    setRescheduleDate(followUp.dueAt ? followUp.dueAt.split("T")[0] : "");
+    setRescheduleReason("");
+  };
+
+  // Submit Reschedule Follow-Up
+  const handleRescheduleFollowUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reschedulingFollowUp || !rescheduleDate || !rescheduleReason.trim()) return;
+    setIsReschedulingSubmitting(true);
+    try {
+      const res = await caseService.rescheduleFollowUp(
+        reschedulingFollowUp.caseId,
+        reschedulingFollowUp.id,
+        new Date(rescheduleDate).toISOString(),
+        rescheduleReason.trim()
+      );
+      if (res.success) {
+        setReschedulingFollowUp(null);
+        setRescheduleDate("");
+        setRescheduleReason("");
+        setSuccessBanner(`Follow-up rescheduled to ${new Date(rescheduleDate).toLocaleDateString()}`);
+        await Promise.all([loadFollowUps(), loadCaseload()]);
+        if (selectedCaseId === reschedulingFollowUp.caseId) {
+          const freshDetail = await caseService.getCaseDetail(selectedCaseId);
+          if (freshDetail.success && freshDetail.data) {
+            setCaseDetail(freshDetail.data);
+          }
+        }
+      }
+    } catch {
+      setErrorMessage("Failed to reschedule follow-up.");
+    } finally {
+      setIsReschedulingSubmitting(false);
+    }
+  };
+
+  // Quick Complete from Case Drawer
   const handleCompleteFollowUp = async (followUpId: string) => {
     if (!selectedCaseId) return;
     try {
-      const res = await caseService.updateFollowUp(selectedCaseId, followUpId, {
-        status: "COMPLETED",
-      });
+      const res = await caseService.completeFollowUp(
+        selectedCaseId,
+        followUpId,
+        "Completed during direct field check-in"
+      );
       if (res.success) {
         const freshDetail = await caseService.getCaseDetail(selectedCaseId);
         if (freshDetail.success && freshDetail.data) {
           setCaseDetail(freshDetail.data);
         }
-        await loadCaseload();
+        await Promise.all([loadFollowUps(), loadCaseload()]);
       }
     } catch {
       // Error handled quietly
@@ -560,13 +679,18 @@ export default function AshaWorkspacePage() {
   ).length;
 
   const totalRequestsBadge = pendingAssistanceCount + connectionRequests.length;
+  const totalFollowUpBadge = (followUpSummary?.overdue || 0) + (followUpSummary?.dueToday || 0);
 
   const navTabs = [
     { id: "overview", label: "Overview", icon: Activity },
     { id: "cases", label: "Caseload", icon: Users },
     { id: "requests", label: `Requests (${totalRequestsBadge})`, icon: Inbox },
-    { id: "attention", label: "Needs Attention", icon: AlertCircle },
-    { id: "followups", label: "Follow-ups", icon: Clock },
+    { id: "attention", label: `Needs Attention (${attentionSignals.length})`, icon: AlertCircle },
+    {
+      id: "followups",
+      label: `Follow-ups${totalFollowUpBadge > 0 ? ` (${totalFollowUpBadge})` : ""}`,
+      icon: Clock,
+    },
   ];
 
   // Filtered Cases
@@ -1524,45 +1648,286 @@ export default function AshaWorkspacePage() {
             )}
 
             {/* ============================================================ */}
-            {/* 5. FOLLOW-UPS TAB */}
+            {/* 5. FOLLOW-UPS TAB (PHASE 10) */}
             {/* ============================================================ */}
             {activeTab === "followups" && (
-              <div className="space-y-4">
-                {upcomingFollowUpCases.length === 0 ? (
-                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
-                    <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <h3 className="text-sm font-bold text-slate-800">No Scheduled Follow-ups</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
-                      You can schedule reminder tasks, document verifications, and family check-ins directly inside any case.
-                    </p>
+              <div className="space-y-5">
+                {/* Top Metrics Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div
+                    onClick={() => setFollowUpFilter("DUE_TODAY")}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                      followUpFilter === "DUE_TODAY"
+                        ? "bg-amber-100/80 border-amber-400 shadow-xs"
+                        : "bg-amber-50/60 border-amber-200/80 hover:bg-amber-100/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Due Today</span>
+                      <Calendar className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-amber-950 mt-1">{followUpSummary?.dueToday || 0}</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">Visits scheduled today</p>
                   </div>
-                ) : (
-                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs divide-y divide-slate-100">
-                    {upcomingFollowUpCases.map((c) => (
-                      <div
-                        key={c.id}
-                        onClick={() => openCaseDetail(c.id)}
-                        className="p-4 flex items-center justify-between hover:bg-slate-50/80 cursor-pointer transition-colors"
+
+                  <div
+                    onClick={() => setFollowUpFilter("OVERDUE")}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                      followUpFilter === "OVERDUE"
+                        ? "bg-rose-100/80 border-rose-400 shadow-xs"
+                        : "bg-rose-50/60 border-rose-200/80 hover:bg-rose-100/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Overdue</span>
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-rose-950 mt-1">{followUpSummary?.overdue || 0}</p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">Urgent pending action</p>
+                  </div>
+
+                  <div
+                    onClick={() => setFollowUpFilter("UPCOMING")}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                      followUpFilter === "UPCOMING"
+                        ? "bg-sky-100/80 border-sky-400 shadow-xs"
+                        : "bg-sky-50/60 border-sky-200/80 hover:bg-sky-100/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">Upcoming</span>
+                      <Clock className="w-4 h-4 text-sky-600" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-sky-950 mt-1">{followUpSummary?.upcoming || 0}</p>
+                    <p className="text-[11px] text-sky-700 mt-0.5">Scheduled in next 14 days</p>
+                  </div>
+
+                  <div
+                    onClick={() => setFollowUpFilter("COMPLETED")}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                      followUpFilter === "COMPLETED"
+                        ? "bg-emerald-100/80 border-emerald-400 shadow-xs"
+                        : "bg-emerald-50/60 border-emerald-200/80 hover:bg-emerald-100/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Completed</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-emerald-950 mt-1">{followUpSummary?.completed || 0}</p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">Visits successfully done</p>
+                  </div>
+                </div>
+
+                {/* Filter Pills Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    {[
+                      { id: "ALL", label: `All Follow-ups (${followUpSummary?.total || 0})` },
+                      { id: "OVERDUE", label: `Overdue (${followUpSummary?.overdue || 0})` },
+                      { id: "DUE_TODAY", label: `Due Today (${followUpSummary?.dueToday || 0})` },
+                      { id: "UPCOMING", label: `Upcoming (${followUpSummary?.upcoming || 0})` },
+                      { id: "COMPLETED", label: `Completed (${followUpSummary?.completed || 0})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setFollowUpFilter(tab.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+                          followUpFilter === tab.id
+                            ? "bg-slate-900 text-white"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                            <span className="text-xs font-bold text-blue-900">
-                              {c.nextFollowUpAt ? new Date(c.nextFollowUpAt).toLocaleDateString() : "Scheduled"}
-                            </span>
-                            <span className="text-sm font-bold text-slate-900 ml-2">{c.headOfHouseholdName}</span>
-                          </div>
-                          <p className="text-xs text-slate-500 pl-6">
-                            Location: {c.district}, {c.state} • Status: {c.status}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm" className="text-xs font-semibold">
-                          View Case <ChevronRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      </div>
+                        {tab.label}
+                      </button>
                     ))}
                   </div>
-                )}
+
+                  <button
+                    onClick={loadFollowUps}
+                    disabled={isFollowUpsLoading}
+                    className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Activity className={`w-3.5 h-3.5 ${isFollowUpsLoading ? "animate-spin" : ""}`} />
+                    <span>Refresh Roster</span>
+                  </button>
+                </div>
+
+                {/* Follow-up Cards List */}
+                {(() => {
+                  const allFollowUps = followUpSummary?.followUps || [];
+                  const todayStr = new Date().toISOString().split("T")[0];
+
+                  const filtered = allFollowUps.filter((f) => {
+                    const dueDateStr = f.dueAt || f.scheduledAt;
+                    const dateOnlyStr = dueDateStr ? dueDateStr.split("T")[0] : "";
+                    const isToday = dateOnlyStr === todayStr;
+
+                    if (followUpFilter === "ALL") return true;
+                    if (followUpFilter === "DUE_TODAY") return f.status === "PENDING" && isToday;
+                    if (followUpFilter === "OVERDUE") return f.isOverdue === true;
+                    if (followUpFilter === "UPCOMING") return f.status === "PENDING" && !isToday && !f.isOverdue;
+                    if (followUpFilter === "COMPLETED") return f.status === "COMPLETED";
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
+                        <Clock className="w-9 h-9 text-slate-300 mx-auto mb-2.5" />
+                        <h3 className="text-sm font-bold text-slate-800">No Follow-ups in this Category</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                          {followUpFilter === "OVERDUE"
+                            ? "Great job! There are no overdue household follow-ups."
+                            : followUpFilter === "DUE_TODAY"
+                            ? "No follow-up visits scheduled for today."
+                            : "You can schedule follow-ups from any active case or let automated workflow triggers schedule them on task completion."}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {filtered.map((f) => {
+                        const dueDateStr = f.dueAt || f.scheduledAt;
+                        const dateOnlyStr = dueDateStr ? dueDateStr.split("T")[0] : "";
+                        const isToday = dateOnlyStr === todayStr;
+
+                        return (
+                          <div
+                            key={f.id}
+                            className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                              f.status === "COMPLETED"
+                                ? "bg-slate-50/70 border-slate-200 opacity-90"
+                                : f.isOverdue
+                                ? "bg-rose-50/40 border-rose-300 shadow-2xs hover:border-rose-400"
+                                : isToday
+                                ? "bg-amber-50/40 border-amber-300 shadow-2xs hover:border-amber-400"
+                                : "bg-white border-slate-200 shadow-2xs hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                              <div className="space-y-2 max-w-2xl">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {f.status === "COMPLETED" ? (
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3" /> Completed
+                                    </span>
+                                  ) : f.isOverdue ? (
+                                    <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[11px] font-bold flex items-center gap-1 animate-pulse">
+                                      <AlertTriangle className="w-3 h-3" /> OVERDUE
+                                    </span>
+                                  ) : isToday ? (
+                                    <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[11px] font-bold flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" /> DUE TODAY
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[11px] font-bold flex items-center gap-1">
+                                      <Clock className="w-3 h-3" /> UPCOMING
+                                    </span>
+                                  )}
+
+                                  {f.schemeName && (
+                                    <span className="px-2 py-0.5 rounded-md bg-teal-100 text-teal-900 text-[11px] font-bold">
+                                      {f.schemeName}
+                                    </span>
+                                  )}
+
+                                  <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                                    <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+                                    Due: {new Date(dueDateStr).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <h4 className="text-sm font-bold text-slate-900">
+                                    {f.title || f.reason}
+                                  </h4>
+                                  {f.title && f.title !== f.reason && (
+                                    <p className="text-xs text-slate-600 mt-0.5">{f.reason}</p>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-1">
+                                  <span>
+                                    Household: <strong className="text-slate-700">{f.headOfHouseholdName || "Assigned Family"}</strong>
+                                  </span>
+                                  {f.beneficiaryName && (
+                                    <span>
+                                      Beneficiary: <strong className="text-slate-700">{f.beneficiaryName}</strong>
+                                    </span>
+                                  )}
+                                  {f.sourceTaskId && (
+                                    <span className="text-[11px] text-teal-700 font-medium">
+                                      ⚡ Workflow Auto-Triggered
+                                    </span>
+                                  )}
+                                </div>
+
+                                {f.outcome && (
+                                  <div className="mt-2.5 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-0.5">
+                                    <p className="font-bold flex items-center gap-1">
+                                      <FileCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                                      Outcome: {f.outcome}
+                                    </p>
+                                    {f.notes && <p className="text-emerald-800 text-[11px] pl-4">{f.notes}</p>}
+                                    {f.completedAt && (
+                                      <p className="text-[10px] text-emerald-600 pl-4">
+                                        Completed on {new Date(f.completedAt).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {f.rescheduleReason && f.status !== "COMPLETED" && (
+                                  <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                                    <p className="font-semibold text-[11px]">
+                                      Rescheduled: {f.rescheduleReason} ({new Date(f.rescheduledAt || "").toLocaleDateString()})
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 pt-2 sm:pt-0">
+                                {f.status !== "COMPLETED" && (
+                                  <>
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() => handleOpenCompleteModal(f)}
+                                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Mark Done</span>
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleOpenRescheduleModal(f)}
+                                      className="text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                                    >
+                                      <span>Reschedule</span>
+                                    </Button>
+                                  </>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openCaseDetail(f.caseId)}
+                                  className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>View Case</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -2422,37 +2787,78 @@ export default function AshaWorkspacePage() {
                           </div>
                         </form>
 
-                        <div className="space-y-2 pt-2">
+                        <div className="space-y-2.5 pt-2">
                           {caseDetail.followUps.length === 0 ? (
                             <p className="text-xs text-slate-400 text-center py-6">No scheduled follow-ups.</p>
                           ) : (
                             caseDetail.followUps.map((f) => (
                               <div
                                 key={f.id}
-                                className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs"
+                                className={`p-3.5 rounded-xl border text-xs space-y-2 ${
+                                  f.status === "COMPLETED"
+                                    ? "bg-slate-50 border-slate-200"
+                                    : f.isOverdue
+                                    ? "bg-rose-50/50 border-rose-200"
+                                    : "bg-white border-slate-200"
+                                }`}
                               >
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-slate-900">{f.reason}</span>
-                                    <span
-                                      className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                        f.status === "COMPLETED" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-                                      }`}
-                                    >
-                                      {f.status}
-                                    </span>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900">{f.title || f.reason}</span>
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                          f.status === "COMPLETED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : f.isOverdue
+                                            ? "bg-rose-100 text-rose-800"
+                                            : "bg-sky-100 text-sky-800"
+                                        }`}
+                                      >
+                                        {f.status === "COMPLETED" ? "COMPLETED" : f.isOverdue ? "OVERDUE" : "PENDING"}
+                                      </span>
+                                    </div>
+                                    {f.title && f.title !== f.reason && (
+                                      <p className="text-slate-600 text-[11px] mt-0.5">{f.reason}</p>
+                                    )}
+                                    <p className="text-slate-500 text-[11px] mt-0.5">
+                                      Due: {new Date(f.dueAt || f.scheduledAt).toLocaleDateString()}
+                                    </p>
                                   </div>
-                                  <p className="text-slate-500 text-[11px] mt-0.5">Due: {new Date(f.scheduledAt).toLocaleDateString()}</p>
+
+                                  {f.status !== "COMPLETED" && (
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => handleOpenCompleteModal(f)}
+                                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
+                                      >
+                                        Mark Done
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleOpenRescheduleModal(f)}
+                                        className="text-xs text-slate-700 hover:bg-slate-100 cursor-pointer"
+                                      >
+                                        Reschedule
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
-                                {f.status !== "COMPLETED" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleCompleteFollowUp(f.id)}
-                                    className="text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-                                  >
-                                    Mark Done
-                                  </Button>
+
+                                {f.outcome && (
+                                  <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
+                                    <strong>Outcome:</strong> {f.outcome}
+                                    {f.notes && <span className="block text-slate-600 mt-0.5">{f.notes}</span>}
+                                  </div>
+                                )}
+
+                                {f.rescheduleReason && f.status !== "COMPLETED" && (
+                                  <div className="p-1.5 rounded bg-amber-50 text-amber-800 text-[10px]">
+                                    Rescheduled: {f.rescheduleReason}
+                                  </div>
                                 )}
                               </div>
                             ))
@@ -2580,6 +2986,170 @@ export default function AshaWorkspacePage() {
                     className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
                   >
                     {registerSubmitting ? "Registering..." : "Create Case"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* COMPLETE FOLLOW-UP MODAL (PHASE 10) */}
+        {/* ============================================================ */}
+        {completingFollowUp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                  <span>Record Follow-up Outcome</span>
+                </h3>
+                <button
+                  onClick={() => setCompletingFollowUp(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1">
+                <p className="font-bold text-slate-800">{completingFollowUp.title || completingFollowUp.reason}</p>
+                <p className="text-slate-500">
+                  Household: <strong>{completingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
+                </p>
+                <p className="text-slate-500">
+                  Target Due Date: {new Date(completingFollowUp.dueAt || completingFollowUp.scheduledAt).toLocaleDateString()}
+                </p>
+              </div>
+
+              <form onSubmit={handleCompleteFollowUpSubmit} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Visit Outcome / Action Taken *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Verified PM-JAY registration & assisted with e-KYC photo"
+                    value={completeOutcome}
+                    onChange={(e) => setCompleteOutcome(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Field Notes & Observations (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Household informed about empaneled district hospital and emergency contact numbers."
+                    value={completeNotes}
+                    onChange={(e) => setCompleteNotes(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletingFollowUp(null)}
+                    className="cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={isCompletingSubmitting || !completeOutcome.trim()}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
+                  >
+                    {isCompletingSubmitting ? "Completing..." : "Save & Complete Visit"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* RESCHEDULE FOLLOW-UP MODAL (PHASE 10) */}
+        {/* ============================================================ */}
+        {reschedulingFollowUp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-amber-700" />
+                  <span>Reschedule Follow-up Visit</span>
+                </h3>
+                <button
+                  onClick={() => setReschedulingFollowUp(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 bg-amber-50/60 rounded-xl text-xs space-y-1 border border-amber-200/60">
+                <p className="font-bold text-slate-800">{reschedulingFollowUp.title || reschedulingFollowUp.reason}</p>
+                <p className="text-slate-600">
+                  Household: <strong>{reschedulingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
+                </p>
+                <p className="text-slate-600">
+                  Current Due Date: {new Date(reschedulingFollowUp.dueAt || reschedulingFollowUp.scheduledAt).toLocaleDateString()}
+                </p>
+              </div>
+
+              <form onSubmit={handleRescheduleFollowUpSubmit} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    New Target Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden text-xs bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Reason for Rescheduling *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Beneficiary was traveling; requested visit next week"
+                    value={rescheduleReason}
+                    onChange={(e) => setRescheduleReason(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden text-xs"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReschedulingFollowUp(null)}
+                    className="cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={isReschedulingSubmitting || !rescheduleDate || !rescheduleReason.trim()}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
+                  >
+                    {isReschedulingSubmitting ? "Rescheduling..." : "Confirm New Schedule"}
                   </Button>
                 </div>
               </form>

@@ -19,6 +19,7 @@ import { IntelligenceService } from "../services/ai/intelligence.service.js";
 import { PrivilegedAuthService } from "../services/privileged-auth.service.js";
 import { GeminiService } from "../services/ai/gemini.service.js";
 import { AssistantService } from "../services/ai/assistant.service.js";
+import { AutomationService } from "../services/automation/automation.service.js";
 import { CaseRepository } from "../repositories/case.repository.js";
 import { CaseService } from "../services/case.service.js";
 import { ConnectionRepository } from "../repositories/connection.repository.js";
@@ -36,6 +37,7 @@ declare module "fastify" {
     householdService: HouseholdService;
     caseRepository: CaseRepository;
     caseService: CaseService;
+    automationService: AutomationService;
     connectionRepository: ConnectionRepository;
     connectionService: ConnectionService;
     assistanceRepository: AssistanceRepository;
@@ -88,6 +90,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   );
   const connectionRepository = new ConnectionRepository(firestoreInstance);
   const assistanceRepository = new AssistanceRepository(firestoreInstance);
+  const automationService = new AutomationService();
   const caseService = new CaseService(
     caseRepository,
     householdRepository,
@@ -95,7 +98,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     guidanceService,
     userRepository,
     connectionRepository,
-    assistanceRepository
+    assistanceRepository,
+    automationService
   );
   const connectionService = new ConnectionService(
     connectionRepository,
@@ -147,6 +151,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("householdService", householdService);
   fastify.decorate("caseRepository", caseRepository);
   fastify.decorate("caseService", caseService);
+  fastify.decorate("automationService", automationService);
   fastify.decorate("connectionRepository", connectionRepository);
   fastify.decorate("connectionService", connectionService);
   fastify.decorate("assistanceRepository", assistanceRepository);

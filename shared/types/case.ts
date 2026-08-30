@@ -38,6 +38,8 @@ export type CaseActivityType =
   | "NOTE_ADDED"
   | "FOLLOWUP_SCHEDULED"
   | "FOLLOWUP_COMPLETED"
+  | "FOLLOWUP_RESCHEDULED"
+  | "FOLLOWUP_CANCELLED"
   | "CONTACT_RECORDED"
   | "TASK_CREATED"
   | "TASK_COMPLETED"
@@ -47,7 +49,9 @@ export type CaseActivityType =
   | "REQUEST_DECLINED"
   | "CASE_SCHEME_INITIATED"
   | "CASE_ESCALATED"
-  | "CASE_RESOLVED";
+  | "CASE_RESOLVED"
+  | "AUTOMATION_DISPATCHED"
+  | "AUTOMATION_FAILED";
 
 export type CaseTaskStatus =
   | "PENDING"
@@ -121,13 +125,26 @@ export interface CaseNote {
 export interface CaseFollowUp {
   id: string;
   caseId: string;
-  scheduledAt: string;
-  reason: string;
-  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  householdId?: string;
+  headOfHouseholdName?: string;
+  assignedAshaUid?: string;
+  schemeId?: string | null;
+  schemeName?: string | null;
   beneficiaryMemberId?: string | null;
   beneficiaryName?: string | null;
+  title?: string;
+  reason: string;
+  dueAt: string;
+  scheduledAt: string; // for backward compatibility
+  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  isOverdue?: boolean;
   completedAt?: string | null;
+  completedBy?: string | null;
+  outcome?: string | null;
   notes?: string | null;
+  rescheduledAt?: string | null;
+  rescheduleReason?: string | null;
+  sourceTaskId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -163,6 +180,39 @@ export interface CaseSummaryResponse {
   urgentCount: number;
   upcomingFollowUpsCount: number;
   resolvedCount: number;
+}
+
+export interface FollowUpSummaryResponse {
+  total: number;
+  dueToday: number;
+  upcoming: number;
+  overdue: number;
+  completed: number;
+  followUps: CaseFollowUp[];
+}
+
+export type DomainEventType =
+  | "CASE_CREATED"
+  | "CASE_ASSIGNED"
+  | "TASK_COMPLETED"
+  | "FOLLOWUP_CREATED"
+  | "FOLLOWUP_COMPLETED"
+  | "FOLLOWUP_OVERDUE"
+  | "FOLLOWUP_RESCHEDULED"
+  | "CASE_SCHEME_INITIATED"
+  | "CASE_RESOLVED";
+
+export interface AutomationDomainEvent {
+  eventId: string;
+  eventType: DomainEventType;
+  timestamp: string;
+  caseId: string;
+  householdId: string;
+  assignedAshaUid: string;
+  schemeId?: string | null;
+  beneficiaryMemberId?: string | null;
+  beneficiaryName?: string | null;
+  payload: Record<string, unknown>;
 }
 
 export type AshaAttentionCategory =

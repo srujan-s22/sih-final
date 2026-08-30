@@ -170,11 +170,13 @@ export const assistanceRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userProfile = request.userProfile!;
       const { requestId } = request.params as { requestId: string };
+      const { responseNote } = (request.body as { responseNote?: string }) || {};
 
       try {
         const result = await fastify.assistanceService.acceptAssistanceRequest(
           requestId,
-          userProfile
+          userProfile,
+          responseNote
         );
 
         return reply.status(HTTP_STATUS.OK).send({

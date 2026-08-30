@@ -3,6 +3,7 @@ import {
   AshaCase,
   CaseNote,
   CaseFollowUp,
+  FollowUpSummaryResponse,
   CaseActivity,
   CaseTask,
   CaseStatus,
@@ -112,6 +113,22 @@ export class CaseServiceClient {
   }
 
   /**
+   * Retrieves all scheduled, upcoming, overdue, and completed follow-ups for the authenticated ASHA worker
+   */
+  public async listAshaFollowUps(): Promise<ApiResult<FollowUpSummaryResponse>> {
+    return apiClient.get<FollowUpSummaryResponse>("/api/v1/asha/follow-ups");
+  }
+
+  /**
+   * Retrieves follow-ups for a specific case
+   */
+  public async getCaseFollowUps(caseId: string): Promise<ApiResult<{ followUps: CaseFollowUp[] }>> {
+    return apiClient.get<{ followUps: CaseFollowUp[] }>(
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups`
+    );
+  }
+
+  /**
    * Schedules a follow-up task
    */
   public async createFollowUp(
@@ -125,7 +142,37 @@ export class CaseServiceClient {
   }
 
   /**
-   * Updates or completes a follow-up task
+   * Completes a follow-up task with outcome and resolution notes
+   */
+  public async completeFollowUp(
+    caseId: string,
+    followUpId: string,
+    outcome: string,
+    notes?: string | null
+  ): Promise<ApiResult<{ followUp: CaseFollowUp }>> {
+    return apiClient.patch<{ followUp: CaseFollowUp }>(
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}/complete`,
+      { outcome, notes }
+    );
+  }
+
+  /**
+   * Reschedules a follow-up task
+   */
+  public async rescheduleFollowUp(
+    caseId: string,
+    followUpId: string,
+    dueAt: string,
+    reason: string
+  ): Promise<ApiResult<{ followUp: CaseFollowUp }>> {
+    return apiClient.patch<{ followUp: CaseFollowUp }>(
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}/reschedule`,
+      { dueAt, reason }
+    );
+  }
+
+  /**
+   * Updates or completes a follow-up task (general)
    */
   public async updateFollowUp(
     caseId: string,

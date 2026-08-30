@@ -75,20 +75,35 @@ export const CreateCaseNoteInputSchema = z.object({
 });
 
 export const CreateCaseFollowUpInputSchema = z.object({
-  scheduledAt: z.string().min(1, "Scheduled date/time is required"),
+  scheduledAt: z.string().optional(),
+  dueAt: z.string().optional(),
+  title: z.string().max(200).optional().nullable(),
   reason: z
     .string()
     .min(1, "Follow-up reason cannot be empty")
     .max(500, "Follow-up reason cannot exceed 500 characters")
     .trim(),
+  schemeId: z.string().optional().nullable(),
   beneficiaryMemberId: z.string().optional().nullable(),
   beneficiaryName: z.string().optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
 export const UpdateCaseFollowUpInputSchema = z.object({
-  status: z.enum(["PENDING", "COMPLETED", "CANCELLED"]),
+  status: z.enum(["PENDING", "COMPLETED", "CANCELLED"]).optional(),
+  dueAt: z.string().optional(),
+  outcome: z.string().max(500).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
+});
+
+export const CompleteCaseFollowUpInputSchema = z.object({
+  outcome: z.string().min(1, "Follow-up outcome/resolution is required").max(500).trim(),
+  notes: z.string().max(1000).optional().nullable(),
+});
+
+export const RescheduleCaseFollowUpInputSchema = z.object({
+  dueAt: z.string().min(1, "New follow-up due date is required").trim(),
+  reason: z.string().min(1, "Reschedule reason is required").max(500).trim(),
 });
 
 export const AssignCaseInputSchema = z.object({
@@ -110,6 +125,8 @@ export type CompleteCaseTaskInput = z.infer<typeof CompleteCaseTaskInputSchema>;
 export type CreateCaseNoteInput = z.infer<typeof CreateCaseNoteInputSchema>;
 export type CreateCaseFollowUpInput = z.infer<typeof CreateCaseFollowUpInputSchema>;
 export type UpdateCaseFollowUpInput = z.infer<typeof UpdateCaseFollowUpInputSchema>;
+export type CompleteCaseFollowUpInput = z.infer<typeof CompleteCaseFollowUpInputSchema>;
+export type RescheduleCaseFollowUpInput = z.infer<typeof RescheduleCaseFollowUpInputSchema>;
 export type AssignCaseInput = z.infer<typeof AssignCaseInputSchema>;
 export type InitiateSchemeAssistanceInput = z.infer<typeof InitiateSchemeAssistanceInputSchema>;
 

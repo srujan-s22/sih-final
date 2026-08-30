@@ -218,7 +218,8 @@ export class AssistanceService {
    */
   public async acceptAssistanceRequest(
     requestId: string,
-    ashaProfile: UserProfile
+    ashaProfile: UserProfile,
+    responseNote?: string | null
   ): Promise<{ request: AshaAssistanceRequest; caseId: string }> {
     if (ashaProfile.role !== "ASHA" && ashaProfile.role !== "ADMIN") {
       throw new AssistanceServiceError(
@@ -308,6 +309,7 @@ export class AssistanceService {
     const updatedRequest = await this.assistanceRepo.updateRequest(requestId, {
       status: "ACCEPTED",
       caseId: existingCase.id,
+      responseNote: responseNote !== undefined ? responseNote : undefined,
     });
 
     // Record audit activity

@@ -9,6 +9,8 @@ import {
   CreateCaseNoteInputSchema,
   CreateCaseFollowUpInputSchema,
   UpdateCaseFollowUpInputSchema,
+  CompleteCaseFollowUpInputSchema,
+  RescheduleCaseFollowUpInputSchema,
   AssignCaseInputSchema,
   InitiateSchemeAssistanceInputSchema,
 } from "../../../shared/schemas/case.schema.js";
@@ -303,6 +305,50 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * GET /api/v1/asha/follow-ups
+   * Retrieves all scheduled and overdue follow-ups for the authenticated ASHA worker across their caseload
+   */
+  fastify.get(
+    "/v1/asha/follow-ups",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const ashaUid = (request.query as { ashaUid?: string }).ashaUid || request.userProfile!.uid;
+        const summary = await fastify.caseService.listAshaFollowUps(ashaUid, request.userProfile!);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: summary,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/asha/cases/:caseId/follow-ups
+   * Lists follow-up tasks for a specific authorized case
+   */
+  fastify.get(
+    "/v1/asha/cases/:caseId/follow-ups",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId } = request.params as { caseId: string };
+        const detail = await fastify.caseService.getCaseDetail(caseId, request.userProfile!);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { followUps: detail.followUps },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
    * POST /api/v1/asha/cases/:caseId/follow-ups
    * Schedules a follow-up task for the case
    */
@@ -339,8 +385,82 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * PATCH /api/v1/asha/cases/:caseId/follow-ups/:followUpId/complete
+   * Completes a follow-up task with outcome and resolution notes
+   */
+  fastify.patch(
+    "/v1/asha/cases/:caseId/follow-ups/:followUpId/complete",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, followUpId } = request.params as { caseId: string; followUpId: string };
+        const parseResult = CompleteCaseFollowUpInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid follow-up completion payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const followUp = await fastify.caseService.completeFollowUp(
+          caseId,
+          followUpId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { followUp },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/v1/asha/cases/:caseId/follow-ups/:followUpId/reschedule
+   * Reschedules a follow-up task
+   */
+  fastify.patch(
+    "/v1/asha/cases/:caseId/follow-ups/:followUpId/reschedule",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, followUpId } = request.params as { caseId: string; followUpId: string };
+        const parseResult = RescheduleCaseFollowUpInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid follow-up reschedule payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const followUp = await fastify.caseService.rescheduleFollowUp(
+          caseId,
+          followUpId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { followUp },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
    * PATCH /api/v1/asha/cases/:caseId/follow-ups/:followUpId
-   * Updates/completes a scheduled follow-up
+   * General update for a follow-up task
    */
   fastify.patch(
     "/v1/asha/cases/:caseId/follow-ups/:followUpId",
@@ -480,7 +600,7 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { caseId, taskId } = request.params as { caseId: string; taskId: string };
-        const parseResult = CompleteCaseTaskInputSchema.safeParse(request.body);
+        const parseResult = CompleteCaseTaskInputSchema.safeParse(request.body || {});
         if (!parseResult.success) {
           return reply.status(HTTP_STATUS.BAD_REQUEST).send({
             success: false,
