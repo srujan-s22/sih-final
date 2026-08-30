@@ -7,6 +7,8 @@ import { siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-context";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 export interface MobileNavProps {
   isOpen: boolean;
   onClose: () => void;
@@ -67,19 +69,7 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-md bg-teal-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                SS
-              </span>
-              <div className="flex flex-col">
-                <span className="font-bold text-slate-900 text-sm leading-tight">
-                  {siteConfig.name}
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium uppercase">
-                  Healthcare Access
-                </span>
-              </div>
-            </div>
+            <BrandLogo size="sm" showText={true} subtitle="Healthcare Access" priority={true} />
             <button
               type="button"
               onClick={onClose}

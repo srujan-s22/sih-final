@@ -22,6 +22,8 @@ import {
   Search,
 } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 export interface NavTabItem {
   id: string;
   label: string;
@@ -115,17 +117,12 @@ export function AuthenticatedShell({
               href={roleConfig.homeHref}
               className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-md"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white font-bold text-base shadow-xs group-hover:bg-teal-800 transition-colors">
-                SS
-              </div>
-              <div className="flex flex-col">
-                <span className="text-base font-bold tracking-tight text-slate-900 leading-tight">
-                  SwasthyaSetu
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">
-                  {roleConfig.portalName}
-                </span>
-              </div>
+              <BrandLogo
+                size="md"
+                showText={true}
+                subtitle={roleConfig.portalName}
+                priority={true}
+              />
             </Link>
 
             <div className="hidden sm:block">{roleConfig.portalBadge}</div>

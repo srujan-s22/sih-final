@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
+import { BrandLogo } from "@/components/brand-logo";
 
 export function Footer() {
   const pathname = usePathname();
@@ -23,9 +24,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-teal-700 text-white font-bold text-xs">
-              SS
-            </div>
+            <BrandLogo size="xs" />
             <span className="text-sm font-bold text-slate-900">{siteConfig.name}</span>
             <span className="text-xs text-slate-400">|</span>
             <span className="text-xs text-slate-500">Public Healthcare Access Platform</span>

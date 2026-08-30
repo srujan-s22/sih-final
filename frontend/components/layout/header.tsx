@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { useAuth } from "@/lib/auth/auth-context";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -49,17 +51,7 @@ export function Header() {
             href="/"
             className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-md"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white font-bold text-base shadow-xs group-hover:bg-teal-800 transition-colors">
-              SS
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base font-bold tracking-tight text-slate-900 leading-tight">
-                {siteConfig.name}
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium tracking-wide uppercase">
-                Healthcare Access
-              </span>
-            </div>
+            <BrandLogo size="md" showText={true} subtitle="Healthcare Access" priority={true} />
           </Link>
         </div>
 

@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { UserRole } from "@shared/types/auth";
 import { env } from "@/config/env";
 import { ShieldCheck, Lock, ArrowRight, User, KeyRound, Building2, Users } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -158,9 +159,7 @@ export default function SignInPage() {
       <div className="w-full max-w-md space-y-5">
         {/* Brand & Purpose Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-teal-700 text-white font-bold text-lg shadow-sm mx-auto">
-            SS
-          </div>
+          <BrandLogo size="lg" priority={true} className="mx-auto" />
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
             {mode === "signin"
               ? "Sign in to SwasthyaSetu"

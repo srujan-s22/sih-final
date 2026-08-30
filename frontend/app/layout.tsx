@@ -21,6 +21,13 @@ export const metadata: Metadata = {
     "India Healthcare",
   ],
   authors: [{ name: "SwasthyaSetu Public Service Initiative" }],
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export const viewport: Viewport = {
