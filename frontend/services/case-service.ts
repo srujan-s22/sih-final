@@ -293,6 +293,19 @@ export class CaseServiceClient {
   public async listAllCasesForAdmin(): Promise<ApiResult<{ cases: AshaCase[] }>> {
     return apiClient.get<{ cases: AshaCase[] }>("/api/v1/admin/cases");
   }
+
+  /**
+   * Assigns or reassigns a household case to an ASHA worker (Admin only)
+   */
+  public async assignCaseToAsha(
+    householdId: string,
+    ashaUid: string
+  ): Promise<ApiResult<{ case: AshaCase }>> {
+    return apiClient.post<{ case: AshaCase }>("/api/v1/admin/cases/assign", {
+      householdId,
+      ashaUid,
+    });
+  }
 }
 
 export const caseService = new CaseServiceClient();
