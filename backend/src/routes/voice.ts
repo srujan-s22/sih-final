@@ -1,9 +1,11 @@
 import { FastifyPluginAsync } from "fastify";
+import "@fastify/websocket";
 import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
 import { VoiceSessionRepository } from "../repositories/voice-session.repository.js";
 import { SarvamService } from "../services/telephony/sarvam.service.js";
 import { ExotelService } from "../services/telephony/exotel.service.js";
 import { VoiceActionService } from "../services/telephony/voice-action.service.js";
+import { ExotelStreamGatewayService } from "../services/telephony/exotel-stream-gateway.service.js";
 import { SchemeService } from "../services/scheme.service.js";
 import { SchemeRepository } from "../repositories/scheme.repository.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
@@ -66,6 +68,16 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     userRepo,
     automationService
   );
+
+  const streamGatewayService =
+    (fastify as any).exotelStreamGatewayService ||
+    new ExotelStreamGatewayService(gatewayService, sessionRepo, sarvamService);
+
+  // Real-Time Exotel Audio WebSocket Stream (Phase 11)
+  // Route mounted at /api/v1/voice/stream
+  fastify.get("/v1/voice/stream", { websocket: true } as any, (socket: any, req: any) => {
+    streamGatewayService.handleConnection(socket, req);
+  });
 
   // 0. Public Voice Configuration (No secrets exposed)
   fastify.get("/v1/voice/config", async (_request, reply) => {

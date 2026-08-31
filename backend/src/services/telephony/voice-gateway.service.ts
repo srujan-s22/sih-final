@@ -61,7 +61,7 @@ export class VoiceGatewayService {
   public async createInboundSession(
     callerPhone: string,
     callSid?: string,
-    language: string = "hi-IN"
+    language: string = env.VOICE_LANGUAGE || "en-IN"
   ): Promise<VoiceSession> {
     const id = `vses_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const sid = callSid || `exo_in_${Date.now()}`;
@@ -92,7 +92,7 @@ export class VoiceGatewayService {
       id,
       callSid: sid,
       direction: "INBOUND",
-      provider: this.exotelService.isConfigured() ? "EXOTEL" : "TEST_MOCK",
+      provider: this.exotelService?.isConfigured?.() ? "EXOTEL" : "TEST_MOCK",
       callerNumberHash: hash,
       maskedCallerNumber: masked,
       status: "ACTIVE",

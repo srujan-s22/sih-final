@@ -1,4 +1,5 @@
 import fastify, { FastifyInstance, FastifyServerOptions } from "fastify";
+import websocketPlugin from "@fastify/websocket";
 import correlationPlugin from "./plugins/correlation.js";
 import corsPlugin from "./plugins/cors.js";
 import errorsPlugin from "./plugins/errors.js";
@@ -28,6 +29,11 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   // 1. Core Plugins
   app.register(correlationPlugin);
   app.register(corsPlugin);
+  app.register(websocketPlugin, {
+    options: {
+      maxPayload: 1048576, // 1MB payload ceiling
+    },
+  });
   app.register(errorsPlugin);
   app.register(firebasePlugin);
   app.register(authPlugin);

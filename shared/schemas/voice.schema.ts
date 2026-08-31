@@ -91,3 +91,97 @@ export const ExotelStatusCallbackSchema = z.object({
 });
 
 export type ExotelStatusCallback = z.infer<typeof ExotelStatusCallbackSchema>;
+
+/**
+ * Exotel Stream Inbound Event Schemas
+ */
+export const ExotelStreamConnectedSchema = z.object({
+  event: z.string(),
+  protocol: z.string().optional(),
+  version: z.string().optional(),
+}).passthrough();
+
+export const ExotelStreamStartSchema = z.object({
+  event: z.string(),
+  sequenceNumber: z.union([z.string(), z.number()]).optional(),
+  streamSid: z.string().optional(),
+  stream_sid: z.string().optional(),
+  callSid: z.string().optional(),
+  call_sid: z.string().optional(),
+  start: z
+    .object({
+      streamSid: z.string().optional(),
+      stream_sid: z.string().optional(),
+      accountSid: z.string().optional(),
+      account_sid: z.string().optional(),
+      callSid: z.string().optional(),
+      call_sid: z.string().optional(),
+      tracks: z.array(z.string()).optional(),
+      mediaFormat: z
+        .object({
+          encoding: z.string().optional(),
+          sampleRate: z.number().optional(),
+          sample_rate: z.number().optional(),
+          channels: z.number().optional(),
+        })
+        .optional(),
+      customParameters: z.record(z.any()).nullable().optional(),
+      custom_parameters: z.record(z.any()).nullable().optional(),
+    })
+    .passthrough()
+    .optional(),
+}).passthrough();
+
+export const ExotelStreamMediaSchema = z.object({
+  event: z.string(),
+  sequenceNumber: z.union([z.string(), z.number()]).optional(),
+  streamSid: z.string().optional(),
+  stream_sid: z.string().optional(),
+  media: z
+    .object({
+      track: z.string().optional(),
+      chunk: z.union([z.string(), z.number()]).optional(),
+      timestamp: z.union([z.string(), z.number()]).optional(),
+      payload: z.string().min(1),
+    })
+    .passthrough(),
+}).passthrough();
+
+export const ExotelStreamStopSchema = z.object({
+  event: z.string(),
+  sequenceNumber: z.union([z.string(), z.number()]).optional(),
+  streamSid: z.string().optional(),
+  stream_sid: z.string().optional(),
+  stop: z
+    .object({
+      accountSid: z.string().optional(),
+      account_sid: z.string().optional(),
+      callSid: z.string().optional(),
+      call_sid: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
+}).passthrough();
+
+export const ExotelStreamMarkSchema = z.object({
+  event: z.string(),
+  sequenceNumber: z.union([z.string(), z.number()]).optional(),
+  streamSid: z.string().optional(),
+  stream_sid: z.string().optional(),
+  mark: z
+    .object({
+      name: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
+}).passthrough();
+
+export const ExotelStreamInboundMessageSchema = z.union([
+  ExotelStreamConnectedSchema,
+  ExotelStreamStartSchema,
+  ExotelStreamMediaSchema,
+  ExotelStreamStopSchema,
+  ExotelStreamMarkSchema,
+]);
+
+

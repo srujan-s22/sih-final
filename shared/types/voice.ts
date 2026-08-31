@@ -243,3 +243,109 @@ export interface VoiceHealthResponse {
     startedAt: string;
   }>;
 }
+
+/**
+ * Exotel WebSocket Stream Inbound & Outbound Event Types
+ */
+export type ExotelStreamEventType =
+  | "connected"
+  | "start"
+  | "media"
+  | "stop"
+  | "mark"
+  | "clear";
+
+export interface ExotelStreamMediaFormat {
+  encoding: string; // e.g. "audio/x-mulaw" or "audio/x-l16"
+  sampleRate: number; // e.g. 8000
+  channels: number; // e.g. 1
+}
+
+export interface ExotelStreamStartData {
+  streamSid: string;
+  accountSid?: string;
+  callSid: string;
+  tracks?: string[];
+  mediaFormat?: ExotelStreamMediaFormat;
+  customParameters?: Record<string, string>;
+}
+
+export interface ExotelStreamConnectedEvent {
+  event: "connected";
+  protocol?: string;
+  version?: string;
+}
+
+export interface ExotelStreamStartEvent {
+  event: "start";
+  sequenceNumber?: string;
+  streamSid?: string;
+  start: ExotelStreamStartData;
+}
+
+export interface ExotelStreamMediaData {
+  track?: string;
+  chunk?: string;
+  timestamp?: string;
+  payload: string; // Base64 audio chunk
+}
+
+export interface ExotelStreamMediaEvent {
+  event: "media";
+  sequenceNumber?: string;
+  streamSid?: string;
+  media: ExotelStreamMediaData;
+}
+
+export interface ExotelStreamStopEvent {
+  event: "stop";
+  sequenceNumber?: string;
+  streamSid?: string;
+  stop?: {
+    accountSid?: string;
+    callSid?: string;
+  };
+}
+
+export interface ExotelStreamMarkEvent {
+  event: "mark";
+  sequenceNumber?: string;
+  streamSid?: string;
+  mark?: {
+    name?: string;
+  };
+}
+
+export type ExotelStreamInboundMessage =
+  | ExotelStreamConnectedEvent
+  | ExotelStreamStartEvent
+  | ExotelStreamMediaEvent
+  | ExotelStreamStopEvent
+  | ExotelStreamMarkEvent;
+
+export interface ExotelStreamOutboundMediaMessage {
+  event: "media";
+  streamSid: string;
+  media: {
+    payload: string; // Base64 audio frame
+  };
+}
+
+export interface ExotelStreamOutboundMarkMessage {
+  event: "mark";
+  streamSid: string;
+  mark: {
+    name: string;
+  };
+}
+
+export interface ExotelStreamOutboundClearMessage {
+  event: "clear";
+  streamSid: string;
+}
+
+export type ExotelStreamOutboundMessage =
+  | ExotelStreamOutboundMediaMessage
+  | ExotelStreamOutboundMarkMessage
+  | ExotelStreamOutboundClearMessage;
+

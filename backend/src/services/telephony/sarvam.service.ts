@@ -49,13 +49,15 @@ export class SarvamService {
    */
   public async speechToText(
     audioBase64: string,
-    languageCode: string = "hi-IN",
+    languageCode: string = env.VOICE_LANGUAGE || "en-IN",
     audioFormat: string = "wav"
   ): Promise<SarvamSttResponse> {
+    const effectiveLanguage = env.VOICE_LANGUAGE || languageCode || "en-IN";
+
     if (!this.isConfigured()) {
       return {
         transcript: "",
-        language_code: languageCode,
+        language_code: effectiveLanguage,
       };
     }
 
@@ -83,7 +85,7 @@ export class SarvamService {
         `${this.sttModel}\r\n` +
         `--${boundary}\r\n` +
         `Content-Disposition: form-data; name="language_code"\r\n\r\n` +
-        `${languageCode}\r\n` +
+        `${effectiveLanguage}\r\n` +
         `--${boundary}\r\n` +
         `Content-Disposition: form-data; name="mode"\r\n\r\n` +
         `transcribe\r\n` +
@@ -110,7 +112,7 @@ export class SarvamService {
       const data = (await response.json()) as SarvamSttResponse;
       return {
         transcript: data.transcript || "",
-        language_code: data.language_code || languageCode,
+        language_code: data.language_code || effectiveLanguage,
       };
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -125,45 +127,72 @@ export class SarvamService {
   /**
    * Text-to-Speech via Sarvam AI API
    * POST /text-to-speech
-   * Uses current production bulbul:v3 model with verified v3 speaker (roopa / shubh)
-   * Formatted for 8kHz / 16kHz PSTN telephony output without v2-only pitch/loudness parameters
+   * Uses current production bulbul:v3 model with verified v3 speaker (shubh)
+   * Formatted for 8kHz / 16kHz PSTN telephony output
    */
   public async textToSpeech(
     text: string,
-    targetLanguageCode: string = "hi-IN",
+    targetLanguageCode: string = env.VOICE_LANGUAGE || "en-IN",
     speaker?: string
   ): Promise<SarvamTtsResponse> {
     if (!this.isConfigured()) {
       return { audios: [] };
     }
 
-    const selectedSpeaker = speaker || this.defaultSpeaker;
+    const effectiveLanguage = env.VOICE_LANGUAGE || targetLanguageCode || "en-IN";
+    const sanitizedText = (text || "").trim().slice(0, 2500);
+    if (!sanitizedText) {
+      return { audios: [] };
+    }
+
+    const selectedSpeaker = speaker || this.defaultSpeaker || "shubh";
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
+      const payload: Record<string, any> = {
+        inputs: [sanitizedText],
+        target_language_code: effectiveLanguage,
+        speaker: selectedSpeaker,
+        speech_sample_rate: 8000,
+        enable_preprocessing: true,
+        model: this.ttsModel,
+      };
+
       const response = await fetch(`${this.baseUrl}/text-to-speech`, {
         method: "POST",
         headers: {
           "api-subscription-key": this.apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          text,
-          inputs: [text],
-          target_language_code: targetLanguageCode,
-          speaker: selectedSpeaker,
-          pace: 1.0,
-          temperature: 0.6,
-          speech_sample_rate: 8000,
-          output_audio_codec: "wav",
-          model: this.ttsModel,
-        }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error(`Sarvam TTS failed with HTTP ${response.status}`);
+        const errorText = await response.text();
+        let parsedError: unknown = null;
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          // Plaintext error
+        }
+
+        console.error("❌ [SarvamService.textToSpeech] Sarvam TTS API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: parsedError || errorText,
+          requestDetails: {
+            model: this.ttsModel,
+            target_language_code: effectiveLanguage,
+            speaker: selectedSpeaker,
+            speech_sample_rate: 8000,
+            textLength: sanitizedText.length,
+            textPreview: sanitizedText.slice(0, 80) + (sanitizedText.length > 80 ? "..." : ""),
+          },
+        });
+
+        throw new Error(`Sarvam TTS failed with HTTP ${response.status}: ${errorText}`);
       }
 
       const data = (await response.json()) as SarvamTtsResponse;
@@ -186,7 +215,7 @@ export class SarvamService {
    */
   public understandIntent(
     transcript: string,
-    sessionLanguage: string = "hi-IN"
+    sessionLanguage: string = env.VOICE_LANGUAGE || "en-IN"
   ): SarvamIntentExtractionResult {
     const raw = transcript.trim();
     const normalized = raw.toLowerCase();

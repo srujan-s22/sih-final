@@ -209,7 +209,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(res.intent).toBe("END_CALL");
     });
 
-    it("verifies bulbul:v3 TTS request contract excludes deprecated pitch/loudness and uses verified v3 speaker", async () => {
+    it("verifies bulbul:v3 TTS request contract matches official Sarvam API specification", async () => {
       // Mock global fetch for Sarvam TTS
       const originalFetch = global.fetch;
       let capturedUrl = "";
@@ -231,22 +231,57 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
         // Temporarily configure sarvamService
         (sarvamService as any).apiKey = "test-sarvam-key";
         const result = await sarvamService.textToSpeech(
-          "नमस्ते, स्वास्थ्यासेतु में आपका स्वागत है।",
-          "hi-IN",
-          "roopa"
+          "Hello, welcome to SwasthyaSetu.",
+          "en-IN",
+          "shubh"
         );
 
         expect(capturedUrl).toContain("/text-to-speech");
         expect(capturedBody.model).toBe("bulbul:v3");
-        expect(capturedBody.speaker).toBe("roopa");
+        expect(capturedBody.speaker).toBe("shubh");
         expect(capturedBody.speech_sample_rate).toBe(8000);
-        expect(capturedBody.output_audio_codec).toBe("wav");
-        expect(capturedBody.pitch).toBeUndefined();
-        expect(capturedBody.loudness).toBeUndefined();
+        expect(capturedBody.inputs).toEqual(["Hello, welcome to SwasthyaSetu."]);
+        expect(capturedBody.target_language_code).toBe("en-IN");
+        expect(capturedBody.enable_preprocessing).toBe(true);
+        expect(capturedBody.temperature).toBeUndefined();
+        expect(capturedBody.output_audio_codec).toBeUndefined();
         expect(result.audios.length).toBe(1);
       } finally {
         global.fetch = originalFetch;
         (sarvamService as any).apiKey = "";
+      }
+    });
+
+    it("verifies Sarvam TTS logs structured error details when API returns HTTP 400", async () => {
+      const originalFetch = global.fetch;
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      global.fetch = vi.fn().mockImplementation(async () => {
+        return {
+          ok: false,
+          status: 400,
+          statusText: "Bad Request",
+          text: async () => JSON.stringify({ detail: "Extra inputs are not permitted: temperature" }),
+        };
+      }) as any;
+
+      try {
+        (sarvamService as any).apiKey = "test-sarvam-key";
+        await expect(
+          sarvamService.textToSpeech("Invalid request test", "en-IN", "shubh")
+        ).rejects.toThrow("Sarvam TTS failed with HTTP 400");
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Sarvam TTS API Error"),
+          expect.objectContaining({
+            status: 400,
+            statusText: "Bad Request",
+          })
+        );
+      } finally {
+        global.fetch = originalFetch;
+        (sarvamService as any).apiKey = "";
+        consoleErrorSpy.mockRestore();
       }
     });
 
@@ -262,20 +297,20 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
           ok: true,
           json: async () => ({
             request_id: "req_stt_test_01",
-            transcript: "मेरा नाम रमेश है",
-            language_code: "hi-IN",
+            transcript: "My name is Ramesh",
+            language_code: "en-IN",
           }),
         };
       }) as any;
 
       try {
         (sarvamService as any).apiKey = "test-sarvam-key";
-        const result = await sarvamService.speechToText("dGVzdGF1ZGlv", "hi-IN", "wav");
+        const result = await sarvamService.speechToText("dGVzdGF1ZGlv", "en-IN", "wav");
 
         expect(capturedUrl).toContain("/speech-to-text");
         expect(capturedHeaders["api-subscription-key"]).toBe("test-sarvam-key");
-        expect(result.transcript).toBe("मेरा नाम रमेश है");
-        expect(result.language_code).toBe("hi-IN");
+        expect(result.transcript).toBe("My name is Ramesh");
+        expect(result.language_code).toBe("en-IN");
       } finally {
         global.fetch = originalFetch;
         (sarvamService as any).apiKey = "";
