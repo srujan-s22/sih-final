@@ -53,7 +53,7 @@ export default function ConsentPage() {
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <LoadingState message="Loading consent terms..." />
+        <LoadingState message={t("common.loading")} />
       </div>
     );
   }
@@ -75,7 +75,7 @@ export default function ConsentPage() {
 
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xl shadow-slate-100 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-bold text-slate-900">Healthcare Access Notice</span>
+            <span className="text-xs font-bold text-slate-900">{t("common.notice")}</span>
             <LanguageSelector size="sm" />
           </div>
 
@@ -88,16 +88,16 @@ export default function ConsentPage() {
 
           <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3">
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-              We use the household details you provide to identify healthcare coverage gaps, match government scheme entitlements (e.g. AB-PMJAY), and guide your family to actionable healthcare care.
+              {t("home.trustPrivacyDesc")}
             </p>
 
             <div>
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-xs font-semibold text-teal-700 hover:text-teal-800 underline underline-offset-2 flex items-center gap-1"
+                className="text-xs font-semibold text-teal-700 hover:text-teal-800 underline underline-offset-2 flex items-center gap-1 cursor-pointer"
               >
-                <span>{isExpanded ? "Hide data policy details" : "Read key data safeguards"}</span>
+                <span>{isExpanded ? t("common.details") : t("home.trustEvidenceTitle")}</span>
                 {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
 
@@ -106,19 +106,19 @@ export default function ConsentPage() {
                   <div className="flex items-start gap-2">
                     <Building2 className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
                     <p>
-                      <strong className="text-slate-900">1. Entitlement Purpose:</strong> Evaluated strictly for healthcare support matching and resolution workflows.
+                      <strong className="text-slate-900">1. {t("citizen.healthBenefits")}:</strong> {t("home.card1Desc")}
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Lock className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
                     <p>
-                      <strong className="text-slate-900">2. Privacy & Isolation:</strong> Your data is protected by server-side role boundaries and never sold.
+                      <strong className="text-slate-900">2. {t("home.trustPrivacyTitle")}:</strong> {t("home.trustPrivacyDesc")}
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
                     <p>
-                      <strong className="text-slate-900">3. Citizen Control:</strong> You can review, update, or revoke household information at any time.
+                      <strong className="text-slate-900">3. {t("home.trustEvidenceTitle")}:</strong> {t("home.trustEvidenceDesc")}
                     </p>
                   </div>
                 </div>

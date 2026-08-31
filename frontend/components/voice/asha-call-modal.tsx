@@ -48,6 +48,8 @@ const DEFAULT_LANGUAGES = [
   { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
+import { useTranslation } from "@/i18n/i18n-context";
+
 export function AshaCallModal({
   isOpen,
   onClose,
@@ -60,6 +62,7 @@ export function AshaCallModal({
   defaultReason = "Doorstep visit & document verification reminder",
   onCallComplete,
 }: AshaCallModalProps) {
+  const { t } = useTranslation();
   const [language, setLanguage] = useState("hi-IN");
   const [reason, setReason] = useState(defaultReason);
   const [activeTab, setActiveTab] = useState<"call" | "history">("call");

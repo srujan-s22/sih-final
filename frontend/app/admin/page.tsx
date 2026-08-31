@@ -548,19 +548,19 @@ export default function AdminPage() {
               variant="outline"
               size="sm"
               onClick={() => setIsAssistantOpen(true)}
-              className="text-xs font-semibold flex items-center gap-1.5 border-slate-300 text-slate-800 hover:bg-slate-50 shadow-2xs"
+              className="text-xs font-semibold flex items-center gap-1.5 border-slate-300 text-slate-800 hover:bg-slate-50 shadow-2xs cursor-pointer"
             >
               <Bot className="w-3.5 h-3.5 text-teal-700" />
-              <span>Admin Assistant</span>
+              <span>{t("assistant.badge")}</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={loadAdminData}
-              className="text-xs font-semibold flex items-center gap-1.5 border-slate-300 hover:bg-slate-50 shadow-2xs"
+              className="text-xs font-semibold flex items-center gap-1.5 border-slate-300 hover:bg-slate-50 shadow-2xs cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
-              <span>Refresh</span>
+              <span>{t("common.tryAgain")}</span>
             </Button>
           </div>
         }
@@ -583,7 +583,7 @@ export default function AdminPage() {
 
         {isLoading ? (
           <div className="py-20 text-center">
-            <LoadingState message="Loading administrative caseload, workforce telemetry, and system registries..." />
+            <LoadingState message={t("common.loading")} />
           </div>
         ) : (
           <div className="space-y-6">
@@ -600,14 +600,14 @@ export default function AdminPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        Registered Households
+                        {t("navigation.directory")}
                       </span>
                       <Users className="w-4 h-4 text-slate-400" />
                     </div>
                     <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1.5">
                       {totalHouseholdsCount}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">Persisted family units</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t("navigation.household")}</p>
                   </div>
 
                   <div
@@ -616,14 +616,14 @@ export default function AdminPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                        Active ASHA Workers
+                        {t("navigation.workforce")}
                       </span>
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     </div>
                     <p className="text-2xl sm:text-3xl font-black text-emerald-950 mt-1.5">
                       {totalAshasCount}
                     </p>
-                    <p className="text-xs text-emerald-700 mt-0.5">Field healthcare workforce</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">{t("admin.activeAshas")}</p>
                   </div>
 
                   <div
@@ -632,7 +632,7 @@ export default function AdminPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wider">
-                        Active Cases
+                        {t("navigation.oversight")}
                       </span>
                       <Inbox className="w-4 h-4 text-blue-600" />
                     </div>
@@ -640,7 +640,7 @@ export default function AdminPage() {
                       {activeCasesCount}
                     </p>
                     <p className="text-xs text-blue-700 mt-0.5">
-                      {blockedCasesCount} blocked or escalated
+                      {blockedCasesCount} {t("status.urgent")}
                     </p>
                   </div>
 
@@ -650,7 +650,7 @@ export default function AdminPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">
-                        Follow-ups Due
+                        {t("asha.dueFollowUps")}
                       </span>
                       <Clock className="w-4 h-4 text-rose-600" />
                     </div>
@@ -658,7 +658,7 @@ export default function AdminPage() {
                       {actionableFollowUpsCount}
                     </p>
                     <p className="text-xs text-rose-700 mt-0.5">
-                      {overdueFollowUpsCount} overdue, {dueTodayFollowUpsCount} today
+                      {overdueFollowUpsCount} {t("status.urgent")}, {dueTodayFollowUpsCount} {t("status.pending")}
                     </p>
                   </div>
                 </div>
@@ -666,40 +666,40 @@ export default function AdminPage() {
                 {/* 2. Quick Field Action Bar */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                   <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
-                    Administrative Navigation:
+                    {t("navigation.dashboard")}:
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("households")}
-                      className="text-xs font-semibold bg-white border-slate-200 hover:bg-slate-100"
+                      className="text-xs font-semibold bg-white border-slate-200 hover:bg-slate-100 cursor-pointer"
                     >
-                      <Search className="w-3.5 h-3.5 mr-1 text-slate-500" /> Find Household
+                      <Search className="w-3.5 h-3.5 mr-1 text-slate-500" /> {t("navigation.directory")}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("ashas")}
-                      className="text-xs font-semibold bg-white border-emerald-200 text-emerald-900 hover:bg-emerald-50"
+                      className="text-xs font-semibold bg-white border-emerald-200 text-emerald-900 hover:bg-emerald-50 cursor-pointer"
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-700" /> ASHA Workforce ({totalAshasCount})
+                      <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-700" /> {t("navigation.workforce")} ({totalAshasCount})
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("cases")}
-                      className="text-xs font-semibold bg-white border-blue-200 text-blue-900 hover:bg-blue-50"
+                      className="text-xs font-semibold bg-white border-blue-200 text-blue-900 hover:bg-blue-50 cursor-pointer"
                     >
-                      <Inbox className="w-3.5 h-3.5 mr-1 text-blue-700" /> Active Cases ({activeCasesCount})
+                      <Inbox className="w-3.5 h-3.5 mr-1 text-blue-700" /> {t("navigation.oversight")} ({activeCasesCount})
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("schemes")}
-                      className="text-xs font-semibold bg-white border-teal-200 text-teal-900 hover:bg-teal-50"
+                      className="text-xs font-semibold bg-white border-teal-200 text-teal-900 hover:bg-teal-50 cursor-pointer"
                     >
-                      <Layers className="w-3.5 h-3.5 mr-1 text-teal-700" /> Schemes Registry ({schemes.length})
+                      <Layers className="w-3.5 h-3.5 mr-1 text-teal-700" /> {t("navigation.registry")} ({schemes.length})
                     </Button>
                   </div>
                 </div>
@@ -712,7 +712,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-amber-600" />
                         <h3 className="text-sm font-bold text-slate-900">
-                          Priority Case Oversight ({needsAttentionCount})
+                          {t("navigation.oversight")} ({needsAttentionCount})
                         </h3>
                       </div>
                       <Button
@@ -722,17 +722,17 @@ export default function AdminPage() {
                           setCaseStatusFilter("NEEDS_ATTENTION");
                           setActiveTab("cases");
                         }}
-                        className="text-xs font-semibold text-amber-900 border-amber-200 hover:bg-amber-50"
+                        className="text-xs font-semibold text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer"
                       >
-                        View Cases
+                        {t("navigation.oversight")}
                       </Button>
                     </div>
 
                     {needsAttentionCases.length === 0 ? (
                       <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
                         <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
-                        <p className="font-semibold text-slate-700">All caseloads operating normally</p>
-                        <p className="text-slate-500">No unaddressed blockers or escalated cases recorded across platform.</p>
+                        <p className="font-semibold text-slate-700">{t("status.completed")}</p>
+                        <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -752,7 +752,7 @@ export default function AdminPage() {
                                 {c.status}
                               </span>
                               <span className="text-[10px] font-mono text-slate-500">
-                                Case: {c.id.slice(0, 8)}...
+                                {t("common.code")}: {c.id.slice(0, 8)}...
                               </span>
                             </div>
 
@@ -765,15 +765,15 @@ export default function AdminPage() {
 
                             <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
                               <span className="text-[11px] font-semibold text-slate-700">
-                                {c.detectedGapsCount} identified gap(s)
+                                {c.detectedGapsCount} {t("asha.attentionRequired")}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openCaseDetail(c.id)}
-                                className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white"
+                                className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white cursor-pointer"
                               >
-                                Review Case
+                                {t("asha.openCaseDrawer")}
                               </Button>
                             </div>
                           </div>
@@ -788,7 +788,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-rose-600" />
                         <h3 className="text-sm font-bold text-slate-900">
-                          Due Home Visits &amp; Outreach ({actionableFollowUpsCount})
+                          {t("asha.dueFollowUps")} ({actionableFollowUpsCount})
                         </h3>
                       </div>
                       <Button
@@ -798,17 +798,17 @@ export default function AdminPage() {
                           setFollowUpFilter("OVERDUE");
                           setActiveTab("monitoring");
                         }}
-                        className="text-xs font-semibold text-rose-900 border-rose-200 hover:bg-rose-50"
+                        className="text-xs font-semibold text-rose-900 border-rose-200 hover:bg-rose-50 cursor-pointer"
                       >
-                        View Follow-ups
+                        {t("asha.dueFollowUps")}
                       </Button>
                     </div>
 
                     {actionableFollowUpsCount === 0 ? (
                       <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
                         <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
-                        <p className="font-semibold text-slate-700">No overdue visits or tasks</p>
-                        <p className="text-slate-500">All scheduled home visits and door-to-door follow-ups are up to date.</p>
+                        <p className="font-semibold text-slate-700">{t("status.completed")}</p>
+                        <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -828,7 +828,7 @@ export default function AdminPage() {
                                   f.isOverdue ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"
                                 }`}
                               >
-                                {f.isOverdue ? "Overdue Visit" : "Due Today"}
+                                {f.isOverdue ? t("status.urgent") : t("status.pending")}
                               </span>
                             </div>
 
@@ -842,9 +842,9 @@ export default function AdminPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openCaseDetail(f.caseId)}
-                                className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white"
+                                className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white cursor-pointer"
                               >
-                                Open Case
+                                {t("asha.openCaseDrawer")}
                               </Button>
                             </div>
                           </div>
@@ -859,13 +859,13 @@ export default function AdminPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Activity className="w-4 h-4 text-teal-700" />
-                      <span>Platform Infrastructure &amp; Service Health</span>
+                      <span>{t("navigation.monitoring")}</span>
                     </span>
                     <button
                       onClick={() => setActiveTab("monitoring")}
                       className="text-xs font-bold text-teal-800 hover:text-teal-950 flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Full Telemetry</span>
+                      <span>{t("navigation.monitoring")}</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -874,7 +874,7 @@ export default function AdminPage() {
                     <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-500 font-semibold block uppercase">Core API</span>
                       <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Operational
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {t("status.completed")}
                       </span>
                     </div>
 
@@ -886,7 +886,7 @@ export default function AdminPage() {
                     </div>
 
                     <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-0.5">
-                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">Voice Speech</span>
+                      <span className="text-[10px] text-slate-500 font-semibold block uppercase">{t("citizen.voiceCallBtn")}</span>
                       <span className={`text-xs font-bold flex items-center gap-1 ${voiceTelemetry?.sarvamConfigured ? "text-emerald-800" : "text-amber-800"}`}>
                         <CheckCircle2 className="w-3 h-3" /> {voiceTelemetry?.sarvamConfigured ? "Sarvam saaras:v2" : "Local Engine"}
                       </span>
@@ -902,7 +902,7 @@ export default function AdminPage() {
                     <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-500 font-semibold block uppercase">Automation</span>
                       <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Dispatcher Ready
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {t("status.completed")}
                       </span>
                     </div>
                   </div>
@@ -918,16 +918,16 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      Registered Household Directory
+                      {t("navigation.directory")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Administrative directory of registered families, demographic profiles, and assigned ASHA field workers.
+                      {t("admin.consoleDesc")}
                     </p>
                   </div>
 
                   <div className="w-full sm:w-72">
                     <Input
-                      placeholder="Search household, head, district, or ASHA..."
+                      placeholder={t("common.search")}
                       value={householdSearch}
                       onChange={(e) => setHouseholdSearch(e.target.value)}
                       className="text-xs bg-white"
@@ -938,11 +938,11 @@ export default function AdminPage() {
                 {/* Filter Pills Bar */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {[
-                    { id: "ALL", label: `All Households (${totalHouseholdsCount})` },
-                    { id: "ACTIVE", label: `Active Cases (${activeCasesCount})` },
-                    { id: "NEEDS_ATTENTION", label: `Needs Attention (${needsAttentionCount})` },
-                    { id: "HIGH_PRIORITY", label: `High / Urgent (${adminCases.filter((c) => c.priority === "HIGH" || c.priority === "URGENT").length})` },
-                    { id: "RESOLVED", label: `Resolved (${resolvedCasesCount})` },
+                    { id: "ALL", label: `${t("common.all")} (${totalHouseholdsCount})` },
+                    { id: "ACTIVE", label: `${t("common.active")} (${activeCasesCount})` },
+                    { id: "NEEDS_ATTENTION", label: `${t("status.action_required")} (${needsAttentionCount})` },
+                    { id: "HIGH_PRIORITY", label: `${t("status.urgent")} (${adminCases.filter((c) => c.priority === "HIGH" || c.priority === "URGENT").length})` },
+                    { id: "RESOLVED", label: `${t("status.resolved")} (${resolvedCasesCount})` },
                   ].map((pill) => (
                     <button
                       key={pill.id}
@@ -962,8 +962,8 @@ export default function AdminPage() {
                 {filteredHouseholds.length === 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 space-y-1">
                     <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-800">No households match this filter</p>
-                    <p className="text-slate-500">Try adjusting your search keyword or selected status pill.</p>
+                    <p className="font-semibold text-slate-800">{t("citizen.noSchemesMessage")}</p>
+                    <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                   </div>
                 ) : (
                   <>
@@ -973,13 +973,13 @@ export default function AdminPage() {
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                             <tr>
-                              <th className="py-3 px-4">Head of Household</th>
-                              <th className="py-3 px-4">Location</th>
-                              <th className="py-3 px-4">Assigned ASHA</th>
-                              <th className="py-3 px-4">Case Status</th>
-                              <th className="py-3 px-4">Priority</th>
-                              <th className="py-3 px-4">Gaps</th>
-                              <th className="py-3 px-4 text-right">Actions</th>
+                              <th className="py-3 px-4">{t("citizen.headOfHousehold")}</th>
+                              <th className="py-3 px-4">{t("citizen.locationDetails")}</th>
+                              <th className="py-3 px-4">{t("navigation.workforce")}</th>
+                              <th className="py-3 px-4">{t("forms.relationship")}</th>
+                              <th className="py-3 px-4">{t("status.urgent")}</th>
+                              <th className="py-3 px-4">{t("asha.attentionRequired")}</th>
+                              <th className="py-3 px-4 text-right">{t("common.track")}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1022,16 +1022,16 @@ export default function AdminPage() {
                                         : "bg-slate-100 text-slate-700"
                                     }`}
                                   >
-                                    {c.priority}
+                                    {c.priority === "URGENT" ? t("forms.priorityUrgent") : c.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                                   </span>
                                 </td>
                                 <td className="py-3.5 px-4 text-slate-700 font-medium">
                                   {c.detectedGapsCount > 0 ? (
                                     <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                      {c.detectedGapsCount} gap(s)
+                                      {c.detectedGapsCount} {t("asha.attentionRequired")}
                                     </span>
                                   ) : (
-                                    <span className="text-emerald-700 font-medium">Clear</span>
+                                    <span className="text-emerald-700 font-medium">{t("status.completed")}</span>
                                   )}
                                 </td>
                                 <td className="py-3.5 px-4 text-right">
@@ -1044,17 +1044,17 @@ export default function AdminPage() {
                                         setNewAshaUid(c.assignedAshaUid);
                                         setReassignError(null);
                                       }}
-                                      className="text-xs py-1 px-2.5 font-semibold text-slate-700"
+                                      className="text-xs py-1 px-2.5 font-semibold text-slate-700 cursor-pointer"
                                     >
-                                      Reassign
+                                      {t("admin.reassignAsha")}
                                     </Button>
                                     <Button
                                       variant="primary"
                                       size="sm"
                                       onClick={() => openCaseDetail(c.id)}
-                                      className="text-xs py-1 px-2.5 font-semibold bg-teal-800 hover:bg-teal-900 text-white"
+                                      className="text-xs py-1 px-2.5 font-semibold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                                     >
-                                      Open Case
+                                      {t("asha.openCaseDrawer")}
                                     </Button>
                                   </div>
                                 </td>
@@ -1093,12 +1093,12 @@ export default function AdminPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="text-slate-500">ASHA:</span>
+                            <span className="text-slate-500">{t("navigation.workforce")}:</span>
                             <span className="font-mono font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
                               {c.assignedAshaUid}
                             </span>
                             <span className="text-slate-400">•</span>
-                            <span className="text-slate-500">Priority:</span>
+                            <span className="text-slate-500">{t("status.urgent")}:</span>
                             <span className="font-bold text-slate-800">{c.priority}</span>
                           </div>
 
@@ -1111,17 +1111,17 @@ export default function AdminPage() {
                                 setNewAshaUid(c.assignedAshaUid);
                                 setReassignError(null);
                               }}
-                              className="text-xs font-semibold text-slate-700 w-1/2"
+                              className="text-xs font-semibold text-slate-700 w-1/2 cursor-pointer"
                             >
-                              Reassign
+                              {t("admin.reassignAsha")}
                             </Button>
                             <Button
                               variant="primary"
                               size="sm"
                               onClick={() => openCaseDetail(c.id)}
-                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white w-1/2"
+                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white w-1/2 cursor-pointer"
                             >
-                              Open Case
+                              {t("asha.openCaseDrawer")}
                             </Button>
                           </div>
                         </div>
@@ -1140,16 +1140,16 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      ASHA Workforce Management &amp; Allocation
+                      {t("navigation.workforce")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Operational overview of registered ASHA field workers, assigned caseloads, and delivery workloads.
+                      {t("admin.consoleDesc")}
                     </p>
                   </div>
 
                   <div className="w-full sm:w-64">
                     <Input
-                      placeholder="Search ASHA name, UID, or district..."
+                      placeholder={t("common.search")}
                       value={ashaSearch}
                       onChange={(e) => setAshaSearch(e.target.value)}
                       className="text-xs bg-white"
@@ -1161,34 +1161,34 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Total ASHA Workers
+                      {t("admin.activeAshas")}
                     </span>
                     <p className="text-2xl font-black text-slate-900 mt-1">{totalAshasCount}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Active in field</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{t("common.active")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                      Assigned Households
+                      {t("navigation.household")}
                     </span>
                     <p className="text-2xl font-black text-teal-950 mt-1">{totalHouseholdsCount}</p>
-                    <p className="text-[11px] text-teal-700 mt-0.5">Under frontline care</p>
+                    <p className="text-[11px] text-teal-700 mt-0.5">{t("asha.doorstepTitle")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wider block">
-                      Active Cases Under Care
+                      {t("admin.totalCases")}
                     </span>
                     <p className="text-2xl font-black text-blue-950 mt-1">{activeCasesCount}</p>
-                    <p className="text-[11px] text-blue-700 mt-0.5">Open assistance cases</p>
+                    <p className="text-[11px] text-blue-700 mt-0.5">{t("common.active")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider block">
-                      Pending / Overdue Visits
+                      {t("asha.dueFollowUps")}
                     </span>
                     <p className="text-2xl font-black text-rose-950 mt-1">{actionableFollowUpsCount}</p>
-                    <p className="text-[11px] text-rose-700 mt-0.5">Requiring home visits</p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">{t("status.pending")}</p>
                   </div>
                 </div>
 
@@ -1196,8 +1196,8 @@ export default function AdminPage() {
                 {filteredAshas.length === 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 space-y-1">
                     <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-800">No ASHA workers match this filter</p>
-                    <p className="text-slate-500">Try searching for another worker name or UID.</p>
+                    <p className="font-semibold text-slate-800">{t("citizen.noSchemesMessage")}</p>
+                    <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1213,13 +1213,13 @@ export default function AdminPage() {
                               <p className="text-xs font-mono text-slate-500 mt-0.5">UID: {worker.ashaUid}</p>
                             </div>
                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                              ACTIVE
+                              {t("common.active")}
                             </span>
                           </div>
 
                           <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-xs space-y-1">
                             <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                              Jurisdiction / Coverage:
+                              {t("citizen.locationDetails")}:
                             </span>
                             <p className="font-semibold text-slate-700">
                               {worker.districts.length > 0 ? worker.districts.join(", ") : "General District Area"}
@@ -1228,15 +1228,15 @@ export default function AdminPage() {
 
                           <div className="grid grid-cols-3 gap-2 text-center text-xs">
                             <div className="p-2 bg-slate-50/70 rounded border border-slate-100">
-                              <span className="text-[10px] text-slate-400 block font-semibold">Households</span>
+                              <span className="text-[10px] text-slate-400 block font-semibold">{t("navigation.household")}</span>
                               <strong className="text-sm font-extrabold text-slate-900">{worker.totalCases}</strong>
                             </div>
                             <div className="p-2 bg-blue-50/50 rounded border border-blue-100">
-                              <span className="text-[10px] text-blue-600 block font-semibold">Active</span>
+                              <span className="text-[10px] text-blue-600 block font-semibold">{t("common.active")}</span>
                               <strong className="text-sm font-extrabold text-blue-950">{worker.activeCases}</strong>
                             </div>
                             <div className="p-2 bg-rose-50/50 rounded border border-rose-100">
-                              <span className="text-[10px] text-rose-600 block font-semibold">Overdue</span>
+                              <span className="text-[10px] text-rose-600 block font-semibold">{t("status.urgent")}</span>
                               <strong className="text-sm font-extrabold text-rose-950">{worker.overdueFollowUps}</strong>
                             </div>
                           </div>
@@ -1250,9 +1250,9 @@ export default function AdminPage() {
                               setHouseholdSearch(worker.ashaUid);
                               setActiveTab("households");
                             }}
-                            className="text-xs font-semibold text-slate-700 w-1/2"
+                            className="text-xs font-semibold text-slate-700 w-1/2 cursor-pointer"
                           >
-                            Households
+                            {t("navigation.household")}
                           </Button>
                           <Button
                             variant="outline"
@@ -1261,9 +1261,9 @@ export default function AdminPage() {
                               setCaseSearch(worker.ashaUid);
                               setActiveTab("cases");
                             }}
-                            className="text-xs font-semibold text-teal-900 border-teal-200 bg-teal-50/50 hover:bg-teal-50 w-1/2"
+                            className="text-xs font-semibold text-teal-900 border-teal-200 bg-teal-50/50 hover:bg-teal-50 w-1/2 cursor-pointer"
                           >
-                            Cases ({worker.activeCases})
+                            {t("navigation.oversight")} ({worker.activeCases})
                           </Button>
                         </div>
                       </div>
@@ -1281,16 +1281,16 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      Platform Healthcare Case Oversight
+                      {t("navigation.oversight")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Active healthcare journey milestones, entitlement progress, task completion, and escalation tracking.
+                      {t("admin.consoleDesc")}
                     </p>
                   </div>
 
                   <div className="w-full sm:w-64">
                     <Input
-                      placeholder="Search case, head, district, scheme..."
+                      placeholder={t("common.search")}
                       value={caseSearch}
                       onChange={(e) => setCaseSearch(e.target.value)}
                       className="text-xs bg-white"
@@ -1301,12 +1301,12 @@ export default function AdminPage() {
                 {/* Status Filter Pills */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {[
-                    { id: "ALL", label: `All Cases (${totalHouseholdsCount})` },
-                    { id: "ACTIVE", label: `Active (${activeCasesCount})` },
-                    { id: "NEEDS_ATTENTION", label: `Needs Attention (${needsAttentionCount})` },
-                    { id: "IN_PROGRESS", label: `In Progress (${inProgressCount})` },
-                    { id: "BLOCKED", label: `Blocked / Escalated (${blockedCasesCount})` },
-                    { id: "RESOLVED", label: `Resolved (${resolvedCasesCount})` },
+                    { id: "ALL", label: `${t("common.all")} (${totalHouseholdsCount})` },
+                    { id: "ACTIVE", label: `${t("common.active")} (${activeCasesCount})` },
+                    { id: "NEEDS_ATTENTION", label: `${t("status.action_required")} (${needsAttentionCount})` },
+                    { id: "IN_PROGRESS", label: `${t("status.in_progress")} (${inProgressCount})` },
+                    { id: "BLOCKED", label: `${t("status.urgent")} (${blockedCasesCount})` },
+                    { id: "RESOLVED", label: `${t("status.resolved")} (${resolvedCasesCount})` },
                   ].map((pill) => (
                     <button
                       key={pill.id}
@@ -1326,8 +1326,8 @@ export default function AdminPage() {
                 {filteredCases.length === 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 space-y-1">
                     <Inbox className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-800">No cases match this filter</p>
-                    <p className="text-slate-500">All cases in this category are clear or match another query.</p>
+                    <p className="font-semibold text-slate-800">{t("citizen.noSchemesMessage")}</p>
+                    <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                   </div>
                 ) : (
                   <>
@@ -1337,13 +1337,13 @@ export default function AdminPage() {
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                             <tr>
-                              <th className="py-3 px-4">Household &amp; Beneficiary</th>
-                              <th className="py-3 px-4">Location</th>
-                              <th className="py-3 px-4">Active Scheme</th>
-                              <th className="py-3 px-4">Assigned ASHA</th>
-                              <th className="py-3 px-4">Status</th>
-                              <th className="py-3 px-4">Priority</th>
-                              <th className="py-3 px-4 text-right">Actions</th>
+                              <th className="py-3 px-4">{t("citizen.headOfHousehold")}</th>
+                              <th className="py-3 px-4">{t("citizen.locationDetails")}</th>
+                              <th className="py-3 px-4">{t("citizen.healthBenefits")}</th>
+                              <th className="py-3 px-4">{t("navigation.workforce")}</th>
+                              <th className="py-3 px-4">{t("forms.relationship")}</th>
+                              <th className="py-3 px-4">{t("status.urgent")}</th>
+                              <th className="py-3 px-4 text-right">{t("common.track")}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1363,10 +1363,10 @@ export default function AdminPage() {
                                     </span>
                                   ) : c.eligibleSchemesCount > 0 ? (
                                     <span className="text-blue-700 font-medium text-[11px]">
-                                      {c.eligibleSchemesCount} eligible pathway(s)
+                                      {c.eligibleSchemesCount} {t("citizen.healthBenefits")}
                                     </span>
                                   ) : (
-                                    <span className="text-slate-400 italic">General Enrollment</span>
+                                    <span className="text-slate-400 italic">{t("status.pending")}</span>
                                   )}
                                 </td>
                                 <td className="py-3.5 px-4 font-mono text-slate-700">
@@ -1397,7 +1397,7 @@ export default function AdminPage() {
                                         : "bg-slate-100 text-slate-700"
                                     }`}
                                   >
-                                    {c.priority}
+                                    {c.priority === "URGENT" ? t("forms.priorityUrgent") : c.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                                   </span>
                                 </td>
                                 <td className="py-3.5 px-4 text-right">
@@ -1405,9 +1405,9 @@ export default function AdminPage() {
                                     variant="primary"
                                     size="sm"
                                     onClick={() => openCaseDetail(c.id)}
-                                    className="text-xs py-1 px-3 font-semibold bg-teal-800 hover:bg-teal-900 text-white"
+                                    className="text-xs py-1 px-3 font-semibold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                                   >
-                                    Review Case
+                                    {t("asha.openCaseDrawer")}
                                   </Button>
                                 </td>
                               </tr>
@@ -1454,15 +1454,15 @@ export default function AdminPage() {
 
                           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                             <span className="text-xs text-slate-500 font-medium">
-                              Priority: <strong className="text-slate-800">{c.priority}</strong>
+                              {t("status.urgent")}: <strong className="text-slate-800">{c.priority}</strong>
                             </span>
                             <Button
                               variant="primary"
                               size="sm"
                               onClick={() => openCaseDetail(c.id)}
-                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white"
+                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                             >
-                              Review Case
+                              {t("asha.openCaseDrawer")}
                             </Button>
                           </div>
                         </div>
@@ -1481,16 +1481,16 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      National Healthcare Scheme Registry &amp; Gazette Provenance
+                      {t("navigation.registry")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Verified deterministic rule definitions, gazette citations, and active platform enrollments.
+                      {t("admin.consoleDesc")}
                     </p>
                   </div>
 
                   <div className="w-full sm:w-64">
                     <Input
-                      placeholder="Search schemes by name or code..."
+                      placeholder={t("common.search")}
                       value={schemeSearch}
                       onChange={(e) => setSchemeSearch(e.target.value)}
                       className="text-xs bg-white"
@@ -1502,36 +1502,36 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Active Verified Schemes
+                      {t("navigation.registry")}
                     </span>
                     <p className="text-2xl font-black text-slate-900 mt-1">{schemes.length}</p>
-                    <p className="text-[11px] text-emerald-700 mt-0.5 font-medium">Deterministic Rule Sets</p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5 font-medium">{t("status.verified")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                      Verified Gazette Records
+                      {t("status.verified")}
                     </span>
                     <p className="text-2xl font-black text-teal-950 mt-1">{schemeEvidence.length}</p>
-                    <p className="text-[11px] text-teal-700 mt-0.5">Government Citations</p>
+                    <p className="text-[11px] text-teal-700 mt-0.5">{t("home.trustVerifiedGovtSources")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-blue-800 uppercase tracking-wider block">
-                      Schemes with Active Care
+                      {t("admin.totalCases")}
                     </span>
                     <p className="text-2xl font-black text-blue-950 mt-1">{schemesWithActiveAssistanceCount}</p>
-                    <p className="text-[11px] text-blue-700 mt-0.5">Doorstep delivery underway</p>
+                    <p className="text-[11px] text-blue-700 mt-0.5">{t("asha.doorstepTitle")}</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Rule Verification Engine
+                      {t("home.trustEvidenceTitle")}
                     </span>
                     <p className="text-sm font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded inline-block border border-emerald-200 mt-2">
-                      AUTHORITATIVE
+                      {t("status.verified")}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Zero Hallucination</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{t("home.trustPrivacyTitle")}</p>
                   </div>
                 </div>
 
@@ -1541,13 +1541,13 @@ export default function AdminPage() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                         <tr>
-                          <th className="py-3 px-4">Scheme Code</th>
-                          <th className="py-3 px-4">Official Scheme Name</th>
-                          <th className="py-3 px-4">Level</th>
-                          <th className="py-3 px-4">Category</th>
-                          <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Active Cases</th>
-                          <th className="py-3 px-4 text-right">Source Verification</th>
+                          <th className="py-3 px-4">{t("common.code")}</th>
+                          <th className="py-3 px-4">{t("citizen.healthBenefits")}</th>
+                          <th className="py-3 px-4">{t("citizen.locationDetails")}</th>
+                          <th className="py-3 px-4">{t("forms.relationship")}</th>
+                          <th className="py-3 px-4">{t("status.completed")}</th>
+                          <th className="py-3 px-4">{t("admin.totalCases")}</th>
+                          <th className="py-3 px-4 text-right">{t("status.verified")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1589,7 +1589,7 @@ export default function AdminPage() {
                                   </span>
                                 ) : (
                                   <span className="text-[11px] text-amber-700 font-medium">
-                                    Pending Audit
+                                    {t("status.pending")}
                                   </span>
                                 )}
                               </td>
@@ -1606,17 +1606,17 @@ export default function AdminPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-teal-700" />
-                      <span>Verified Evidence Citations for: <strong className="text-teal-900">{selectedSchemeId}</strong></span>
+                      <span>{t("home.trustVerifiedGovtSources")}: <strong className="text-teal-900">{selectedSchemeId}</strong></span>
                     </h3>
                   </div>
 
                   {loadingEvidence ? (
                     <div className="py-6">
-                      <LoadingState message="Loading verified gazette evidence records..." />
+                      <LoadingState message={t("common.loading")} />
                     </div>
                   ) : schemeEvidence.length === 0 ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-                      No verified evidence citations recorded for this scheme.
+                      {t("citizen.noSchemesMessage")}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1648,7 +1648,7 @@ export default function AdminPage() {
                           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                             <span className="text-emerald-700 font-semibold flex items-center gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>VERIFIED GAZETTE</span>
+                              <span>{t("status.verified")}</span>
                             </span>
                             {ev.sourceUrl && (
                               <a
@@ -1678,10 +1678,10 @@ export default function AdminPage() {
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-teal-700" />
-                    <span>Operational Telemetry &amp; System Infrastructure</span>
+                    <span>{t("navigation.monitoring")}</span>
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500">
-                    Live operational telemetry, telephony engine monitoring, follow-up execution roster, and domain automation event logs.
+                    {t("admin.consoleDesc")}
                   </p>
                 </div>
 
@@ -1690,7 +1690,7 @@ export default function AdminPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <PhoneCall className="w-4 h-4 text-emerald-700" />
-                      <span>Sarvam AI &amp; Exotel Voice Telephony Engine</span>
+                      <span>{t("citizen.voiceCallBtn")}</span>
                     </h3>
                     <span className="text-xs text-slate-600 font-mono bg-slate-100 px-2.5 py-1 rounded">
                       Helpline: {voiceTelemetry?.virtualNumber || "+91-1800-SWASTHYA"}
@@ -1705,7 +1705,7 @@ export default function AdminPage() {
                       <p className={`text-base font-bold ${voiceTelemetry?.sarvamConfigured ? "text-emerald-700" : "text-amber-700"}`}>
                         {voiceTelemetry?.sarvamConfigured ? "Active (saaras:v2)" : "Local Engine"}
                       </p>
-                      <p className="text-[11px] text-slate-400">Multilingual Speech Engine</p>
+                      <p className="text-[11px] text-slate-400">{t("citizen.voiceCallBtn")}</p>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
@@ -1715,29 +1715,29 @@ export default function AdminPage() {
                       <p className={`text-base font-bold ${voiceTelemetry?.exotelConfigured ? "text-emerald-700" : "text-amber-700"}`}>
                         {voiceTelemetry?.exotelConfigured ? "Connected (PSTN)" : "Local Test Mode"}
                       </p>
-                      <p className="text-[11px] text-slate-400">Carrier Outbound / IVR</p>
+                      <p className="text-[11px] text-slate-400">{t("asha.doorstepTitle")}</p>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
                       <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide block">
-                        Calls Today
+                        {t("citizen.voiceCallBtn")}
                       </span>
                       <p className="text-2xl font-bold text-blue-950">
                         {voiceTelemetry?.totalCallsToday || 0}
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        {voiceTelemetry?.completedCallsToday || 0} completed, {voiceTelemetry?.noAnswerCallsToday || 0} no answer
+                        {voiceTelemetry?.completedCallsToday || 0} {t("status.completed")}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
                       <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide block">
-                        Avg Call Duration
+                        {t("navigation.monitoring")}
                       </span>
                       <p className="text-2xl font-bold text-teal-950">
                         {voiceTelemetry?.averageDurationSeconds || 0}s
                       </p>
-                      <p className="text-[11px] text-slate-400">Cost Controlled (Max 300s)</p>
+                      <p className="text-[11px] text-slate-400">{t("status.completed")}</p>
                     </div>
                   </div>
 
@@ -1746,18 +1746,18 @@ export default function AdminPage() {
                     <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
                       <div className="p-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center gap-2">
                         <Mic className="w-3.5 h-3.5 text-teal-700" />
-                        <h4 className="text-xs font-bold text-slate-900">Recent Voice Helpline &amp; Reminder Sessions</h4>
+                        <h4 className="text-xs font-bold text-slate-900">{t("citizen.voiceCallBtn")}</h4>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                             <tr>
-                              <th className="py-2.5 px-4">Session SID</th>
-                              <th className="py-2.5 px-4">Direction</th>
-                              <th className="py-2.5 px-4">Caller (Masked)</th>
-                              <th className="py-2.5 px-4">Intent</th>
-                              <th className="py-2.5 px-4">Duration</th>
-                              <th className="py-2.5 px-4">Outcome</th>
+                              <th className="py-2.5 px-4">{t("common.code")}</th>
+                              <th className="py-2.5 px-4">{t("forms.relationship")}</th>
+                              <th className="py-2.5 px-4">{t("forms.contactPhone")}</th>
+                              <th className="py-2.5 px-4">{t("citizen.healthBenefits")}</th>
+                              <th className="py-2.5 px-4">{t("navigation.monitoring")}</th>
+                              <th className="py-2.5 px-4">{t("status.completed")}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1788,16 +1788,16 @@ export default function AdminPage() {
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <Clock className="w-4 h-4 text-slate-700" />
-                        <span>Platform-Wide Follow-up &amp; Outreach Roster ({adminFollowUps.length})</span>
+                        <span>{t("asha.dueFollowUps")} ({adminFollowUps.length})</span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Track scheduled home visits, pending verifications, and completed field tasks.
+                        {t("asha.doorstepSubtitle")}
                       </p>
                     </div>
 
                     <div className="w-full sm:w-64">
                       <Input
-                        placeholder="Search follow-ups..."
+                        placeholder={t("common.search")}
                         value={followUpSearch}
                         onChange={(e) => setFollowUpSearch(e.target.value)}
                         className="text-xs bg-white"
@@ -1808,12 +1808,12 @@ export default function AdminPage() {
                   {/* Filter Pills Bar */}
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {[
-                      { id: "ALL", label: `All Follow-ups (${totalFollowUpsCount})` },
-                      { id: "OVERDUE", label: `Overdue (${overdueFollowUpsCount})` },
-                      { id: "DUE_TODAY", label: `Due Today (${dueTodayFollowUpsCount})` },
-                      { id: "UPCOMING", label: `Upcoming (${upcomingFollowUpsCount})` },
-                      { id: "COMPLETED", label: `Completed (${completedFollowUpsCount})` },
-                      { id: "CANCELLED", label: `Cancelled (${cancelledFollowUpsCount})` },
+                      { id: "ALL", label: `${t("common.all")} (${totalFollowUpsCount})` },
+                      { id: "OVERDUE", label: `${t("status.urgent")} (${overdueFollowUpsCount})` },
+                      { id: "DUE_TODAY", label: `${t("status.pending")} (${dueTodayFollowUpsCount})` },
+                      { id: "UPCOMING", label: `${t("asha.workspaceSchedule")} (${upcomingFollowUpsCount})` },
+                      { id: "COMPLETED", label: `${t("status.completed")} (${completedFollowUpsCount})` },
+                      { id: "CANCELLED", label: `${t("common.cancel")} (${cancelledFollowUpsCount})` },
                     ].map((pill) => (
                       <button
                         key={pill.id}
@@ -1832,7 +1832,7 @@ export default function AdminPage() {
                   {/* Follow-ups Table */}
                   {filteredFollowUps.length === 0 ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-                      No follow-ups recorded in this category.
+                      {t("citizen.noSchemesMessage")}
                     </div>
                   ) : (
                     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
@@ -1840,12 +1840,12 @@ export default function AdminPage() {
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                             <tr>
-                              <th className="py-3 px-4">Task &amp; Scheme</th>
-                              <th className="py-3 px-4">Household</th>
-                              <th className="py-3 px-4">Assigned ASHA</th>
-                              <th className="py-3 px-4">Due Date</th>
-                              <th className="py-3 px-4">Status</th>
-                              <th className="py-3 px-4 text-right">Action</th>
+                              <th className="py-3 px-4">{t("citizen.healthBenefits")}</th>
+                              <th className="py-3 px-4">{t("navigation.household")}</th>
+                              <th className="py-3 px-4">{t("navigation.workforce")}</th>
+                              <th className="py-3 px-4">{t("forms.dateOfBirth")}</th>
+                              <th className="py-3 px-4">{t("forms.relationship")}</th>
+                              <th className="py-3 px-4 text-right">{t("common.track")}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1881,12 +1881,12 @@ export default function AdminPage() {
                                     }`}
                                   >
                                     {f.status === "COMPLETED"
-                                      ? "COMPLETED"
+                                      ? t("status.completed")
                                       : f.status === "CANCELLED"
-                                      ? "CANCELLED"
+                                      ? t("common.cancel")
                                       : f.isOverdue
-                                      ? "OVERDUE"
-                                      : "PENDING"}
+                                      ? t("status.urgent")
+                                      : t("status.pending")}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-right">
@@ -1894,9 +1894,9 @@ export default function AdminPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => openCaseDetail(f.caseId)}
-                                    className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-slate-100"
+                                    className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-slate-100 cursor-pointer"
                                   >
-                                    Open Case
+                                    {t("asha.openCaseDrawer")}
                                   </Button>
                                 </td>
                               </tr>
@@ -1913,27 +1913,27 @@ export default function AdminPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <Workflow className="w-4 h-4 text-teal-700" />
-                      <span>n8n Workflow Automation Dispatcher &amp; Domain Event Logs</span>
+                      <span>n8n Workflow Automation Dispatcher</span>
                     </h3>
                     <span className="text-xs text-slate-500 font-mono">
-                      Status: {automationHealth?.status || "OPERATIONAL"}
+                      {t("forms.relationship")}: {automationHealth?.status || "OPERATIONAL"}
                     </span>
                   </div>
 
                   {automationHealth?.recentEvents && automationHealth.recentEvents.length > 0 && (
                     <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
                       <div className="p-3 border-b border-slate-200 bg-slate-50/50">
-                        <h4 className="text-xs font-bold text-slate-900">Recent Domain Automation Dispatches</h4>
+                        <h4 className="text-xs font-bold text-slate-900">{t("navigation.monitoring")}</h4>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                             <tr>
-                              <th className="py-2.5 px-4">Event ID</th>
-                              <th className="py-2.5 px-4">Event Type</th>
+                              <th className="py-2.5 px-4">{t("common.code")}</th>
+                              <th className="py-2.5 px-4">{t("forms.relationship")}</th>
                               <th className="py-2.5 px-4">Case ID</th>
                               <th className="py-2.5 px-4">ASHA UID</th>
-                              <th className="py-2.5 px-4">Timestamp</th>
+                              <th className="py-2.5 px-4">{t("forms.dateOfBirth")}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1958,10 +1958,10 @@ export default function AdminPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3 shadow-2xs">
                     <div className="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
                       <Lock className="w-4 h-4 text-teal-700" />
-                      <span>Role-Based Access Control (RBAC)</span>
+                      <span>{t("home.trustPrivacyTitle")} (RBAC)</span>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Role authorization is evaluated strictly on the Fastify backend via verified Firebase ID tokens and server-validated user profiles. Client-side state changes cannot bypass server authorization.
+                      {t("home.trustPrivacyDesc")}
                     </p>
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700 space-y-1">
                       <div>Privileged Endpoint: POST /api/v1/auth/role/assign</div>
@@ -1973,13 +1973,13 @@ export default function AdminPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3 shadow-2xs">
                     <div className="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
                       <ShieldCheck className="w-4 h-4 text-teal-700" />
-                      <span>Platform Audit Integrity</span>
+                      <span>{t("home.trustEvidenceTitle")}</span>
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      All critical workflow transitions (household connection, case assignment, notes, follow-ups, and assistance requests) generate immutable server-side activity records on Cloud Firestore.
+                      {t("home.trustEvidenceDesc")}
                     </p>
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500">
-                      <em>Immutable append-only operational history.</em>
+                      <em>{t("status.verified")}</em>
                     </div>
                   </div>
                 </div>
@@ -2001,13 +2001,13 @@ export default function AdminPage() {
                 <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                   <div>
                     <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 uppercase">
-                      Administrative Case Inspection
+                      {t("navigation.oversight")}
                     </span>
                     <h2 className="text-lg font-bold text-slate-900 mt-1.5">
-                      {caseDetail?.case.headOfHouseholdName || "Household Profile"}
+                      {caseDetail?.case.headOfHouseholdName || t("navigation.household")}
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Case ID: <span className="font-mono">{selectedCaseId}</span>
+                      {t("common.code")}: <span className="font-mono">{selectedCaseId}</span>
                     </p>
                   </div>
                   <button
@@ -2023,36 +2023,36 @@ export default function AdminPage() {
 
                 {isCaseDetailLoading ? (
                   <div className="py-16 text-center">
-                    <LoadingState message="Loading aggregated case records and journey steps..." />
+                    <LoadingState message={t("common.loading")} />
                   </div>
                 ) : !caseDetail ? (
                   <div className="py-12 text-center text-xs text-slate-500">
-                    Failed to load case detail.
+                    {t("errors.caseNotFound")}
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Case Status & Overview */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Status</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">{t("forms.relationship")}</span>
                         <span className="text-xs font-bold text-slate-900 mt-0.5 block">
                           {caseDetail.case.status}
                         </span>
                       </div>
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Priority</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">{t("status.urgent")}</span>
                         <span className="text-xs font-bold text-slate-900 mt-0.5 block">
                           {caseDetail.case.priority}
                         </span>
                       </div>
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Assigned ASHA</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">{t("navigation.workforce")}</span>
                         <span className="text-xs font-mono font-bold text-slate-900 mt-0.5 block truncate">
                           {caseDetail.case.assignedAshaUid}
                         </span>
                       </div>
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Location</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">{t("citizen.locationDetails")}</span>
                         <span className="text-xs font-bold text-slate-900 mt-0.5 block truncate">
                           {caseDetail.case.district}
                         </span>
@@ -2063,7 +2063,7 @@ export default function AdminPage() {
                     <div className="space-y-2.5">
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-teal-700" />
-                        <span>Family Members ({caseDetail.members.length})</span>
+                        <span>{t("citizen.familyMembersTab")} ({caseDetail.members.length})</span>
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {caseDetail.members.map((m) => (
@@ -2078,9 +2078,9 @@ export default function AdminPage() {
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-500">
-                              Age: {m.age} yrs • Gender: {m.gender}
-                              {m.maternalStatus === "pregnant" && " • Pregnant"}
-                              {m.disabilityStatus && " • Disability"}
+                              {t("forms.age")}: {m.age} yrs • {t("forms.gender")}: {m.gender}
+                              {m.maternalStatus === "pregnant" && ` • ${t("citizen.pregnantMotherBadge")}`}
+                              {m.disabilityStatus && ` • ${t("citizen.disabilityBadge")}`}
                             </p>
                           </div>
                         ))}
@@ -2092,7 +2092,7 @@ export default function AdminPage() {
                       <div className="space-y-3">
                         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                           <Workflow className="w-3.5 h-3.5 text-teal-700" />
-                          <span>Scheme Journey Progression</span>
+                          <span>{t("asha.journeyProgress")}</span>
                         </h3>
                         <div className="space-y-2">
                           {caseDetail.journeySteps.map((step, idx) => (
@@ -2137,26 +2137,26 @@ export default function AdminPage() {
                       <div className="space-y-3">
                         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                           <FileCheck className="w-3.5 h-3.5 text-teal-700" />
-                          <span>Actionable Tasks ({caseDetail.tasks.length})</span>
+                          <span>{t("asha.checklistTab")} ({caseDetail.tasks.length})</span>
                         </h3>
                         <div className="space-y-2">
-                          {caseDetail.tasks.map((t) => (
+                          {caseDetail.tasks.map((tItem) => (
                             <div
-                              key={t.id}
+                              key={tItem.id}
                               className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-start justify-between gap-2 text-xs"
                             >
                               <div className="space-y-0.5">
-                                <span className="font-bold text-slate-900 block">{t.title}</span>
-                                <p className="text-[11px] text-slate-600">{t.description}</p>
+                                <span className="font-bold text-slate-900 block">{tItem.title}</span>
+                                <p className="text-[11px] text-slate-600">{tItem.description}</p>
                               </div>
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase shrink-0 ${
-                                  t.status === "COMPLETED"
+                                  tItem.status === "COMPLETED"
                                     ? "bg-emerald-100 text-emerald-800"
                                     : "bg-amber-100 text-amber-800"
                                 }`}
                               >
-                                {t.status}
+                                {tItem.status}
                               </span>
                             </div>
                           ))}
@@ -2169,7 +2169,7 @@ export default function AdminPage() {
                       <div className="space-y-2.5">
                         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                           <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Identified Healthcare Gaps ({caseDetail.guidance.gaps.length})</span>
+                          <span>{t("asha.attentionRequired")} ({caseDetail.guidance.gaps.length})</span>
                         </h3>
                         <div className="space-y-2">
                           {caseDetail.guidance.gaps.map((gap, idx) => (
@@ -2205,9 +2205,9 @@ export default function AdminPage() {
                       setReassignError(null);
                     }
                   }}
-                  className="text-xs font-semibold text-slate-700"
+                  className="text-xs font-semibold text-slate-700 cursor-pointer"
                 >
-                  Reassign ASHA
+                  {t("admin.reassignAsha")}
                 </Button>
                 <Button
                   variant="primary"
@@ -2216,9 +2216,9 @@ export default function AdminPage() {
                     setSelectedCaseId(null);
                     setCaseDetail(null);
                   }}
-                  className="text-xs font-semibold bg-slate-900 text-white"
+                  className="text-xs font-semibold bg-slate-900 text-white cursor-pointer"
                 >
-                  Close Inspection
+                  {t("common.cancel")}
                 </Button>
               </div>
             </div>
@@ -2234,7 +2234,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Share2 className="w-4 h-4 text-teal-700" />
-                  <h3 className="font-bold text-slate-900 text-base">Reassign Household Case</h3>
+                  <h3 className="font-bold text-slate-900 text-base">{t("admin.reassignAsha")}</h3>
                 </div>
                 <button
                   onClick={() => setReassigningCase(null)}
@@ -2246,14 +2246,14 @@ export default function AdminPage() {
 
               <div className="space-y-3 text-xs">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                  <p className="text-slate-500">Target Family:</p>
+                  <p className="text-slate-500">{t("navigation.household")}:</p>
                   <p className="font-bold text-slate-900 text-sm">{reassigningCase.headOfHouseholdName}</p>
-                  <p className="text-slate-500">Location: {reassigningCase.district}, {reassigningCase.state}</p>
+                  <p className="text-slate-500">{t("citizen.locationDetails")}: {reassigningCase.district}, {reassigningCase.state}</p>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="font-semibold text-slate-800 block">
-                    Target ASHA Worker UID:
+                    {t("navigation.workforce")} UID:
                   </label>
                   <Input
                     type="text"
@@ -2263,7 +2263,7 @@ export default function AdminPage() {
                     className="text-xs font-mono bg-white"
                   />
                   <p className="text-[11px] text-slate-400">
-                    The case will be transferred with full history, notes, and journey step status.
+                    {t("asha.workspaceSchedule")}
                   </p>
                 </div>
 
@@ -2281,18 +2281,18 @@ export default function AdminPage() {
                   size="sm"
                   onClick={() => setReassigningCase(null)}
                   disabled={isReassigning}
-                  className="text-xs"
+                  className="text-xs cursor-pointer"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={handleReassignAsha}
                   disabled={isReassigning}
-                  className="text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white"
+                  className="text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                 >
-                  {isReassigning ? "Reassigning..." : "Confirm Reassignment"}
+                  {isReassigning ? t("common.submitting") : t("common.confirm")}
                 </Button>
               </div>
             </div>

@@ -5,9 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
 import { BrandLogo } from "@/components/brand-logo";
+import { useTranslation } from "@/i18n/i18n-context";
 
 export function Footer() {
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   // If inside the authenticated workspace, AuthenticatedShell handles its own footer
   if (
@@ -33,16 +35,16 @@ export function Footer() {
           {/* Quick Links */}
           <div className="flex flex-wrap items-center gap-6 text-xs text-slate-600">
             <Link href="/#schemes" className="hover:text-teal-800 transition-colors">
-              Healthcare Schemes
+              {t("navigation.schemes")}
             </Link>
             <Link href="/#how-it-works" className="hover:text-teal-800 transition-colors">
-              How It Works
+              {t("navigation.howItWorks")}
             </Link>
             <Link href="/#about" className="hover:text-teal-800 transition-colors">
-              About Platform
+              {t("navigation.aboutPlatform")}
             </Link>
             <Link href="/auth/consent" className="hover:text-teal-800 transition-colors">
-              Privacy & Consent
+              {t("navigation.privacyConsent")}
             </Link>
           </div>
         </div>

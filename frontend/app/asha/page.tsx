@@ -884,10 +884,10 @@ export default function AshaWorkspacePage() {
               variant="outline"
               size="sm"
               onClick={() => setIsAssistantOpen(true)}
-              className="text-xs font-semibold flex items-center gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-50 shadow-2xs"
+              className="text-xs font-semibold flex items-center gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-50 shadow-2xs cursor-pointer"
             >
               <Bot className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Field Assistant</span>
+              <span>{t("citizen.healthcareAssistantBtn")}</span>
             </Button>
             <Button
               variant="primary"
@@ -896,10 +896,10 @@ export default function AshaWorkspacePage() {
                 setRegisterError(null);
                 setIsRegisterModalOpen(true);
               }}
-              className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white"
+              className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Register Household</span>
+              <span>{t("asha.registerHousehold")}</span>
             </Button>
           </div>
         }
@@ -913,7 +913,7 @@ export default function AshaWorkspacePage() {
             </div>
             <button
               onClick={() => setRegisterSuccess(null)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4"
+              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4 cursor-pointer"
             >
               ✕
             </button>
@@ -929,7 +929,7 @@ export default function AshaWorkspacePage() {
             </div>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-red-700 hover:text-red-900 font-bold text-xs ml-4"
+              className="text-red-700 hover:text-red-900 font-bold text-xs ml-4 cursor-pointer"
             >
               ✕
             </button>
@@ -945,7 +945,7 @@ export default function AshaWorkspacePage() {
             </div>
             <button
               onClick={() => setSuccessBanner(null)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4"
+              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4 cursor-pointer"
             >
               ✕
             </button>
@@ -955,7 +955,7 @@ export default function AshaWorkspacePage() {
         {isLoading ? (
           <div className="py-16 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mb-3" />
-            <p className="text-sm font-medium text-slate-500">Loading assigned caseload...</p>
+            <p className="text-sm font-medium text-slate-500">{t("common.loading")}</p>
           </div>
         ) : (
           <div>
@@ -972,14 +972,14 @@ export default function AshaWorkspacePage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        Assigned Households
+                        {t("asha.totalAssignedHouseholds")}
                       </span>
                       <Users className="w-4 h-4 text-slate-400" />
                     </div>
                     <p className="text-2xl font-black text-slate-900 mt-1.5">
                       {totalAssignedHouseholds}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">Persisted family records</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t("citizen.portalSubtitle")}</p>
                   </div>
 
                   <div
@@ -988,7 +988,7 @@ export default function AshaWorkspacePage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                        Needs Attention
+                        {t("asha.attentionRequired")}
                       </span>
                       <AlertCircle className="w-4 h-4 text-amber-600" />
                     </div>
@@ -996,7 +996,7 @@ export default function AshaWorkspacePage() {
                       {totalAttentionSignalsCount}
                     </p>
                     <p className="text-xs text-amber-700 mt-0.5">
-                      {totalAttentionSignalsCount === 1 ? "1 item requires action" : `${totalAttentionSignalsCount} items require action`}
+                      {totalAttentionSignalsCount === 1 ? `1 ${t("status.action_required")}` : `${totalAttentionSignalsCount} ${t("status.action_required")}`}
                     </p>
                   </div>
 
@@ -1006,7 +1006,7 @@ export default function AshaWorkspacePage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">
-                        Follow-ups Due
+                        {t("asha.dueFollowUps")}
                       </span>
                       <Clock className="w-4 h-4 text-rose-600" />
                     </div>
@@ -1014,7 +1014,7 @@ export default function AshaWorkspacePage() {
                       {actionableFollowUpBadge}
                     </p>
                     <p className="text-xs text-rose-700 mt-0.5">
-                      {overdueFollowUpsCount} overdue, {dueTodayFollowUpsCount} today
+                      {overdueFollowUpsCount} {t("status.urgent")}, {dueTodayFollowUpsCount} {t("status.pending")}
                     </p>
                   </div>
 
@@ -1024,7 +1024,7 @@ export default function AshaWorkspacePage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
-                        Active Requests
+                        {t("asha.activeAssistanceRequests")}
                       </span>
                       <Inbox className="w-4 h-4 text-teal-600" />
                     </div>
@@ -1032,7 +1032,7 @@ export default function AshaWorkspacePage() {
                       {totalActiveRequestsCount}
                     </p>
                     <p className="text-xs text-teal-700 mt-0.5">
-                      {activeAssistanceCount} assistance, {pendingConnectionCount} connect
+                      {activeAssistanceCount} {t("navigation.assistance")}
                     </p>
                   </div>
                 </div>
@@ -1040,32 +1040,32 @@ export default function AshaWorkspacePage() {
                 {/* Quick Action Navigation Bar */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                   <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
-                    Quick Field Navigation:
+                    {t("asha.fieldPrioritiesTitle")}:
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("cases")}
-                      className="text-xs font-semibold bg-white border-slate-200 hover:bg-slate-100"
+                      className="text-xs font-semibold bg-white border-slate-200 hover:bg-slate-100 cursor-pointer"
                     >
-                      <Search className="w-3.5 h-3.5 mr-1 text-slate-500" /> Find Household
+                      <Search className="w-3.5 h-3.5 mr-1 text-slate-500" /> {t("common.search")}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("requests")}
-                      className="text-xs font-semibold bg-white border-teal-200 text-teal-900 hover:bg-teal-50"
+                      className="text-xs font-semibold bg-white border-teal-200 text-teal-900 hover:bg-teal-50 cursor-pointer"
                     >
-                      <Inbox className="w-3.5 h-3.5 mr-1 text-teal-700" /> Citizen Requests ({totalActiveRequestsCount})
+                      <Inbox className="w-3.5 h-3.5 mr-1 text-teal-700" /> {t("navigation.assistance")} ({totalActiveRequestsCount})
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setActiveTab("followups")}
-                      className="text-xs font-semibold bg-white border-rose-200 text-rose-900 hover:bg-rose-50"
+                      className="text-xs font-semibold bg-white border-rose-200 text-rose-900 hover:bg-rose-50 cursor-pointer"
                     >
-                      <Clock className="w-3.5 h-3.5 mr-1 text-rose-700" /> Due Follow-ups ({actionableFollowUpBadge})
+                      <Clock className="w-3.5 h-3.5 mr-1 text-rose-700" /> {t("asha.dueFollowUps")} ({actionableFollowUpBadge})
                     </Button>
                     <Button
                       variant="primary"
@@ -1074,9 +1074,9 @@ export default function AshaWorkspacePage() {
                         setRegisterError(null);
                         setIsRegisterModalOpen(true);
                       }}
-                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs"
+                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5 mr-1" /> + Register Household
+                      <Plus className="w-3.5 h-3.5 mr-1" /> {t("asha.registerHousehold")}
                     </Button>
                   </div>
                 </div>
@@ -1086,13 +1086,13 @@ export default function AshaWorkspacePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                        <span>Today&apos;s Field Priorities</span>
+                        <span>{t("asha.fieldPrioritiesTitle")}</span>
                         <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                          Action Required
+                          {t("status.action_required")}
                         </span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        High-urgency citizen tasks, scheme enrollments, and scheduled doorstep visits needing attention today.
+                        {t("asha.workspaceDesc")}
                       </p>
                     </div>
                   </div>
@@ -1104,24 +1104,24 @@ export default function AshaWorkspacePage() {
                         <div className="flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-amber-600" />
                           <h4 className="text-sm font-bold text-slate-900">
-                            Entitlement Opportunities ({totalAttentionSignalsCount})
+                            {t("asha.entitlementOpportunities")} ({totalAttentionSignalsCount})
                           </h4>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setActiveTab("attention")}
-                          className="text-xs font-semibold text-amber-900 border-amber-200 hover:bg-amber-50"
+                          className="text-xs font-semibold text-amber-900 border-amber-200 hover:bg-amber-50 cursor-pointer"
                         >
-                          View All Queue
+                          {t("common.viewDetails")}
                         </Button>
                       </div>
 
                       {totalAttentionSignalsCount === 0 ? (
                         <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
                           <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
-                          <p className="font-semibold text-slate-700">All household entitlements up to date</p>
-                          <p className="text-slate-500">No unaddressed senior or maternal schemes in your caseload.</p>
+                          <p className="font-semibold text-slate-700">{t("status.completed")}</p>
+                          <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -1140,7 +1140,7 @@ export default function AshaWorkspacePage() {
                                       : "bg-blue-100 text-blue-800"
                                   }`}
                                 >
-                                  {sig.priority}
+                                  {sig.priority === "URGENT" ? t("forms.priorityUrgent") : sig.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                                 </span>
                                 <span className="text-[10px] font-semibold text-slate-500 uppercase">
                                   {sig.category.replace(/_/g, " ")}
@@ -1165,20 +1165,20 @@ export default function AshaWorkspacePage() {
                                       onClick={() =>
                                         handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
                                       }
-                                      className="text-xs font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white"
+                                      className="text-xs font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
                                     >
                                       {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
-                                        ? "Starting..."
-                                        : "Start Assistance"}
+                                        ? t("common.submitting")
+                                        : t("citizen.requestAssistanceBtn")}
                                     </Button>
                                   )}
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => openCaseDetail(sig.caseId)}
-                                    className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white"
+                                    className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white cursor-pointer"
                                   >
-                                    Open Case
+                                    {t("asha.openCaseDrawer")}
                                   </Button>
                                 </div>
                               </div>
@@ -1194,16 +1194,16 @@ export default function AshaWorkspacePage() {
                         <div className="flex items-center gap-2">
                           <Inbox className="w-4 h-4 text-teal-700" />
                           <h4 className="text-sm font-bold text-slate-900">
-                            Citizen Requests & Due Visits
+                            {t("navigation.assistance")} & {t("asha.dueFollowUps")}
                           </h4>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setActiveTab("requests")}
-                          className="text-xs font-semibold text-teal-900 border-teal-200 hover:bg-teal-50"
+                          className="text-xs font-semibold text-teal-900 border-teal-200 hover:bg-teal-50 cursor-pointer"
                         >
-                          View Requests ({totalActiveRequestsCount})
+                          {t("common.viewDetails")} ({totalActiveRequestsCount})
                         </Button>
                       </div>
 
@@ -1221,8 +1221,8 @@ export default function AshaWorkspacePage() {
                           return (
                             <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
                               <Inbox className="w-6 h-6 text-slate-300 mx-auto mb-1" />
-                              <p className="font-semibold text-slate-700">No pending citizen requests or visits</p>
-                              <p className="text-slate-500">All assistance inquiries and daily scheduled visits are clear.</p>
+                              <p className="font-semibold text-slate-700">{t("citizen.noAssistanceRequests")}</p>
+                              <p className="text-slate-500">{t("citizen.portalSubtitle")}</p>
                             </div>
                           );
                         }
@@ -1261,9 +1261,9 @@ export default function AshaWorkspacePage() {
                                         variant="primary"
                                         size="sm"
                                         onClick={() => handleAcceptAssistance(req.id)}
-                                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5"
+                                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5 cursor-pointer"
                                       >
-                                        Accept & Open
+                                        {t("common.confirm")}
                                       </Button>
                                     )}
                                     <Button
@@ -1273,9 +1273,9 @@ export default function AshaWorkspacePage() {
                                         setRequestsSubTab("assistance");
                                         setActiveTab("requests");
                                       }}
-                                      className="text-xs font-semibold py-1 px-2.5"
+                                      className="text-xs font-semibold py-1 px-2.5 cursor-pointer"
                                     >
-                                      View Details
+                                      {t("common.viewDetails")}
                                     </Button>
                                   </div>
                                 </div>
@@ -1297,7 +1297,7 @@ export default function AshaWorkspacePage() {
                                       f.isOverdue ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"
                                     }`}
                                   >
-                                    {f.isOverdue ? "Overdue Visit" : "Due Today"}
+                                    {f.isOverdue ? t("status.urgent") : t("status.pending")}
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-700 font-medium">{f.title || f.reason}</p>
@@ -1310,17 +1310,17 @@ export default function AshaWorkspacePage() {
                                       variant="primary"
                                       size="sm"
                                       onClick={() => handleOpenCompleteModal(f)}
-                                      className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5"
+                                      className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5 cursor-pointer"
                                     >
-                                      Mark Done
+                                      {t("status.completed")}
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => openCaseDetail(f.caseId)}
-                                      className="text-xs font-semibold py-1 px-2.5"
+                                      className="text-xs font-semibold py-1 px-2.5 cursor-pointer"
                                     >
-                                      Open Case
+                                      {t("asha.openCaseDrawer")}
                                     </Button>
                                   </div>
                                 </div>
@@ -1343,10 +1343,10 @@ export default function AshaWorkspacePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      My Assigned Households ({cases.length})
+                      {t("asha.caseloadTitle")} ({cases.length})
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      View assigned family profiles, monitor verified entitlements, and initiate doorstep assistance.
+                      {t("asha.workspaceDesc")}
                     </p>
                   </div>
                   <Button
@@ -1356,10 +1356,10 @@ export default function AshaWorkspacePage() {
                       setRegisterError(null);
                       setIsRegisterModalOpen(true);
                     }}
-                    className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white self-start sm:self-auto shadow-2xs"
+                    className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white self-start sm:self-auto shadow-2xs cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Register Household</span>
+                    <span>{t("asha.registerHousehold")}</span>
                   </Button>
                 </div>
 
@@ -1381,13 +1381,13 @@ export default function AshaWorkspacePage() {
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
                     >
-                      <option value="ALL">All Statuses</option>
+                      <option value="ALL">{t("common.all")}</option>
                       <option value="NEW">New</option>
-                      <option value="ACTIVE">Active Journey</option>
-                      <option value="NEEDS_ATTENTION">Needs Attention</option>
-                      <option value="FOLLOW_UP">Follow Up</option>
-                      <option value="RESOLVED">Resolved</option>
-                      <option value="CLOSED">Closed</option>
+                      <option value="ACTIVE">{t("common.active")}</option>
+                      <option value="NEEDS_ATTENTION">{t("status.action_required")}</option>
+                      <option value="FOLLOW_UP">{t("navigation.followUps")}</option>
+                      <option value="RESOLVED">{t("status.resolved")}</option>
+                      <option value="CLOSED">{t("status.completed")}</option>
                     </select>
 
                     <select
@@ -1395,11 +1395,11 @@ export default function AshaWorkspacePage() {
                       onChange={(e) => setPriorityFilter(e.target.value)}
                       className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
                     >
-                      <option value="ALL">All Priorities</option>
-                      <option value="URGENT">Urgent</option>
-                      <option value="HIGH">High</option>
-                      <option value="NORMAL">Normal</option>
-                      <option value="LOW">Low</option>
+                      <option value="ALL">{t("common.all")}</option>
+                      <option value="URGENT">{t("forms.priorityUrgent")}</option>
+                      <option value="HIGH">{t("forms.priorityHigh")}</option>
+                      <option value="NORMAL">{t("forms.priorityNormal")}</option>
+                      <option value="LOW">{t("forms.priorityLow")}</option>
                     </select>
                   </div>
                 </div>
@@ -1408,9 +1408,9 @@ export default function AshaWorkspacePage() {
                 {filteredCases.length === 0 ? (
                   <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-2">
                     <Users className="w-9 h-9 text-slate-300 mx-auto mb-1" />
-                    <h3 className="text-sm font-bold text-slate-800">No Matching Households Found</h3>
+                    <h3 className="text-sm font-bold text-slate-800">{t("citizen.noSchemesMessage")}</h3>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      No assigned cases match your current search and filter criteria.
+                      {t("citizen.noSchemesMessage")}
                     </p>
                   </div>
                 ) : (
@@ -1456,14 +1456,14 @@ export default function AshaWorkspacePage() {
                                     : "bg-slate-100 text-slate-600"
                                 }`}
                               >
-                                {c.priority}
+                                {c.priority === "URGENT" ? t("forms.priorityUrgent") : c.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                               </span>
                             </div>
 
                             {/* Ration Category & Status Badges */}
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
                               <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
-                                Ration: {c.incomeCategory}
+                                {t("citizen.incomeCategory")}: {c.incomeCategory}
                               </span>
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
@@ -1490,12 +1490,12 @@ export default function AshaWorkspacePage() {
                               ) : c.detectedGapsCount > 0 ? (
                                 <div className="p-2 bg-amber-50/50 rounded-lg border border-amber-100 text-amber-900 font-semibold text-[11px] flex items-center gap-1.5">
                                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                  <span>{c.detectedGapsCount} Entitlement Gap Identified</span>
+                                  <span>{c.detectedGapsCount} {t("asha.attentionRequired")}</span>
                                 </div>
                               ) : (
                                 <div className="text-slate-500 text-[11px] flex items-center gap-1">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>Entitlements up to date</span>
+                                  <span>{t("status.completed")}</span>
                                 </div>
                               )}
                             </div>
@@ -1503,10 +1503,10 @@ export default function AshaWorkspacePage() {
 
                           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                             <span className="text-[10px] text-slate-400 font-mono">
-                              Case: {c.id.slice(0, 10)}...
+                              {t("common.code")}: {c.id.slice(0, 10)}...
                             </span>
                             <span className="font-bold text-emerald-800 flex items-center gap-1 hover:text-emerald-950">
-                              <span>Open Household</span>
+                              <span>{t("asha.openCaseDrawer")}</span>
                               <ChevronRight className="w-3.5 h-3.5" />
                             </span>
                           </div>
@@ -1526,10 +1526,10 @@ export default function AshaWorkspacePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      Incoming Citizen Requests
+                      {t("navigation.assistance")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Respond to scheme enrollment, document verification, and household connection requests.
+                      {t("asha.fieldPrioritiesTitle")}
                     </p>
                   </div>
                 </div>
@@ -1544,7 +1544,7 @@ export default function AshaWorkspacePage() {
                         : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
-                    Citizen Assistance Requests ({activeAssistanceCount} Active / {assistanceRequests.length} Total)
+                    {t("navigation.assistance")} ({activeAssistanceCount} {t("common.active")} / {assistanceRequests.length} {t("common.all")})
                   </button>
                   <button
                     onClick={() => setRequestsSubTab("connections")}
@@ -1554,7 +1554,7 @@ export default function AshaWorkspacePage() {
                         : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
-                    Household Connection Requests ({pendingConnectionCount})
+                    {t("citizen.ashaSectionTitle")} ({pendingConnectionCount})
                   </button>
                 </div>
 
@@ -1564,9 +1564,9 @@ export default function AshaWorkspacePage() {
                     {assistanceRequests.length === 0 ? (
                       <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8 space-y-2">
                         <MessageSquare className="w-9 h-9 text-slate-300 mx-auto mb-1" />
-                        <h3 className="text-base font-bold text-slate-800">No Assistance Requests</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("citizen.noAssistanceRequests")}</h3>
                         <p className="text-xs text-slate-500 max-w-md mx-auto">
-                          When connected citizens request help with schemes or documents, their requests will appear here for one-click case activation.
+                          {t("citizen.ashaCardDesc")}
                         </p>
                       </div>
                     ) : (
@@ -1628,38 +1628,31 @@ export default function AshaWorkspacePage() {
                                   <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-2.5 flex items-center justify-between text-xs text-emerald-950">
                                     <div className="flex items-center gap-1.5 font-semibold">
                                       <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
-                                      <span>Target Beneficiary: {req.beneficiaryName}</span>
+                                      <span>{t("citizen.headOfHousehold")}: {req.beneficiaryName}</span>
                                     </div>
                                     <span className="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-mono">
-                                      {req.beneficiaryRelationship || "Member"}{req.beneficiaryAge ? `, ${req.beneficiaryAge} yrs` : ""}
+                                      {req.beneficiaryRelationship || t("common.member")}{req.beneficiaryAge ? `, ${req.beneficiaryAge} yrs` : ""}
                                     </span>
                                   </div>
                                 )}
 
                                 {req.schemeName && (
                                   <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-800">
-                                    Associated Scheme: <strong>{req.schemeName}</strong>
+                                    {t("citizen.healthBenefits")}: <strong>{req.schemeName}</strong>
                                   </div>
                                 )}
 
                                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-800">
                                   <span className="font-semibold block text-[10px] text-slate-400 uppercase">
-                                    Citizen Request Message:
+                                    {t("forms.notes")}:
                                   </span>
                                   <p className="mt-0.5 leading-relaxed">&ldquo;{req.message}&rdquo;</p>
                                 </div>
 
                                 {req.responseNote && (
                                   <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-900">
-                                    <span className="font-semibold block text-[10px] uppercase">Your Response Note:</span>
+                                    <span className="font-semibold block text-[10px] uppercase">{t("forms.notes")}:</span>
                                     <p className="mt-0.5">{req.responseNote}</p>
-                                  </div>
-                                )}
-
-                                {isDeclined && req.declineReason && (
-                                  <div className="p-2.5 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-900">
-                                    <span className="font-semibold block text-[10px] uppercase">Decline Reason:</span>
-                                    <p className="mt-0.5">{req.declineReason}</p>
                                   </div>
                                 )}
 
@@ -1667,7 +1660,7 @@ export default function AshaWorkspacePage() {
                                 {decliningRequestId === req.id && (
                                   <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 space-y-2">
                                     <label className="text-xs font-semibold text-rose-900 block">
-                                      Reason for declining this request:
+                                      {t("dialogs.declineReasonPrompt")}:
                                     </label>
                                     <input
                                       type="text"
@@ -1684,18 +1677,18 @@ export default function AshaWorkspacePage() {
                                           setDecliningRequestId(null);
                                           setDeclineReasonText("");
                                         }}
-                                        className="text-xs"
+                                        className="text-xs cursor-pointer"
                                       >
-                                        Cancel
+                                        {t("common.cancel")}
                                       </Button>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleDeclineAssistance(req.id)}
                                         disabled={!declineReasonText.trim()}
-                                        className="text-xs bg-rose-600 text-white hover:bg-rose-700 border-rose-600"
+                                        className="text-xs bg-rose-600 text-white hover:bg-rose-700 border-rose-600 cursor-pointer"
                                       >
-                                        Confirm Decline
+                                        {t("common.confirm")}
                                       </Button>
                                     </div>
                                   </div>
@@ -1704,7 +1697,7 @@ export default function AshaWorkspacePage() {
                                 {!isResolved && !isDeclined && (
                                   <div className="space-y-1.5 pt-1">
                                     <label className="text-[11px] font-semibold text-slate-600 block">
-                                      Add ASHA Progress Note:
+                                      {t("forms.notes")}:
                                     </label>
                                     <input
                                       type="text"
@@ -1730,9 +1723,9 @@ export default function AshaWorkspacePage() {
                                     openCaseDetailByHousehold(req.householdId);
                                     setDetailTab("journey");
                                   }}
-                                  className="text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50"
+                                  className="text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
                                 >
-                                  Open Case & Tasks
+                                  {t("asha.openCaseDrawer")}
                                 </Button>
 
                                 {!isResolved && !isDeclined ? (
@@ -1743,18 +1736,18 @@ export default function AshaWorkspacePage() {
                                           variant="outline"
                                           size="sm"
                                           onClick={() => setDecliningRequestId(req.id)}
-                                          className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50"
+                                          className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer"
                                         >
-                                          Decline
+                                          {t("common.delete")}
                                         </Button>
                                         <Button
                                           variant="primary"
                                           size="sm"
                                           disabled={isUpdatingAssistance === req.id}
                                           onClick={() => handleAcceptAssistance(req.id)}
-                                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 shadow-2xs"
+                                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 shadow-2xs cursor-pointer"
                                         >
-                                          <Check className="w-3.5 h-3.5" /> Accept & Open Case
+                                          <Check className="w-3.5 h-3.5" /> {t("common.confirm")}
                                         </Button>
                                       </>
                                     )}
@@ -1764,19 +1757,19 @@ export default function AshaWorkspacePage() {
                                         size="sm"
                                         disabled={isUpdatingAssistance === req.id}
                                         onClick={() => handleUpdateAssistance(req.id, "RESOLVED")}
-                                        className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold shadow-2xs"
+                                        className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold shadow-2xs cursor-pointer"
                                       >
-                                        Resolve Request
+                                        {t("status.resolved")}
                                       </Button>
                                     )}
                                   </div>
                                 ) : isResolved ? (
                                   <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5" /> Resolved
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> {t("status.resolved")}
                                   </span>
                                 ) : (
                                   <span className="text-xs text-rose-700 font-semibold flex items-center gap-1">
-                                    <X className="w-3.5 h-3.5" /> Declined
+                                    <X className="w-3.5 h-3.5" /> {t("status.declined")}
                                   </span>
                                 )}
                               </div>
@@ -1795,16 +1788,16 @@ export default function AshaWorkspacePage() {
                       <div>
                         <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                           <Inbox className="w-4 h-4 text-emerald-700" />
-                          <span>Household Connection Requests ({connectionRequests.length})</span>
+                          <span>{t("citizen.ashaSectionTitle")} ({connectionRequests.length})</span>
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Citizens who entered your ASHA Service Code to link their households for doorstep healthcare guidance.
+                          {t("citizen.ashaCardDesc")}
                         </p>
                       </div>
 
                       {userProfile?.ashaServiceCode && (
                         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-                          <span className="text-[11px] font-semibold text-slate-500">Your Shareable ID:</span>
+                          <span className="text-[11px] font-semibold text-slate-500">{t("common.code")}:</span>
                           <span className="text-xs font-mono font-bold text-slate-900">{userProfile.ashaServiceCode}</span>
                           <button
                             onClick={copyServiceCode}
@@ -1819,9 +1812,9 @@ export default function AshaWorkspacePage() {
                     {connectionRequests.length === 0 ? (
                       <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8 space-y-2">
                         <Inbox className="w-9 h-9 text-slate-300 mx-auto mb-1" />
-                        <h3 className="text-base font-bold text-slate-800">No Pending Requests</h3>
+                        <h3 className="text-base font-bold text-slate-800">{t("citizen.noAssistanceRequests")}</h3>
                         <p className="text-xs text-slate-500 max-w-md mx-auto">
-                          When families in your area enter your Service Code <span className="font-mono font-bold text-slate-700">{userProfile?.ashaServiceCode || "ASHA-KA-XXXX"}</span>, their requests will appear here for one-click verification and enrollment.
+                          {t("citizen.ashaCardDesc")}
                         </p>
                       </div>
                     ) : (
@@ -1841,19 +1834,13 @@ export default function AshaWorkspacePage() {
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-500">
-                                    {req.district}, {req.state} • {req.memberCount} member{req.memberCount === 1 ? "" : "s"}
+                                    {req.district}, {req.state} • {t("citizen.memberCount", { count: req.memberCount })}
                                   </p>
                                 </div>
                                 <span className="text-[10px] text-slate-400 font-mono">
                                   {new Date(req.requestedAt).toLocaleDateString()}
                                 </span>
                               </div>
-
-                              {req.responseNote && (
-                                <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 italic">
-                                  &ldquo;{req.responseNote}&rdquo;
-                                </p>
-                              )}
                             </div>
 
                             <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -1861,17 +1848,17 @@ export default function AshaWorkspacePage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleRejectRequest(req.id)}
-                                className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold"
+                                className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold cursor-pointer"
                               >
-                                Decline
+                                {t("common.delete")}
                               </Button>
                               <Button
                                 variant="primary"
                                 size="sm"
                                 onClick={() => handleAcceptRequest(req.id)}
-                                className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-2xs"
+                                className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-2xs cursor-pointer"
                               >
-                                <Check className="w-3.5 h-3.5 mr-1" /> Accept & Add to Caseload
+                                <Check className="w-3.5 h-3.5 mr-1" /> {t("common.confirm")}
                               </Button>
                             </div>
                           </div>
@@ -1891,9 +1878,9 @@ export default function AshaWorkspacePage() {
                 <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold">Proactive Healthcare Access Intelligence</p>
+                    <p className="font-bold">{t("asha.attentionRequired")}</p>
                     <p className="mt-0.5 text-amber-800">
-                      These signals highlight senior citizens eligible for PM-JAY (70+), pregnant mothers needing maternal care (JSY), overdue home visits, and blocked tasks across your assigned households.
+                      {t("asha.workspaceDesc")}
                     </p>
                   </div>
                 </div>
@@ -1901,14 +1888,14 @@ export default function AshaWorkspacePage() {
                 {isSignalsLoading ? (
                   <div className="py-12 text-center bg-white rounded-xl border border-slate-200 shadow-2xs">
                     <div className="inline-block animate-spin rounded-full h-7 w-7 border-3 border-amber-600 border-t-transparent mb-2" />
-                    <p className="text-xs text-slate-500 font-medium">Evaluating proactive household signals...</p>
+                    <p className="text-xs text-slate-500 font-medium">{t("common.loading")}</p>
                   </div>
                 ) : attentionSignals.length === 0 ? (
                   <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-1">
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-1 opacity-80" />
-                    <p className="text-sm font-bold text-slate-800">No households currently require attention</p>
+                    <p className="text-sm font-bold text-slate-800">{t("status.completed")}</p>
                     <p className="text-xs text-slate-500">
-                      All assigned households have active, addressed entitlements and up-to-date follow-ups.
+                      {t("citizen.portalSubtitle")}
                     </p>
                   </div>
                 ) : (
@@ -1935,7 +1922,7 @@ export default function AshaWorkspacePage() {
                                   : "bg-blue-100 text-blue-800"
                               }`}
                             >
-                              {sig.priority}
+                              {sig.priority === "URGENT" ? t("forms.priorityUrgent") : sig.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                             </span>
                           </div>
 
@@ -1943,14 +1930,14 @@ export default function AshaWorkspacePage() {
 
                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 block mb-0.5">
-                              Recommended Field Action
+                              {t("citizen.stepGuideTitle")}
                             </span>
                             <p className="text-slate-800 font-medium">{sig.recommendedAction}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <span className="text-[11px] text-slate-400 font-mono">Case: {sig.caseId.slice(0, 10)}...</span>
+                          <span className="text-[11px] text-slate-400 font-mono">{t("common.code")}: {sig.caseId.slice(0, 10)}...</span>
                           <div className="flex items-center gap-2">
                             {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
                               <Button
@@ -1960,13 +1947,13 @@ export default function AshaWorkspacePage() {
                                 onClick={() =>
                                   handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
                                 }
-                                className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs"
+                                className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs cursor-pointer"
                               >
                                 <Send className="w-3.5 h-3.5" />
                                 <span>
                                   {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
-                                    ? "Initiating..."
-                                    : "Start Assistance"}
+                                    ? t("common.submitting")
+                                    : t("citizen.requestAssistanceBtn")}
                                 </span>
                               </Button>
                             )}
@@ -1974,9 +1961,9 @@ export default function AshaWorkspacePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => openCaseDetail(sig.caseId)}
-                              className="text-xs font-semibold py-1.5 px-3"
+                              className="text-xs font-semibold py-1.5 px-3 cursor-pointer"
                             >
-                              Open Household
+                              {t("asha.openCaseDrawer")}
                             </Button>
                           </div>
                         </div>
@@ -1995,10 +1982,10 @@ export default function AshaWorkspacePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      Follow-up &amp; Visit Tasks
+                      {t("asha.dueFollowUps")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Scheduled home visits, documentation verification checks, and health outreach tasks.
+                      {t("asha.workspaceDesc")}
                     </p>
                   </div>
                   <button
@@ -2007,7 +1994,7 @@ export default function AshaWorkspacePage() {
                     className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer self-start sm:self-auto bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"
                   >
                     <Activity className={`w-3.5 h-3.5 ${isFollowUpsLoading ? "animate-spin" : ""}`} />
-                    <span>Refresh Roster</span>
+                    <span>{t("common.tryAgain")}</span>
                   </button>
                 </div>
 
@@ -2022,11 +2009,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Due Today</span>
+                      <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">{t("status.pending")}</span>
                       <Calendar className="w-4 h-4 text-amber-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-amber-950 mt-1">{dueTodayFollowUpsCount}</p>
-                    <p className="text-[11px] text-amber-700 mt-0.5">Visits scheduled today</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">{t("status.pending")}</p>
                   </div>
 
                   <div
@@ -2038,11 +2025,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Overdue</span>
+                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">{t("status.urgent")}</span>
                       <AlertTriangle className="w-4 h-4 text-rose-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-rose-950 mt-1">{overdueFollowUpsCount}</p>
-                    <p className="text-[11px] text-rose-700 mt-0.5">Urgent pending action</p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">{t("status.urgent")}</p>
                   </div>
 
                   <div
@@ -2054,11 +2041,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">Upcoming</span>
+                      <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">{t("common.pending")}</span>
                       <Clock className="w-4 h-4 text-sky-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-sky-950 mt-1">{upcomingFollowUpsCount}</p>
-                    <p className="text-[11px] text-sky-700 mt-0.5">Scheduled in next 14 days</p>
+                    <p className="text-[11px] text-sky-700 mt-0.5">{t("common.pending")}</p>
                   </div>
 
                   <div
@@ -2070,11 +2057,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Completed</span>
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">{t("status.completed")}</span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-emerald-950 mt-1">{completedFollowUpsCount}</p>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">Visits successfully done</p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">{t("status.completed")}</p>
                   </div>
                 </div>
 
@@ -2082,12 +2069,12 @@ export default function AshaWorkspacePage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
                   <div className="flex items-center gap-1.5 overflow-x-auto">
                     {[
-                      { id: "ALL", label: `All Follow-ups (${totalFollowUpsCount})` },
-                      { id: "OVERDUE", label: `Overdue (${overdueFollowUpsCount})` },
-                      { id: "DUE_TODAY", label: `Due Today (${dueTodayFollowUpsCount})` },
-                      { id: "UPCOMING", label: `Upcoming (${upcomingFollowUpsCount})` },
-                      { id: "COMPLETED", label: `Completed (${completedFollowUpsCount})` },
-                      { id: "CANCELLED", label: `Cancelled (${cancelledFollowUpsCount})` },
+                      { id: "ALL", label: `${t("asha.dueFollowUps")} (${totalFollowUpsCount})` },
+                      { id: "OVERDUE", label: `${t("status.urgent")} (${overdueFollowUpsCount})` },
+                      { id: "DUE_TODAY", label: `${t("status.pending")} (${dueTodayFollowUpsCount})` },
+                      { id: "UPCOMING", label: `${t("common.pending")} (${upcomingFollowUpsCount})` },
+                      { id: "COMPLETED", label: `${t("status.completed")} (${completedFollowUpsCount})` },
+                      { id: "CANCELLED", label: `${t("status.declined")} (${cancelledFollowUpsCount})` },
                     ].map((tab) => (
                       <button
                         key={tab.id}
@@ -2127,15 +2114,9 @@ export default function AshaWorkspacePage() {
                     return (
                       <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-1">
                         <Clock className="w-9 h-9 text-slate-300 mx-auto mb-2.5" />
-                        <h3 className="text-sm font-bold text-slate-800">No Follow-ups in this Category</h3>
+                        <h3 className="text-sm font-bold text-slate-800">{t("status.completed")}</h3>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          {followUpFilter === "OVERDUE"
-                            ? "Great job! There are no overdue household follow-ups."
-                            : followUpFilter === "DUE_TODAY"
-                            ? "No follow-up visits scheduled for today."
-                            : followUpFilter === "CANCELLED"
-                            ? "No cancelled follow-ups recorded."
-                            : "You can schedule follow-ups from any active case or let automated workflow triggers schedule them on task completion."}
+                          {t("citizen.portalSubtitle")}
                         </p>
                       </div>
                     );
@@ -2168,23 +2149,23 @@ export default function AshaWorkspacePage() {
                                 <div className="flex flex-wrap items-center gap-2">
                                   {f.status === "COMPLETED" ? (
                                     <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3" /> Completed
+                                      <CheckCircle2 className="w-3 h-3" /> {t("status.completed")}
                                     </span>
                                   ) : f.status === "CANCELLED" ? (
                                     <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1">
-                                      <X className="w-3 h-3" /> Cancelled
+                                      <X className="w-3 h-3" /> {t("status.declined")}
                                     </span>
                                   ) : f.isOverdue ? (
                                     <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[11px] font-bold flex items-center gap-1 animate-pulse">
-                                      <AlertTriangle className="w-3 h-3" /> OVERDUE
+                                      <AlertTriangle className="w-3 h-3" /> {t("status.urgent")}
                                     </span>
                                   ) : isToday ? (
                                     <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[11px] font-bold flex items-center gap-1">
-                                      <Calendar className="w-3 h-3" /> DUE TODAY
+                                      <Calendar className="w-3 h-3" /> {t("status.pending")}
                                     </span>
                                   ) : (
                                     <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[11px] font-bold flex items-center gap-1">
-                                      <Clock className="w-3 h-3" /> UPCOMING
+                                      <Clock className="w-3 h-3" /> {t("common.pending")}
                                     </span>
                                   )}
 
@@ -2196,7 +2177,7 @@ export default function AshaWorkspacePage() {
 
                                   <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                                     <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                                    Due: {new Date(dueDateStr).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                                    {new Date(dueDateStr).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                                   </span>
                                 </div>
 
@@ -2211,16 +2192,11 @@ export default function AshaWorkspacePage() {
 
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-1">
                                   <span>
-                                    Household: <strong className="text-slate-700">{f.headOfHouseholdName || "Assigned Family"}</strong>
+                                    {t("navigation.household")}: <strong className="text-slate-700">{f.headOfHouseholdName || "Assigned Family"}</strong>
                                   </span>
                                   {f.beneficiaryName && (
                                     <span>
-                                      Beneficiary: <strong className="text-slate-700">{f.beneficiaryName}</strong>
-                                    </span>
-                                  )}
-                                  {f.sourceTaskId && (
-                                    <span className="text-[11px] text-teal-700 font-medium">
-                                      ⚡ Workflow Auto-Triggered
+                                      {t("citizen.headOfHousehold")}: <strong className="text-slate-700">{f.beneficiaryName}</strong>
                                     </span>
                                   )}
                                 </div>
@@ -2229,30 +2205,9 @@ export default function AshaWorkspacePage() {
                                   <div className="mt-2.5 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-0.5">
                                     <p className="font-bold flex items-center gap-1">
                                       <FileCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                                      Outcome: {f.outcome}
+                                      {t("status.verified")}: {f.outcome}
                                     </p>
                                     {f.notes && <p className="text-emerald-800 text-[11px] pl-4">{f.notes}</p>}
-                                    {f.completedAt && (
-                                      <p className="text-[10px] text-emerald-600 pl-4">
-                                        Completed on {new Date(f.completedAt).toLocaleString()}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-
-                                {f.rescheduleReason && f.status !== "COMPLETED" && f.status !== "CANCELLED" && (
-                                  <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                                    <p className="font-semibold text-[11px]">
-                                      Rescheduled: {f.rescheduleReason} ({new Date(f.rescheduledAt || "").toLocaleDateString()})
-                                    </p>
-                                  </div>
-                                )}
-
-                                {f.cancelReason && (
-                                  <div className="mt-2 p-2 rounded-lg bg-slate-200/80 border border-slate-300 text-xs text-slate-700">
-                                    <p className="font-semibold text-[11px]">
-                                      Cancelled ({f.cancelledBy || "ASHA"}): {f.cancelReason}
-                                    </p>
                                   </div>
                                 )}
                               </div>
@@ -2267,7 +2222,7 @@ export default function AshaWorkspacePage() {
                                       className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
                                     >
                                       <Check className="w-3.5 h-3.5" />
-                                      <span>Mark Done</span>
+                                      <span>{t("status.completed")}</span>
                                     </Button>
                                     <Button
                                       variant="outline"
@@ -2275,7 +2230,7 @@ export default function AshaWorkspacePage() {
                                       onClick={() => handleOpenRescheduleModal(f)}
                                       className="text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
                                     >
-                                      <span>Reschedule</span>
+                                      <span>{t("common.track")}</span>
                                     </Button>
                                     <Button
                                       variant="outline"
@@ -2283,7 +2238,7 @@ export default function AshaWorkspacePage() {
                                       onClick={() => handleOpenCancelModal(f)}
                                       className="text-xs font-semibold text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
                                     >
-                                      <span>Cancel</span>
+                                      <span>{t("common.cancel")}</span>
                                     </Button>
                                     <Button
                                       variant="outline"
@@ -2293,7 +2248,7 @@ export default function AshaWorkspacePage() {
                                       className="text-xs font-semibold text-emerald-800 border-emerald-300 hover:bg-emerald-50 flex items-center gap-1 cursor-pointer"
                                     >
                                       <PhoneCall className={`w-3 h-3 text-emerald-700 ${isVoiceCallingId === f.id ? "animate-spin" : ""}`} />
-                                      <span>{isVoiceCallingId === f.id ? "Calling..." : "Voice Reminder"}</span>
+                                      <span>{isVoiceCallingId === f.id ? t("common.submitting") : t("citizen.voiceCallBtn")}</span>
                                     </Button>
                                   </>
                                 )}
@@ -2303,7 +2258,7 @@ export default function AshaWorkspacePage() {
                                   onClick={() => openCaseDetail(f.caseId)}
                                   className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50 flex items-center gap-1 cursor-pointer"
                                 >
-                                  <span>View Case</span>
+                                  <span>{t("asha.openCaseDrawer")}</span>
                                   <ChevronRight className="w-3.5 h-3.5" />
                                 </Button>
                               </div>
@@ -2330,7 +2285,7 @@ export default function AshaWorkspacePage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-slate-900">
-                      {caseDetail ? caseDetail.household.headOfHouseholdName : "Loading Case..."}
+                      {caseDetail ? caseDetail.household.headOfHouseholdName : t("common.loading")}
                     </h2>
                     {caseDetail && (
                       <span
@@ -2342,13 +2297,13 @@ export default function AshaWorkspacePage() {
                             : "bg-slate-200 text-slate-700"
                         }`}
                       >
-                        {caseDetail.case.priority}
+                        {caseDetail.case.priority === "URGENT" ? t("forms.priorityUrgent") : caseDetail.case.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
                       </span>
                     )}
                   </div>
                   {caseDetail && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Case ID: <span className="font-mono text-slate-700">{caseDetail.case.id}</span> • {caseDetail.household.district}, {caseDetail.household.state} • {caseDetail.household.incomeCategory}
+                      {t("common.code")}: <span className="font-mono text-slate-700">{caseDetail.case.id}</span> • {caseDetail.household.district}, {caseDetail.household.state} • {caseDetail.household.incomeCategory}
                     </p>
                   )}
                 </div>
@@ -2357,14 +2312,14 @@ export default function AshaWorkspacePage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setIsAssistantOpen(true)}
-                    className="text-xs font-semibold flex items-center gap-1 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                    className="text-xs font-semibold flex items-center gap-1 border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
                   >
                     <Bot className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Ask AI About Case</span>
+                    <span>{t("assistant.badge")}</span>
                   </Button>
                   <button
                     onClick={closeCaseDetail}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -2375,31 +2330,31 @@ export default function AshaWorkspacePage() {
               {caseDetail && (
                 <div className="px-6 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-600">Case Status:</span>
+                    <span className="font-semibold text-slate-600">{t("forms.relationship")}:</span>
                     <select
                       value={caseDetail.case.status}
                       onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
                       className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
                     >
                       <option value="NEW">New</option>
-                      <option value="ACTIVE">Active</option>
-                      <option value="NEEDS_ATTENTION">Needs Attention</option>
-                      <option value="FOLLOW_UP">Follow Up</option>
-                      <option value="RESOLVED">Resolved</option>
-                      <option value="CLOSED">Closed</option>
+                      <option value="ACTIVE">{t("common.active")}</option>
+                      <option value="NEEDS_ATTENTION">{t("status.action_required")}</option>
+                      <option value="FOLLOW_UP">{t("navigation.followUps")}</option>
+                      <option value="RESOLVED">{t("status.resolved")}</option>
+                      <option value="CLOSED">{t("status.completed")}</option>
                     </select>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-600">Priority:</span>
+                    <span className="font-semibold text-slate-600">{t("status.urgent")}:</span>
                     <select
                       value={caseDetail.case.priority}
                       onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
                       className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
                     >
-                      <option value="LOW">Low</option>
-                      <option value="NORMAL">Normal</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
+                      <option value="LOW">{t("forms.priorityLow")}</option>
+                      <option value="NORMAL">{t("forms.priorityNormal")}</option>
+                      <option value="HIGH">{t("forms.priorityHigh")}</option>
+                      <option value="URGENT">{t("forms.priorityUrgent")}</option>
                     </select>
                   </div>
                 </div>
@@ -2409,113 +2364,74 @@ export default function AshaWorkspacePage() {
               <div className="flex border-b border-slate-200 bg-white px-6 text-xs font-semibold overflow-x-auto">
                 <button
                   onClick={() => setDetailTab("journey")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     detailTab === "journey"
                       ? "border-teal-700 text-teal-900 font-bold bg-teal-50/50"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   <CheckSquare className="w-3.5 h-3.5 text-teal-700" />
-                  <span>Scheme Journey & Tasks</span>
-                  {caseDetail && caseDetail.tasks && caseDetail.tasks.length > 0 ? (
-                    <span
-                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                        caseDetail.tasks.filter((t) => t.status === "COMPLETED").length ===
-                        caseDetail.tasks.length
-                          ? "bg-emerald-100 text-emerald-900"
-                          : "bg-teal-100 text-teal-900"
-                      }`}
-                    >
-                      {caseDetail.tasks.filter((t) => t.status === "COMPLETED").length}/
-                      {caseDetail.tasks.length}
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px]">
-                      Not Started
-                    </span>
-                  )}
+                  <span>{t("asha.activeJourney")}</span>
                 </button>
                 <button
                   onClick={() => setDetailTab("overview")}
-                  className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
+                  className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                     detailTab === "overview"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  Household Info
+                  {t("citizen.householdInfo")}
                 </button>
                 <button
                   onClick={() => setDetailTab("gaps")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
                     detailTab === "gaps"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span>Healthcare Gaps</span>
-                  {caseDetail && caseDetail.guidance.gaps.length > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px]">
-                      {caseDetail.guidance.gaps.length}
-                    </span>
-                  )}
+                  <span>{t("asha.attentionRequired")}</span>
                 </button>
                 <button
                   onClick={() => setDetailTab("schemes")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
                     detailTab === "schemes"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span>Eligible Schemes</span>
-                  {caseDetail && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
-                      {caseDetail.eligibilityResults?.filter((r) => r.status === "ELIGIBLE").length ||
-                        0}
-                    </span>
-                  )}
+                  <span>{t("citizen.healthBenefits")}</span>
                 </button>
                 <button
                   onClick={() => setDetailTab("notes")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
                     detailTab === "notes"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span>Case Notes</span>
-                  {caseDetail && caseDetail.notes.length > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 text-[10px]">
-                      {caseDetail.notes.length}
-                    </span>
-                  )}
+                  <span>{t("forms.notes")}</span>
                 </button>
                 <button
                   onClick={() => setDetailTab("followups")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
                     detailTab === "followups"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span>Follow-ups</span>
-                  {caseDetail &&
-                    caseDetail.followUps.filter((f) => f.status === "PENDING").length > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 text-[10px]">
-                        {caseDetail.followUps.filter((f) => f.status === "PENDING").length}
-                      </span>
-                    )}
+                  <span>{t("asha.dueFollowUps")}</span>
                 </button>
                 <button
                   onClick={() => setDetailTab("history")}
-                  className={`py-3 px-3 border-b-2 transition-colors ${
+                  className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
                     detailTab === "history"
                       ? "border-emerald-600 text-emerald-800 font-bold"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  Audit Trail
+                  {t("admin.auditTrail")}
                 </button>
               </div>
 
@@ -2524,7 +2440,7 @@ export default function AshaWorkspacePage() {
                 {isDetailLoading || !caseDetail ? (
                   <div className="py-16 text-center">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mb-3" />
-                    <p className="text-sm text-slate-500">Loading household case details...</p>
+                    <p className="text-sm text-slate-500">{t("common.loading")}</p>
                   </div>
                 ) : (
                   <div>
@@ -2541,19 +2457,17 @@ export default function AshaWorkspacePage() {
                             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase bg-slate-200 text-slate-700 tracking-wider">
-                                  Assistance Not Started
+                                  {t("common.pending")}
                                 </span>
                                 <span className="text-xs text-slate-500 font-mono">
-                                  Case ID: {caseDetail.case.id}
+                                  {t("common.code")}: {caseDetail.case.id}
                                 </span>
                               </div>
                               <h3 className="text-base font-bold text-slate-900">
-                                Doorstep Healthcare Assistance Not Started
+                                {t("asha.workspaceDesc")}
                               </h3>
                               <p className="text-xs text-slate-600 leading-relaxed">
-                                No active scheme facilitation journey is currently running for this
-                                household. Select an identified entitlement opportunity below to begin
-                                doorstep verification, field assistance, and milestone progress.
+                                {t("citizen.stepGuideTitle")}
                               </p>
                             </div>
 
@@ -2561,7 +2475,7 @@ export default function AshaWorkspacePage() {
                             <div className="space-y-3">
                               <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                 <ShieldCheck className="w-4 h-4 text-teal-700" />
-                                <span>Identified Entitlement Opportunities</span>
+                                <span>{t("citizen.healthBenefits")}</span>
                               </h4>
 
                               {(() => {
@@ -2581,11 +2495,7 @@ export default function AshaWorkspacePage() {
                                     <div className="p-6 rounded-xl border border-slate-200 bg-white text-center space-y-2 text-xs text-slate-500">
                                       <HelpCircle className="w-8 h-8 text-slate-300 mx-auto" />
                                       <p className="font-semibold text-slate-700">
-                                        No immediate scheme opportunities identified
-                                      </p>
-                                      <p>
-                                        Review Household Info and Healthcare Gaps tabs to check member
-                                        demographic and health details.
+                                        {t("citizen.noSchemesMessage")}
                                       </p>
                                     </div>
                                   );
@@ -2635,30 +2545,22 @@ export default function AshaWorkspacePage() {
                                             <div className="p-2.5 rounded-lg bg-white border border-teal-100 flex items-center justify-between text-xs">
                                               <div>
                                                 <span className="text-[10px] font-semibold text-slate-400 uppercase block">
-                                                  Target Beneficiary
+                                                  {t("citizen.headOfHousehold")}
                                                 </span>
                                                 <span className="font-bold text-slate-900">
                                                   {targetMember.fullName} (
                                                   {targetMember.relationship}, Age{" "}
                                                   {targetMember.age}
                                                   {targetMember.maternalStatus === "pregnant"
-                                                    ? " • Pregnant"
+                                                    ? ` • ${t("citizen.pregnantTag")}`
                                                     : ""}
                                                   )
                                                 </span>
                                               </div>
-                                              <span className="text-[10px] font-mono text-teal-800 bg-teal-50 px-2 py-1 rounded">
-                                                {scheme.schemeId === "ab-pmjay"
-                                                  ? "5 Field Tasks"
-                                                  : "6 Field Tasks"}
-                                              </span>
                                             </div>
                                           )}
 
                                           <div className="pt-2 border-t border-teal-100/80 flex items-center justify-between">
-                                            <span className="text-[11px] text-teal-800 font-medium">
-                                              Ready to begin doorstep facilitation & card issuance
-                                            </span>
                                             <Button
                                               variant="primary"
                                               size="sm"
@@ -2670,11 +2572,11 @@ export default function AshaWorkspacePage() {
                                                   targetMember?.id
                                                 )
                                               }
-                                              className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs"
+                                              className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs cursor-pointer ml-auto"
                                             >
                                               <Send className="w-3.5 h-3.5" />
                                               <span>
-                                                {isInitiating ? "Starting..." : "Start Assistance"}
+                                                {isInitiating ? t("common.submitting") : t("citizen.requestAssistanceBtn")}
                                               </span>
                                             </Button>
                                           </div>
@@ -2694,7 +2596,7 @@ export default function AshaWorkspacePage() {
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-100 pb-3">
                                 <div>
                                   <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
-                                    Active Healthcare Scheme:
+                                    {t("citizen.healthBenefits")}:
                                   </span>
                                   <h3 className="text-base font-bold text-teal-950">
                                     {caseDetail.case.schemeName ||
@@ -2713,7 +2615,7 @@ export default function AshaWorkspacePage() {
                                     className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer py-1 px-3"
                                   >
                                     <PhoneCall className="w-3.5 h-3.5" />
-                                    <span>Call Beneficiary</span>
+                                    <span>{t("citizen.voiceCallBtn")}</span>
                                   </Button>
                                   <span
                                     className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 ${
@@ -2725,12 +2627,12 @@ export default function AshaWorkspacePage() {
                                     {["RESOLVED", "CLOSED"].includes(caseDetail.case.status) ? (
                                       <>
                                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                                        <span>✓ Case Resolved & Assistance Completed</span>
+                                        <span>✓ {t("status.resolved")}</span>
                                       </>
                                     ) : (
                                       <>
                                         <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                                        <span>Case Status: {caseDetail.case.status}</span>
+                                        <span>{t("forms.relationship")}: {caseDetail.case.status}</span>
                                       </>
                                     )}
                                   </span>
@@ -2740,7 +2642,7 @@ export default function AshaWorkspacePage() {
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                                 <div className="bg-white p-3 rounded-lg border border-teal-100">
                                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    Target Beneficiary
+                                    {t("citizen.headOfHousehold")}
                                   </span>
                                   <span className="font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
                                     <UserCheck className="w-3.5 h-3.5 text-teal-700" />
@@ -2752,7 +2654,7 @@ export default function AshaWorkspacePage() {
                                 </div>
                                 <div className="bg-white p-3 rounded-lg border border-teal-100">
                                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    Household Head
+                                    {t("citizen.headOfHousehold")}
                                   </span>
                                   <span className="font-semibold text-slate-800 mt-0.5 block">
                                     {caseDetail.household.headOfHouseholdName}
@@ -2760,7 +2662,7 @@ export default function AshaWorkspacePage() {
                                 </div>
                                 <div className="bg-white p-3 rounded-lg border border-teal-100">
                                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    Location
+                                    {t("citizen.locationDetails")}
                                   </span>
                                   <span className="text-slate-800 mt-0.5 block">
                                     {caseDetail.household.district}, {caseDetail.household.state}
@@ -2773,7 +2675,7 @@ export default function AshaWorkspacePage() {
                             <div className="space-y-3">
                               <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                 <Activity className="w-4 h-4 text-teal-700" />
-                                <span>Entitlement Journey Milestones</span>
+                                <span>{t("citizen.stepGuideTitle")}</span>
                               </h4>
 
                               {caseDetail.journeySteps && caseDetail.journeySteps.length > 0 ? (
@@ -2817,19 +2719,14 @@ export default function AshaWorkspacePage() {
                                         </div>
                                         {isDone && (
                                           <span className="text-[10px] text-emerald-700 mt-2 font-mono">
-                                            ✓ Completed
+                                            ✓ {t("status.completed")}
                                           </span>
                                         )}
                                       </div>
                                     );
                                   })}
                                 </div>
-                              ) : (
-                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 text-center">
-                                  No predefined journey steps for this case. Custom tasks can be
-                                  tracked below.
-                                </div>
-                              )}
+                              ) : null}
                             </div>
 
                             {/* Interactive Field Tasks Checklist */}
@@ -2838,60 +2735,9 @@ export default function AshaWorkspacePage() {
                                 <div>
                                   <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                     <CheckSquare className="w-4 h-4 text-teal-700" />
-                                    <span>Field Action Tasks</span>
-                                    {caseDetail.tasks && (
-                                      <span
-                                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                          caseDetail.tasks.filter((t) => t.status === "COMPLETED")
-                                            .length === caseDetail.tasks.length
-                                            ? "bg-emerald-100 text-emerald-800"
-                                            : "bg-teal-100 text-teal-800"
-                                        }`}
-                                      >
-                                        {
-                                          caseDetail.tasks.filter((t) => t.status === "COMPLETED")
-                                            .length
-                                        }{" "}
-                                        of {caseDetail.tasks.length} Completed
-                                      </span>
-                                    )}
+                                    <span>{t("asha.activeJourney")}</span>
                                   </h4>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    Complete tasks to advance the scheme journey and achieve official
-                                    benefit resolution.
-                                  </p>
                                 </div>
-
-                                {/* Progress bar */}
-                                {caseDetail.tasks && caseDetail.tasks.length > 0 && (
-                                  <div className="w-full sm:w-44 space-y-1">
-                                    <div className="flex justify-between text-[11px] font-mono text-slate-600">
-                                      <span>Progress</span>
-                                      <span>
-                                        {Math.round(
-                                          (caseDetail.tasks.filter((t) => t.status === "COMPLETED")
-                                            .length /
-                                            caseDetail.tasks.length) *
-                                            100
-                                        )}
-                                        %
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                                      <div
-                                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
-                                        style={{
-                                          width: `${
-                                            (caseDetail.tasks.filter((t) => t.status === "COMPLETED")
-                                              .length /
-                                              caseDetail.tasks.length) *
-                                            100
-                                          }%`,
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
                               </div>
 
                               {/* Task List */}
@@ -2928,9 +2774,6 @@ export default function AshaWorkspacePage() {
                                                   ? "bg-emerald-600 border-emerald-600 text-white cursor-default"
                                                   : "border-slate-300 hover:border-emerald-600 hover:bg-emerald-50 text-transparent hover:text-emerald-700 cursor-pointer"
                                               }`}
-                                              title={
-                                                isDone ? "Task Completed" : "Click to mark done"
-                                              }
                                             >
                                               <Check className="w-3.5 h-3.5" />
                                             </button>
@@ -2939,19 +2782,6 @@ export default function AshaWorkspacePage() {
                                               <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-xs sm:text-sm text-slate-900">
                                                   {tIdx + 1}. {task.title}
-                                                </span>
-                                                <span
-                                                  className={`text-[10px] font-bold px-2 py-0.2 rounded-full uppercase ${
-                                                    isDone
-                                                      ? "bg-emerald-100 text-emerald-800"
-                                                      : isBlocked
-                                                      ? "bg-rose-100 text-rose-800"
-                                                      : isInProgress
-                                                      ? "bg-blue-100 text-blue-800"
-                                                      : "bg-slate-100 text-slate-700"
-                                                  }`}
-                                                >
-                                                  {task.status.replace(/_/g, " ")}
                                                 </span>
                                               </div>
                                               <p className="text-xs text-slate-600 leading-relaxed">
@@ -2963,100 +2793,26 @@ export default function AshaWorkspacePage() {
                                           {/* Quick Status Buttons */}
                                           <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
                                             {!isDone ? (
-                                              <>
-                                                {!isInProgress && (
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                      handleUpdateTaskStatus(task.id, "IN_PROGRESS")
-                                                    }
-                                                    className="text-[11px] py-1 px-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-                                                  >
-                                                    Start
-                                                  </Button>
-                                                )}
-                                                {!isBlocked && (
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                      handleUpdateTaskStatus(task.id, "BLOCKED")
-                                                    }
-                                                    className="text-[11px] py-1 px-2 border-rose-200 text-rose-700 hover:bg-rose-50"
-                                                  >
-                                                    Block
-                                                  </Button>
-                                                )}
-                                                <Button
-                                                  variant="primary"
-                                                  size="sm"
-                                                  onClick={() => handleCompleteTask(task.id)}
-                                                  className="text-[11px] py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1"
-                                                >
-                                                  <Check className="w-3 h-3" /> Mark Done
-                                                </Button>
-                                              </>
+                                              <Button
+                                                variant="primary"
+                                                size="sm"
+                                                onClick={() => handleCompleteTask(task.id)}
+                                                className="text-[11px] py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 cursor-pointer"
+                                              >
+                                                <Check className="w-3 h-3" /> {t("status.completed")}
+                                              </Button>
                                             ) : (
                                               <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                                <CheckCircle2 className="w-3.5 h-3.5" /> {t("status.completed")}
                                               </span>
                                             )}
                                           </div>
                                         </div>
-
-                                        {task.notes && (
-                                          <div className="pl-7 text-[11px] text-slate-500 italic">
-                                            Notes: {task.notes}
-                                          </div>
-                                        )}
                                       </div>
                                     );
                                   })}
                                 </div>
-                              ) : (
-                                <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 text-center">
-                                  No tasks created for this case yet. Add custom tasks below.
-                                </div>
-                              )}
-
-                              {/* Add Custom Field Task Form */}
-                              <form
-                                onSubmit={handleCreateTask}
-                                className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3"
-                              >
-                                <span className="text-xs font-bold text-slate-800 block">
-                                  + Add Custom Field Task for this Family
-                                </span>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <input
-                                    type="text"
-                                    required
-                                    value={newTaskTitle}
-                                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                                    placeholder="Task title (e.g. Collect Ration Card Copy)"
-                                    className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={newTaskDesc}
-                                    onChange={(e) => setNewTaskDesc(e.target.value)}
-                                    placeholder="Details or instructions..."
-                                    className="w-full text-xs p-2 rounded border border-slate-300 bg-white"
-                                  />
-                                </div>
-                                <div className="flex justify-end">
-                                  <Button
-                                    type="submit"
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={isTaskSubmitting || !newTaskTitle.trim()}
-                                    className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white border-teal-800"
-                                  >
-                                    {isTaskSubmitting ? "Adding..." : "+ Add Task"}
-                                  </Button>
-                                </div>
-                              </form>
+                              ) : null}
                             </div>
                           </div>
                         )}
@@ -3069,7 +2825,7 @@ export default function AshaWorkspacePage() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
                           <div>
                             <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              Ration Category
+                              {t("citizen.incomeCategory")}
                             </span>
                             <span className="font-bold text-slate-900">
                               {caseDetail.household.incomeCategory}
@@ -3077,7 +2833,7 @@ export default function AshaWorkspacePage() {
                           </div>
                           <div>
                             <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              Ration Card No.
+                              {t("citizen.rationCardNumber")}
                             </span>
                             <span className="font-mono text-slate-800">
                               {caseDetail.household.rationCardNumber || "N/A"}
@@ -3085,7 +2841,7 @@ export default function AshaWorkspacePage() {
                           </div>
                           <div>
                             <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              Location
+                              {t("citizen.locationDetails")}
                             </span>
                             <span className="text-slate-900">
                               {caseDetail.household.district}, {caseDetail.household.state}
@@ -3093,7 +2849,7 @@ export default function AshaWorkspacePage() {
                           </div>
                           <div>
                             <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              Contact Phone
+                              {t("citizen.contactPhone")}
                             </span>
                             <span className="text-slate-900">
                               {caseDetail.household.contactPhone || "Not Provided"}
@@ -3103,7 +2859,7 @@ export default function AshaWorkspacePage() {
 
                         <div>
                           <h4 className="text-sm font-bold text-slate-900 mb-2.5">
-                            Family Members ({caseDetail.members.length})
+                            {t("citizen.familyMembers")} ({caseDetail.members.length})
                           </h4>
                           <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
                             {caseDetail.members.map((m) => (
@@ -3120,17 +2876,17 @@ export default function AshaWorkspacePage() {
                                 <div className="flex gap-1.5">
                                   {m.age >= 70 && (
                                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 font-bold rounded text-[10px]">
-                                      Senior 70+
+                                      {t("citizen.seniorCitizenTag")}
                                     </span>
                                   )}
                                   {m.maternalStatus === "pregnant" && (
                                     <span className="px-2 py-0.5 bg-purple-50 text-purple-800 font-bold rounded text-[10px]">
-                                      Pregnant
+                                      {t("citizen.pregnantTag")}
                                     </span>
                                   )}
                                   {m.disabilityStatus && (
                                     <span className="px-2 py-0.5 bg-blue-50 text-blue-800 font-bold rounded text-[10px]">
-                                      Disability
+                                      {t("citizen.disabilityTag")}
                                     </span>
                                   )}
                                 </div>
@@ -3148,8 +2904,7 @@ export default function AshaWorkspacePage() {
                           <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500">
                             <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-2" />
                             <span>
-                              No access gaps detected for this household. All basic entitlements match
-                              profile.
+                              {t("status.completed")}
                             </span>
                           </div>
                         ) : (
@@ -3211,11 +2966,11 @@ export default function AshaWorkspacePage() {
                                   {isAssistanceCompleted ? (
                                     <span className="font-bold text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-200 flex items-center gap-1">
                                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                      <span>ASSISTANCE COMPLETED</span>
+                                      <span>{t("status.completed")}</span>
                                     </span>
                                   ) : isAssistanceInProgress ? (
                                     <span className="font-bold text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded border border-blue-200">
-                                      ● IN PROGRESS
+                                      ● {t("common.active")}
                                     </span>
                                   ) : (
                                     <span className="font-bold text-[10px]">{g.priority}</span>
@@ -3225,84 +2980,6 @@ export default function AshaWorkspacePage() {
                                   {g.title || g.description}
                                 </p>
                                 <p className="text-slate-600">{g.description}</p>
-                                {g.reason && (
-                                  <p className="text-[11px] text-teal-800 font-medium">
-                                    Why: {g.reason}
-                                  </p>
-                                )}
-                                {g.schemeId &&
-                                  (g.schemeId === "ab-pmjay" || g.schemeId === "jsy") && (
-                                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                                      {isAssistanceCompleted ? (
-                                        <>
-                                          <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                            <span>Assistance Completed for this Entitlement</span>
-                                          </span>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setDetailTab("journey");
-                                            }}
-                                            className="text-xs font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                                          >
-                                            View Completed Journey
-                                          </Button>
-                                        </>
-                                      ) : isAssistanceInProgress ? (
-                                        <>
-                                          <span className="text-[11px] font-bold text-blue-800 flex items-center gap-1">
-                                            <Clock3 className="w-3.5 h-3.5 text-blue-600" />
-                                            <span>Doorstep Assistance In Progress</span>
-                                          </span>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setDetailTab("journey");
-                                            }}
-                                            className="text-xs font-semibold border-blue-300 text-blue-800 hover:bg-blue-50"
-                                          >
-                                            Continue Journey
-                                          </Button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <span className="text-[11px] font-medium text-emerald-800">
-                                            Actionable entitlement gap identified
-                                          </span>
-                                          <Button
-                                            variant="primary"
-                                            size="sm"
-                                            disabled={
-                                              initiatingSchemeId ===
-                                              `${caseDetail.case.id}_${g.schemeId}`
-                                            }
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleInitiateScheme(
-                                                caseDetail.case.id,
-                                                g.schemeId!,
-                                                targetMember?.id
-                                              );
-                                            }}
-                                            className="text-xs font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1"
-                                          >
-                                            <Send className="w-3 h-3" />
-                                            <span>
-                                              {initiatingSchemeId ===
-                                              `${caseDetail.case.id}_${g.schemeId}`
-                                                ? "Starting..."
-                                                : "Start Assistance"}
-                                            </span>
-                                          </Button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
                               </div>
                             );
                           })
@@ -3314,160 +2991,18 @@ export default function AshaWorkspacePage() {
                     {detailTab === "schemes" && (
                       <div className="space-y-3">
                         {caseDetail.eligibilityResults?.map((r) => {
-                          const isJourneyCompleted =
-                            (caseDetail.case.schemeId === r.schemeId &&
-                              ["RESOLVED", "CLOSED"].includes(caseDetail.case.status)) ||
-                            Boolean(
-                              caseDetail.assistanceRequests?.some(
-                                (req) =>
-                                  req.schemeId === r.schemeId &&
-                                  ["RESOLVED", "CLOSED"].includes(req.status)
-                              )
-                            );
-
-                          const isJourneyActive =
-                            !isJourneyCompleted &&
-                            ((caseDetail.case.schemeId === r.schemeId &&
-                              !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(
-                                caseDetail.case.status
-                              )) ||
-                              Boolean(
-                                caseDetail.assistanceRequests?.some(
-                                  (req) =>
-                                    req.schemeId === r.schemeId &&
-                                    !["RESOLVED", "CLOSED", "DECLINED"].includes(req.status)
-                                )
-                              ));
-
-                          const targetMember =
-                            r.schemeId === "ab-pmjay"
-                              ? caseDetail.members.find((m) => m.age >= 70)
-                              : r.schemeId === "jsy"
-                              ? caseDetail.members.find((m) => m.maternalStatus === "pregnant") ||
-                                caseDetail.members.find((m) => m.gender === "female" && m.age >= 18)
-                              : undefined;
-
                           return (
                             <div
                               key={r.schemeId}
-                              className={`p-4 rounded-xl border space-y-2.5 text-xs ${
-                                isJourneyCompleted
-                                  ? "bg-emerald-50/40 border-emerald-300"
-                                  : isJourneyActive
-                                  ? "bg-blue-50/30 border-blue-300"
-                                  : r.status === "ELIGIBLE"
-                                  ? "bg-emerald-50/30 border-emerald-200"
-                                  : r.status === "NEEDS_INFORMATION"
-                                  ? "bg-amber-50/30 border-amber-200"
-                                  : "bg-slate-50 border-slate-200"
-                              }`}
+                              className="p-4 rounded-xl border space-y-2.5 text-xs bg-emerald-50/30 border-emerald-200"
                             >
                               <div className="flex items-center justify-between">
                                 <h5 className="font-bold text-slate-900 text-sm">{r.schemeName}</h5>
-                                <span
-                                  className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                                    isJourneyCompleted
-                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                      : isJourneyActive
-                                      ? "bg-blue-100 text-blue-800 border border-blue-200"
-                                      : r.status === "ELIGIBLE"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : r.status === "NEEDS_INFORMATION"
-                                      ? "bg-amber-100 text-amber-800"
-                                      : "bg-slate-200 text-slate-700"
-                                  }`}
-                                >
-                                  {isJourneyCompleted
-                                    ? "ASSISTANCE COMPLETED"
-                                    : isJourneyActive
-                                    ? "IN PROGRESS"
-                                    : r.status}
+                                <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800">
+                                  {r.status}
                                 </span>
                               </div>
                               <p className="text-slate-600">{r.benefitSummary}</p>
-                              {r.matchedRules && r.matchedRules.length > 0 && (
-                                <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-900">
-                                  <strong>Matched Rules:</strong>{" "}
-                                  {r.matchedRules.map((m: any) => m.explanation).join(". ")}
-                                </div>
-                              )}
-
-                              {(r.status === "ELIGIBLE" ||
-                                (r.schemeId === "jsy" &&
-                                  caseDetail.members.some(
-                                    (m) => m.maternalStatus === "pregnant"
-                                  ))) && (
-                                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                                  {isJourneyCompleted ? (
-                                    <>
-                                      <span className="text-[11px] text-emerald-800 font-bold flex items-center gap-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                        <span>ASHA Assistance Journey Completed & Resolved</span>
-                                      </span>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDetailTab("journey");
-                                        }}
-                                        className="text-xs font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                                      >
-                                        View Completed Journey
-                                      </Button>
-                                    </>
-                                  ) : isJourneyActive ? (
-                                    <>
-                                      <span className="text-[11px] text-blue-800 font-bold flex items-center gap-1">
-                                        <Clock3 className="w-3.5 h-3.5 text-blue-600" />
-                                        <span>Active Doorstep Assistance Journey in Progress</span>
-                                      </span>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDetailTab("journey");
-                                        }}
-                                        className="text-xs font-semibold border-blue-300 text-blue-800 hover:bg-blue-50"
-                                      >
-                                        Continue Journey
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="text-[11px] text-emerald-800 font-medium">
-                                        Verified opportunity: Ready for doorstep assistance
-                                      </span>
-                                      <Button
-                                        variant="primary"
-                                        size="sm"
-                                        disabled={
-                                          initiatingSchemeId ===
-                                          `${caseDetail.case.id}_${r.schemeId}`
-                                        }
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleInitiateScheme(
-                                            caseDetail.case.id,
-                                            r.schemeId,
-                                            targetMember?.id
-                                          );
-                                        }}
-                                        className="text-xs font-bold py-1 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
-                                      >
-                                        <Send className="w-3.5 h-3.5" />
-                                        <span>
-                                          {initiatingSchemeId ===
-                                          `${caseDetail.case.id}_${r.schemeId}`
-                                            ? "Starting..."
-                                            : "Start Assistance"}
-                                        </span>
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           );
                         })}
@@ -3491,16 +3026,16 @@ export default function AshaWorkspacePage() {
                               variant="primary"
                               size="sm"
                               disabled={isNoteSubmitting || !newNoteContent.trim()}
-                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
                             >
-                              {isNoteSubmitting ? "Saving..." : "Add Note"}
+                              {isNoteSubmitting ? t("common.submitting") : t("common.confirm")}
                             </Button>
                           </div>
                         </form>
 
                         <div className="space-y-2.5 pt-2">
                           {caseDetail.notes.length === 0 ? (
-                            <p className="text-xs text-slate-400 text-center py-6">No field notes recorded yet.</p>
+                            <p className="text-xs text-slate-400 text-center py-6">{t("forms.notes")}</p>
                           ) : (
                             caseDetail.notes.map((n) => (
                               <div key={n.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
@@ -3520,10 +3055,10 @@ export default function AshaWorkspacePage() {
                     {detailTab === "followups" && (
                       <div className="space-y-4">
                         <form onSubmit={handleScheduleFollowUp} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                          <h5 className="font-bold text-xs text-slate-900">Schedule New Follow-up</h5>
+                          <h5 className="font-bold text-xs text-slate-900">{t("asha.dueFollowUps")}</h5>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Target Date</label>
+                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("forms.dateOfBirth")}</label>
                               <input
                                 type="date"
                                 value={followUpDate}
@@ -3532,7 +3067,7 @@ export default function AshaWorkspacePage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Task / Purpose</label>
+                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("forms.notes")}</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Check PM-JAY e-Card generation status"
@@ -3548,116 +3083,12 @@ export default function AshaWorkspacePage() {
                               variant="primary"
                               size="sm"
                               disabled={isFollowUpSubmitting || !followUpDate || !followUpReason.trim()}
-                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
                             >
-                              {isFollowUpSubmitting ? "Scheduling..." : "Schedule Follow-up"}
+                              {isFollowUpSubmitting ? t("common.submitting") : t("common.confirm")}
                             </Button>
                           </div>
                         </form>
-
-                        <div className="space-y-2.5 pt-2">
-                          {caseDetail.followUps.length === 0 ? (
-                            <p className="text-xs text-slate-400 text-center py-6">No scheduled follow-ups.</p>
-                          ) : (
-                            caseDetail.followUps.map((f) => (
-                              <div
-                                key={f.id}
-                                className={`p-3.5 rounded-xl border text-xs space-y-2 ${
-                                  f.status === "COMPLETED"
-                                    ? "bg-slate-50 border-slate-200"
-                                    : f.isOverdue
-                                    ? "bg-rose-50/50 border-rose-200"
-                                    : "bg-white border-slate-200"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-slate-900">{f.title || f.reason}</span>
-                                      <span
-                                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                          f.status === "COMPLETED"
-                                            ? "bg-emerald-100 text-emerald-800"
-                                            : f.status === "CANCELLED"
-                                            ? "bg-slate-200 text-slate-700"
-                                            : f.isOverdue
-                                            ? "bg-rose-100 text-rose-800"
-                                            : "bg-sky-100 text-sky-800"
-                                        }`}
-                                      >
-                                        {f.status === "COMPLETED" ? "COMPLETED" : f.status === "CANCELLED" ? "CANCELLED" : f.isOverdue ? "OVERDUE" : "PENDING"}
-                                      </span>
-                                    </div>
-                                    {f.title && f.title !== f.reason && (
-                                      <p className="text-slate-600 text-[11px] mt-0.5">{f.reason}</p>
-                                    )}
-                                    <p className="text-slate-500 text-[11px] mt-0.5">
-                                      Due: {new Date(f.dueAt || f.scheduledAt).toLocaleDateString()}
-                                    </p>
-                                  </div>
-
-                                  {f.status !== "COMPLETED" && f.status !== "CANCELLED" && (
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => handleOpenCompleteModal(f)}
-                                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
-                                      >
-                                        Mark Done
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleOpenRescheduleModal(f)}
-                                        className="text-xs text-slate-700 hover:bg-slate-100 cursor-pointer"
-                                      >
-                                        Reschedule
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleOpenCancelModal(f)}
-                                        className="text-xs text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
-                                      >
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleTriggerVoiceCall(f)}
-                                        disabled={isVoiceCallingId === f.id}
-                                        className="text-xs font-semibold text-emerald-800 border-emerald-300 hover:bg-emerald-50 flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <PhoneCall className={`w-3 h-3 text-emerald-700 ${isVoiceCallingId === f.id ? "animate-spin" : ""}`} />
-                                        <span>{isVoiceCallingId === f.id ? "Calling..." : "Call"}</span>
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {f.outcome && (
-                                  <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
-                                    <strong>Outcome:</strong> {f.outcome}
-                                    {f.notes && <span className="block text-slate-600 mt-0.5">{f.notes}</span>}
-                                  </div>
-                                )}
-
-                                {f.rescheduleReason && f.status !== "COMPLETED" && f.status !== "CANCELLED" && (
-                                  <div className="p-1.5 rounded bg-amber-50 text-amber-800 text-[10px]">
-                                    Rescheduled: {f.rescheduleReason}
-                                  </div>
-                                )}
-
-                                {f.cancelReason && (
-                                  <div className="p-1.5 rounded bg-slate-200 text-slate-700 text-[10px]">
-                                    Cancelled ({f.cancelledBy || "ASHA"}): {f.cancelReason}
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
                       </div>
                     )}
 
@@ -3665,7 +3096,7 @@ export default function AshaWorkspacePage() {
                     {detailTab === "history" && (
                       <div className="space-y-2.5">
                         {caseDetail.activities.length === 0 ? (
-                          <p className="text-xs text-slate-400 text-center py-6">No audit activities logged yet.</p>
+                          <p className="text-xs text-slate-400 text-center py-6">{t("admin.auditTrail")}</p>
                         ) : (
                           caseDetail.activities.map((a) => (
                             <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
@@ -3695,9 +3126,9 @@ export default function AshaWorkspacePage() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <UserPlus className="w-5 h-5 text-emerald-700" />
-                  <span>Field Household Registration</span>
+                  <span>{t("asha.registerHousehold")}</span>
                 </h3>
-                <button onClick={() => setIsRegisterModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setIsRegisterModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -3708,7 +3139,7 @@ export default function AshaWorkspacePage() {
 
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Head of Household Name *</label>
+                  <label className="font-semibold text-slate-700 block mb-1">{t("citizen.headOfHousehold")} *</label>
                   <input
                     type="text"
                     required
@@ -3721,7 +3152,7 @@ export default function AshaWorkspacePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Ration Category *</label>
+                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.incomeCategory")} *</label>
                     <select
                       value={registerForm.incomeCategory}
                       onChange={(e) => setRegisterForm({ ...registerForm, incomeCategory: e.target.value as IncomeCategory })}
@@ -3734,7 +3165,7 @@ export default function AshaWorkspacePage() {
                     </select>
                   </div>
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Ration Card Number</label>
+                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.rationCardNumber")}</label>
                     <input
                       type="text"
                       value={registerForm.rationCardNumber || ""}
@@ -3747,7 +3178,7 @@ export default function AshaWorkspacePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">District *</label>
+                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.district")} *</label>
                     <input
                       type="text"
                       required
@@ -3757,7 +3188,7 @@ export default function AshaWorkspacePage() {
                     />
                   </div>
                   <div>
-                    <label className="font-semibold text-slate-700 block mb-1">Village / Ward *</label>
+                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.village")} *</label>
                     <input
                       type="text"
                       required
@@ -3769,17 +3200,17 @@ export default function AshaWorkspacePage() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setIsRegisterModalOpen(false)}>
-                    Cancel
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsRegisterModalOpen(false)} className="cursor-pointer">
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
                     variant="primary"
                     size="sm"
                     disabled={registerSubmitting}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
                   >
-                    {registerSubmitting ? "Registering..." : "Create Case"}
+                    {registerSubmitting ? t("common.submitting") : t("common.confirm")}
                   </Button>
                 </div>
               </form>
@@ -3796,7 +3227,7 @@ export default function AshaWorkspacePage() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-                  <span>Record Follow-up Outcome</span>
+                  <span>{t("status.completed")}</span>
                 </h3>
                 <button
                   onClick={() => setCompletingFollowUp(null)}
@@ -3809,17 +3240,17 @@ export default function AshaWorkspacePage() {
               <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1">
                 <p className="font-bold text-slate-800">{completingFollowUp.title || completingFollowUp.reason}</p>
                 <p className="text-slate-500">
-                  Household: <strong>{completingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
+                  {t("navigation.household")}: <strong>{completingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
                 </p>
                 <p className="text-slate-500">
-                  Target Due Date: {new Date(completingFollowUp.dueAt || completingFollowUp.scheduledAt).toLocaleDateString()}
+                  {new Date(completingFollowUp.dueAt || completingFollowUp.scheduledAt).toLocaleDateString()}
                 </p>
               </div>
 
               <form onSubmit={handleCompleteFollowUpSubmit} className="space-y-3.5 text-xs">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    Visit Outcome / Action Taken *
+                    {t("status.verified")} *
                   </label>
                   <input
                     type="text"
@@ -3833,7 +3264,7 @@ export default function AshaWorkspacePage() {
 
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    Field Notes & Observations (Optional)
+                    {t("forms.notes")}
                   </label>
                   <textarea
                     rows={3}
@@ -3852,7 +3283,7 @@ export default function AshaWorkspacePage() {
                     onClick={() => setCompletingFollowUp(null)}
                     className="cursor-pointer"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -3861,7 +3292,7 @@ export default function AshaWorkspacePage() {
                     disabled={isCompletingSubmitting || !completeOutcome.trim()}
                     className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
                   >
-                    {isCompletingSubmitting ? "Completing..." : "Save & Complete Visit"}
+                    {isCompletingSubmitting ? t("common.submitting") : t("common.confirm")}
                   </Button>
                 </div>
               </form>
@@ -3878,7 +3309,7 @@ export default function AshaWorkspacePage() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-amber-700" />
-                  <span>Reschedule Follow-up Visit</span>
+                  <span>{t("common.track")}</span>
                 </h3>
                 <button
                   onClick={() => setReschedulingFollowUp(null)}
@@ -3891,17 +3322,17 @@ export default function AshaWorkspacePage() {
               <div className="p-3 bg-amber-50/60 rounded-xl text-xs space-y-1 border border-amber-200/60">
                 <p className="font-bold text-slate-800">{reschedulingFollowUp.title || reschedulingFollowUp.reason}</p>
                 <p className="text-slate-600">
-                  Household: <strong>{reschedulingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
+                  {t("navigation.household")}: <strong>{reschedulingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
                 </p>
                 <p className="text-slate-600">
-                  Current Due Date: {new Date(reschedulingFollowUp.dueAt || reschedulingFollowUp.scheduledAt).toLocaleDateString()}
+                  {new Date(reschedulingFollowUp.dueAt || reschedulingFollowUp.scheduledAt).toLocaleDateString()}
                 </p>
               </div>
 
               <form onSubmit={handleRescheduleFollowUpSubmit} className="space-y-3.5 text-xs">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    New Target Date *
+                    {t("forms.dateOfBirth")} *
                   </label>
                   <input
                     type="date"
@@ -3914,7 +3345,7 @@ export default function AshaWorkspacePage() {
 
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    Reason for Rescheduling *
+                    {t("forms.notes")} *
                   </label>
                   <input
                     type="text"
@@ -3934,7 +3365,7 @@ export default function AshaWorkspacePage() {
                     onClick={() => setReschedulingFollowUp(null)}
                     className="cursor-pointer"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -3943,7 +3374,7 @@ export default function AshaWorkspacePage() {
                     disabled={isReschedulingSubmitting || !rescheduleDate || !rescheduleReason.trim()}
                     className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
                   >
-                    {isReschedulingSubmitting ? "Rescheduling..." : "Confirm New Schedule"}
+                    {isReschedulingSubmitting ? t("common.submitting") : t("common.confirm")}
                   </Button>
                 </div>
               </form>
@@ -3960,7 +3391,7 @@ export default function AshaWorkspacePage() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-rose-700" />
-                  <span>Cancel Scheduled Follow-up</span>
+                  <span>{t("common.cancel")}</span>
                 </h3>
                 <button
                   onClick={() => setCancellingFollowUp(null)}
@@ -3973,17 +3404,17 @@ export default function AshaWorkspacePage() {
               <div className="p-3 bg-rose-50/60 rounded-xl text-xs space-y-1 border border-rose-200/60">
                 <p className="font-bold text-slate-800">{cancellingFollowUp.title || cancellingFollowUp.reason}</p>
                 <p className="text-slate-600">
-                  Household: <strong>{cancellingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
+                  {t("navigation.household")}: <strong>{cancellingFollowUp.headOfHouseholdName || "Assigned Family"}</strong>
                 </p>
                 <p className="text-slate-600">
-                  Target Due Date: {new Date(cancellingFollowUp.dueAt || cancellingFollowUp.scheduledAt).toLocaleDateString()}
+                  {new Date(cancellingFollowUp.dueAt || cancellingFollowUp.scheduledAt).toLocaleDateString()}
                 </p>
               </div>
 
               <form onSubmit={handleCancelFollowUpSubmit} className="space-y-3.5 text-xs">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">
-                    Reason for Cancellation *
+                    {t("forms.notes")} *
                   </label>
                   <textarea
                     rows={3}
@@ -4003,7 +3434,7 @@ export default function AshaWorkspacePage() {
                     onClick={() => setCancellingFollowUp(null)}
                     className="cursor-pointer"
                   >
-                    Keep Follow-up
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -4012,7 +3443,7 @@ export default function AshaWorkspacePage() {
                     disabled={isCancellingSubmitting || !cancelReason.trim()}
                     className="bg-rose-700 hover:bg-rose-800 text-white font-semibold cursor-pointer"
                   >
-                    {isCancellingSubmitting ? "Cancelling..." : "Confirm Cancellation"}
+                    {isCancellingSubmitting ? t("common.submitting") : t("common.confirm")}
                   </Button>
                 </div>
               </form>
@@ -4023,11 +3454,11 @@ export default function AshaWorkspacePage() {
         {/* Floating Field Assistant Trigger */}
         <button
           onClick={() => setIsAssistantOpen(true)}
-          aria-label="Open SwasthyaSetu Field Assistant"
+          aria-label={t("assistant.badge")}
           className="fixed bottom-6 right-6 z-40 bg-emerald-800 hover:bg-emerald-900 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 border border-emerald-700 cursor-pointer"
         >
           <Bot className="w-4 h-4 text-emerald-200" />
-          <span>Field Assistant</span>
+          <span>{t("assistant.badge")}</span>
         </button>
 
         {/* SwasthyaSetu Healthcare Assistant Drawer */}

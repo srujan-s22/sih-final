@@ -165,21 +165,21 @@ export default function SignInPage() {
           <BrandLogo size="lg" priority={true} className="mx-auto" />
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
             {mode === "signin"
-              ? "Sign in to SwasthyaSetu"
+              ? t("auth.signInTitle")
               : requestedRole === "ASHA"
-              ? "Create ASHA worker account"
+              ? t("auth.ashaRole")
               : requestedRole === "ADMIN"
-              ? "Create administrator account"
-              : "Create your citizen account"}
+              ? t("auth.adminRole")
+              : t("auth.createAccountTitle")}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 max-w-xs mx-auto">
             {mode === "signin"
-              ? "Access healthcare benefits and manage records safely."
+              ? t("auth.signInDesc")
               : requestedRole === "ASHA"
-              ? "ASHA worker accounts require authorized staff registration code."
+              ? t("auth.ashaSignupDesc")
               : requestedRole === "ADMIN"
-              ? "Administrator accounts require authorized registration code."
-              : "Discover verified government healthcare support for your family."}
+              ? t("auth.adminSignupDesc")
+              : t("auth.citizenSignupDesc")}
           </p>
         </div>
 
@@ -200,7 +200,7 @@ export default function SignInPage() {
                 setMode("signin");
                 setErrorMessage(null);
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${
                 mode === "signin"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-800"
@@ -214,7 +214,7 @@ export default function SignInPage() {
                 setMode("signup");
                 setErrorMessage(null);
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${
                 mode === "signup"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-800"
@@ -229,15 +229,15 @@ export default function SignInPage() {
             <div className="space-y-2 pt-1 border-b border-slate-100 pb-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Account Type:
+                  {t("auth.roleLabel")}:
                 </span>
                 {!showStaffOptions && requestedRole === "CITIZEN" && (
                   <button
                     type="button"
                     onClick={() => setShowStaffOptions(true)}
-                    className="text-[11px] font-medium text-teal-700 hover:text-teal-900 underline underline-offset-2"
+                    className="text-[11px] font-medium text-teal-700 hover:text-teal-900 underline underline-offset-2 cursor-pointer"
                   >
-                    Register as Staff / Admin?
+                    Staff / Admin
                   </button>
                 )}
               </div>
@@ -251,7 +251,7 @@ export default function SignInPage() {
                       setRegistrationSecret("");
                       setErrorMessage(null);
                     }}
-                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer ${
                       requestedRole === "CITIZEN"
                         ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
                         : "text-slate-600 hover:text-slate-900"
@@ -265,7 +265,7 @@ export default function SignInPage() {
                       setRequestedRole("ASHA");
                       setErrorMessage(null);
                     }}
-                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer ${
                       requestedRole === "ASHA"
                         ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
                         : "text-slate-600 hover:text-slate-900"
@@ -279,7 +279,7 @@ export default function SignInPage() {
                       setRequestedRole("ADMIN");
                       setErrorMessage(null);
                     }}
-                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all ${
+                    className={`py-1.5 px-2 rounded text-xs font-bold transition-all cursor-pointer ${
                       requestedRole === "ADMIN"
                         ? "bg-white text-teal-900 shadow-2xs border border-teal-200"
                         : "text-slate-600 hover:text-slate-900"
@@ -304,14 +304,8 @@ export default function SignInPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "signup" && (
               <Input
-                label="Full Name"
-                placeholder={
-                  requestedRole === "ASHA"
-                    ? "e.g. Sunita Devi (ASHA)"
-                    : requestedRole === "ADMIN"
-                    ? "e.g. System Administrator"
-                    : "e.g. Ramesh Kumar"
-                }
+                label={t("auth.nameLabel")}
+                placeholder={t("auth.namePlaceholder")}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={loading}
@@ -320,9 +314,9 @@ export default function SignInPage() {
             )}
 
             <Input
-              label="Email Address"
+              label={t("auth.emailLabel")}
               type="email"
-              placeholder="name@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
@@ -331,9 +325,9 @@ export default function SignInPage() {
 
             <div className="space-y-1">
               <Input
-                label="Password"
+                label={t("auth.passwordLabel")}
                 type="password"
-                placeholder="••••••••"
+                placeholder={t("auth.passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
@@ -349,9 +343,9 @@ export default function SignInPage() {
                       setResetError(null);
                       setIsResetOpen(true);
                     }}
-                    className="text-[11px] font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2"
+                    className="text-[11px] font-semibold text-teal-700 hover:text-teal-900 underline underline-offset-2 cursor-pointer"
                   >
-                    Forgot password?
+                    {t("auth.forgotPassword")}
                   </button>
                 </div>
               )}
@@ -363,14 +357,12 @@ export default function SignInPage() {
                 <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
                   <KeyRound className="w-3.5 h-3.5 text-teal-700" />
                   <span>
-                    {requestedRole === "ASHA"
-                      ? "ASHA Staff Registration Code"
-                      : "Admin Authorization Code"}
+                    {t("auth.secretCode")}
                   </span>
                 </div>
                 <Input
                   type="password"
-                  placeholder="Enter authorized code"
+                  placeholder={t("auth.secretCodePlaceholder")}
                   value={registrationSecret}
                   onChange={(e) => setRegistrationSecret(e.target.value)}
                   disabled={loading}
@@ -378,8 +370,8 @@ export default function SignInPage() {
                 />
                 <p className="text-[11px] text-slate-500">
                   {requestedRole === "ASHA"
-                    ? "Issued by your district health administration or team supervisor."
-                    : "Issued to verified platform infrastructure administrators."}
+                    ? t("auth.ashaSignupDesc")
+                    : t("auth.adminSignupDesc")}
                 </p>
               </div>
             )}
@@ -388,18 +380,14 @@ export default function SignInPage() {
               type="submit"
               variant="primary"
               size="md"
-              className="w-full font-semibold shadow-xs"
+              className="w-full font-semibold shadow-xs cursor-pointer"
               disabled={loading}
             >
               {loading
-                ? "Processing..."
+                ? t("common.submitting")
                 : mode === "signin"
-                ? "Sign In"
-                : requestedRole === "ASHA"
-                ? "Create ASHA Account"
-                : requestedRole === "ADMIN"
-                ? "Create Admin Account"
-                : "Create Account"}
+                ? t("navigation.signIn")
+                : t("auth.createAccount")}
             </Button>
           </form>
 
@@ -408,7 +396,7 @@ export default function SignInPage() {
               <div className="relative flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-2 text-[10px] uppercase text-slate-400 font-semibold absolute">
-                  Or
+                  {t("auth.orContinueWith")}
                 </span>
               </div>
 
@@ -418,9 +406,9 @@ export default function SignInPage() {
                 size="md"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full text-xs font-semibold"
+                className="w-full text-xs font-semibold cursor-pointer"
               >
-                Continue with Google
+                {t("auth.googleSignIn")}
               </Button>
             </div>
           )}

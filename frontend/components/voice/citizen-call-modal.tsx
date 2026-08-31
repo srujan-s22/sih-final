@@ -51,12 +51,15 @@ const DEFAULT_LANGUAGES = [
   { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
+import { useTranslation } from "@/i18n/i18n-context";
+
 export function CitizenCallModal({
   isOpen,
   onClose,
   defaultPhone = "",
   householdHeadName,
 }: CitizenCallModalProps) {
+  const { t } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState(
     defaultPhone.replace(/^\+91/, "").replace(/\D/g, "")
   );

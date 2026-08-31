@@ -1,7 +1,10 @@
+"use client";
+
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useTranslation } from "@/i18n/i18n-context";
 
 export interface ErrorStateProps {
   title?: string;
@@ -11,11 +14,13 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = "Unable to load information",
-  message = "An error occurred while loading this section. Please try again.",
+  title,
+  message,
   onRetry,
   className,
 }: ErrorStateProps) {
+  const { t } = useTranslation();
+
   return (
     <div
       className={cn(
@@ -28,10 +33,10 @@ export function ErrorState({
         <AlertCircle className="w-6 h-6" aria-hidden="true" />
       </div>
       <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-        {title}
+        {title || t("errors.loadFailed")}
       </h3>
       <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
-        {message}
+        {message || t("errors.generic")}
       </p>
       {onRetry && (
         <div className="mt-5">
@@ -39,10 +44,10 @@ export function ErrorState({
             variant="outline"
             size="sm"
             onClick={onRetry}
-            className="text-xs font-semibold text-slate-800 bg-white border-slate-300 hover:bg-slate-50 flex items-center gap-1.5"
+            className="text-xs font-semibold text-slate-800 bg-white border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
-            <span>Try Again</span>
+            <span>{t("common.tryAgain")}</span>
           </Button>
         </div>
       )}

@@ -3,7 +3,7 @@
 import React from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { useTranslation } from "@/i18n/i18n-context";
 
 export interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -23,11 +23,12 @@ export function ConfirmationDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   variant = "destructive",
   isLoading = false,
 }: ConfirmationDialogProps) {
+  const { t } = useTranslation();
   const isDestructive = variant === "destructive";
 
   return (
@@ -45,7 +46,7 @@ export function ConfirmationDialog({
             disabled={isLoading}
             className="text-xs"
           >
-            {cancelLabel}
+            {cancelLabel || t("common.cancel")}
           </Button>
           <Button
             variant={isDestructive ? "destructive" : "primary"}
@@ -55,18 +56,13 @@ export function ConfirmationDialog({
             disabled={isLoading}
             className="text-xs font-bold"
           >
-            {confirmLabel}
+            {confirmLabel || t("common.confirm")}
           </Button>
         </div>
       }
     >
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 flex items-start gap-3">
-        {isDestructive ? (
-          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-        ) : (
-          <CheckCircle2 className="w-5 h-5 text-teal-700 shrink-0 mt-0.5" />
-        )}
-        <p className="leading-relaxed">{description}</p>
+      <div className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+        {description}
       </div>
     </Modal>
   );

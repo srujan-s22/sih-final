@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { assistantService } from "@/services/assistant-service";
+import { useTranslation } from "@/i18n/i18n-context";
+import { Language } from "@/i18n/types";
 import {
   AssistantMessage,
   AssistantCitedEvidence,
@@ -16,11 +18,7 @@ import {
   ShieldCheck,
   AlertCircle,
   ExternalLink,
-  ChevronRight,
   RefreshCw,
-  Info,
-  Layers,
-  FileCheck,
   CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,13 +39,6 @@ interface ChatEntry extends AssistantMessage {
   isError?: boolean;
 }
 
-const QUICK_ACTIONS = [
-  "What schemes can my family get?",
-  "Explain my eligibility results",
-  "What documents do I need next?",
-  "What healthcare gaps were found?",
-];
-
 export function HealthcareAssistantDrawer({
   isOpen,
   onClose,
@@ -56,15 +47,21 @@ export function HealthcareAssistantDrawer({
   schemeId,
   caseId,
 }: HealthcareAssistantDrawerProps) {
+  const { language, setLanguage, t } = useTranslation();
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [language, setLanguage] = useState<"en" | "hi" | "kn">("en");
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const quickActions = [
+    t("assistant.q1"),
+    t("assistant.q2"),
+    t("assistant.q3"),
+  ];
 
   // Check assistant status on open
   useEffect(() => {
@@ -85,15 +82,24 @@ export function HealthcareAssistantDrawer({
         role: "assistant",
         content:
           userRole === "ASHA"
-            ? "Namaste. I am your SwasthyaSetu ASHA Field Assistant. I can help you understand verified government scheme rules, health access gaps, and documentation guidance for your assigned caseload."
+            ? language === "kn"
+              ? "ನಮಸ್ಕಾರ. ನಾನು ನಿಮ್ಮ ಸ್ವಾಸ್ಥ್ಯಸೇತು ಆಶಾ ಕ್ಷೇತ್ರ ಸಹಾಯಕ. ನಿಮ್ಮ ಕುಟುಂಬಗಳ ಯೋಜನೆ ನಿಯಮಗಳು, ಆರೋಗ್ಯ ಕೊರತೆಗಳು ಮತ್ತು ದಾಖಲೆಗಳ ಮಾರ್ಗದರ್ಶನಕ್ಕೆ ನಾನು ಸಹಾಯ ಮಾಡಬಲ್ಲೆ."
+              : language === "hi"
+              ? "नमस्ते। मैं आपका स्वास्थ्यसेतु आशा फील्ड सहायक हूँ। मैं आपके नामित परिवारों के लिए योजना नियमों, कमियों और दस्तावेज़ों के मार्गदर्शन में आपकी सहायता कर सकता हूँ।"
+              : "Namaste. I am your SwasthyaSetu ASHA Field Assistant. I can help you understand verified government scheme rules, health access gaps, and documentation guidance for your assigned caseload."
             : userRole === "ADMIN"
-            ? "Hello. I am the SwasthyaSetu Administrative Assistant. I can help you query active scheme metadata, verified evidence records, and platform governance summaries."
+            ? language === "kn"
+              ? "ನಮಸ್ಕಾರ. ನಾನು ಸ್ವಾಸ್ಥ್ಯಸೇತು ಆಡಳಿತ ಸಹಾಯಕ. ಸಕ್ರಿಯ ಯೋಜನೆಗಳು, ಗೆಜೆಟ್ ಆಧಾರಗಳು ಮತ್ತು ವ್ಯವಸ್ಥೆಯ ಮಾಹಿತಿ ನೀಡಲು ನಾನು ಸಿದ್ಧನಿದ್ದೇನೆ."
+              : language === "hi"
+              ? "नमस्ते। मैं स्वास्थ्यसेतु प्रशासनिक सहायक हूँ। मैं सक्रिय योजनाओं, सरकारी साक्ष्यों और सिस्टम सारांश में सहायता कर सकता हूँ।"
+              : "Hello. I am the SwasthyaSetu Administrative Assistant. I can help you query active scheme metadata, verified evidence records, and platform governance summaries."
+            : language === "kn"
+            ? "ನಮಸ್ಕಾರ. ನಾನು ನಿಮ್ಮ ಸ್ವಾಸ್ಥ್ಯಸೇತು ಆರೋಗ್ಯ ಸಹಾಯಕ. ನಿಮ್ಮ ಕುಟುಂಬದ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು, ಅರ್ಹತೆಯ ಕಾರಣಗಳು ಮತ್ತು ಅಗತ್ಯ ದಾಖಲೆಗಳನ್ನು ತಿಳಿಯಲು ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ."
+            : language === "hi"
+            ? "नमस्ते। मैं आपका स्वास्थ्यसेतु स्वास्थ्य सहायक हूँ। मैं आपके परिवार के लिए सरकारी स्वास्थ्य योजनाओं, पात्रता और आवश्यक दस्तावेज़ों को समझने में मदद करूँगा।"
             : "Namaste. I am your SwasthyaSetu Healthcare Assistant. I am here to help you understand your healthcare entitlements, explain why schemes apply to your family, and guide you on necessary documents.",
         timestamp: new Date().toISOString(),
-        suggestedActions:
-          userRole === "CITIZEN"
-            ? QUICK_ACTIONS.slice(0, 3)
-            : ["Explain active schemes", "Summarize verified evidence"],
+        suggestedActions: userRole === "CITIZEN" ? quickActions : undefined,
       };
       setMessages([welcome]);
 
@@ -101,7 +107,7 @@ export function HealthcareAssistantDrawer({
         handleSend(initialPrompt);
       }
     }
-  }, [isOpen, userRole]);
+  }, [isOpen, userRole, language]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -131,13 +137,11 @@ export function HealthcareAssistantDrawer({
       timestamp: new Date().toISOString(),
     };
 
-    // Update conversation state with user message
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInputValue("");
     setIsLoading(true);
 
-    // Prepare bounded conversation history for API (last 8 messages)
     const historyPayload: AssistantMessage[] = updatedMessages
       .filter((m) => !m.isError && m.id !== "welcome-msg")
       .slice(-8)
@@ -149,44 +153,54 @@ export function HealthcareAssistantDrawer({
     try {
       const res = await assistantService.sendMessage({
         message: text,
+        conversationId: conversationId || undefined,
         conversationHistory: historyPayload,
-        language,
-        schemeId: schemeId || null,
-        caseId: caseId || null,
-        conversationId: conversationId || null,
+        language: language === "kn" || language === "hi" ? language : "en",
+        schemeId,
+        caseId,
       });
 
-      if (res.success) {
-        const assistantMsg: ChatEntry = {
-          id: `asst_${Date.now()}`,
+      if (res.success && res.data) {
+        if (res.data.conversationId) {
+          setConversationId(res.data.conversationId);
+        }
+
+        const botMsg: ChatEntry = {
+          id: `bot_${Date.now()}`,
           role: "assistant",
           content: res.data.reply,
-          timestamp: res.data.timestamp,
           groundingData: res.data.groundingData,
-          suggestedActions: res.data.suggestedActions,
+          timestamp: new Date().toISOString(),
         };
-        setConversationId(res.data.conversationId);
-        setMessages((prev) => [...prev, assistantMsg]);
+
+        setMessages((prev) => [...prev, botMsg]);
       } else {
         const errorMsg: ChatEntry = {
           id: `err_${Date.now()}`,
           role: "assistant",
           content:
-            res.error.code === "GEMINI_UNCONFIGURED"
-              ? "The conversational assistant is currently unavailable. Please try again later."
-              : res.error.message || "An error occurred while processing your request.",
-          timestamp: new Date().toISOString(),
+            language === "kn"
+              ? "ಕ್ಷಮಿಸಿ, ಪ್ರತಿಕ್ರಿಯೆ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+              : language === "hi"
+              ? "क्षमा करें, उत्तर प्राप्त करने में असमर्थ। कृपया पुनः प्रयास करें।"
+              : "I apologize, but I could not process your request at this moment. Please try asking again.",
           isError: true,
+          timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
       }
-    } catch (err: unknown) {
+    } catch {
       const errorMsg: ChatEntry = {
         id: `err_${Date.now()}`,
         role: "assistant",
-        content: "Unable to reach the assistant service. Please check your network connection.",
-        timestamp: new Date().toISOString(),
+        content:
+          language === "kn"
+            ? "ಸರ್ವರ್ ಸಂಪರ್ಕದಲ್ಲಿ ದೋಷವಾಗಿದೆ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ."
+            : language === "hi"
+            ? "सर्वर कनेक्शन में त्रुटि। कृपया अपना इंटरनेट कनेक्शन जांचें।"
+            : "Network error occurred while contacting the assistant. Please verify your connection.",
         isError: true,
+        timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
@@ -209,9 +223,14 @@ export function HealthcareAssistantDrawer({
     const welcome: ChatEntry = {
       id: "welcome-msg",
       role: "assistant",
-      content: "Conversation reset. How can I assist you with your healthcare entitlements today?",
+      content:
+        language === "kn"
+          ? "ಸಂಭಾಷಣೆ ಮರುಹೊಂದಿಸಲಾಗಿದೆ. ಇಂದು ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?"
+          : language === "hi"
+          ? "बातचीत रीसेट हो गई है। आज मैं आपकी क्या सहायता करूँ?"
+          : "Conversation reset. How can I assist you with your healthcare entitlements today?",
       timestamp: new Date().toISOString(),
-      suggestedActions: userRole === "CITIZEN" ? QUICK_ACTIONS.slice(0, 3) : undefined,
+      suggestedActions: userRole === "CITIZEN" ? quickActions : undefined,
     };
     setMessages([welcome]);
   };
@@ -239,18 +258,18 @@ export function HealthcareAssistantDrawer({
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-sm font-bold text-slate-900 leading-tight">
                     {userRole === "ASHA"
-                      ? "ASHA Field Assistant"
+                      ? t("asha.workspaceTitle")
                       : userRole === "ADMIN"
-                      ? "Administrative Assistant"
-                      : "Ask SwasthyaSetu"}
+                      ? t("admin.consoleTitle")
+                      : t("assistant.drawerTitle")}
                   </h3>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-100 text-teal-800">
                     <ShieldCheck className="w-2.5 h-2.5" />
-                    Verified Data
+                    {t("status.verified")}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Authoritative healthcare guidance & eligibility explanation
+                  {t("assistant.drawerSubtitle")}
                 </p>
               </div>
             </div>
@@ -260,8 +279,8 @@ export function HealthcareAssistantDrawer({
               <select
                 aria-label="Select assistant language"
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as "en" | "hi" | "kn")}
-                className="text-xs bg-white border border-slate-200 rounded-md px-2 py-1 text-slate-700 font-medium hover:border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-teal-700"
+                onChange={(e) => setLanguage(e.target.value as Language)}
+                className="text-xs bg-white border border-slate-200 rounded-md px-2 py-1 text-slate-700 font-medium hover:border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-teal-700 cursor-pointer"
               >
                 <option value="en">English</option>
                 <option value="hi">हिन्दी</option>
@@ -272,7 +291,7 @@ export function HealthcareAssistantDrawer({
                 onClick={handleClearChat}
                 title="Reset conversation"
                 aria-label="Reset conversation"
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -280,7 +299,7 @@ export function HealthcareAssistantDrawer({
               <button
                 onClick={onClose}
                 aria-label="Close assistant"
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -327,14 +346,14 @@ export function HealthcareAssistantDrawer({
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
 
-                  {/* Verified Citations Box (if grounded evidence exists) */}
+                  {/* Verified Citations Box */}
                   {msg.groundingData &&
                     msg.groundingData.citedEvidence &&
                     msg.groundingData.citedEvidence.length > 0 && (
                       <div className="mt-3 pt-2.5 border-t border-slate-200/60 space-y-1.5">
                         <div className="text-[11px] font-bold text-teal-800 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-teal-700" />
-                          <span>Verified Government Sources</span>
+                          <span>Official Gazette Citations</span>
                         </div>
                         <div className="space-y-1">
                           {msg.groundingData.citedEvidence.map((ev) => (
@@ -400,7 +419,7 @@ export function HealthcareAssistantDrawer({
                 </div>
                 <div className="rounded-xl px-4 py-3 bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-teal-700 animate-pulse" />
-                  <span>Evaluating verified rules & drafting explanation...</span>
+                  <span>{t("common.loading")}</span>
                 </div>
               </div>
             )}
@@ -412,14 +431,14 @@ export function HealthcareAssistantDrawer({
           {messages.length <= 2 && !isLoading && (
             <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
               <p className="text-[11px] font-semibold text-slate-400 mb-1.5">
-                Suggested Questions
+                {t("assistant.suggestedQueriesTitle")}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {QUICK_ACTIONS.map((prompt, idx) => (
+                {quickActions.map((prompt, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSend(prompt)}
-                    className="text-xs bg-white border border-slate-200 hover:border-teal-700 hover:bg-teal-50/50 text-slate-700 px-2.5 py-1 rounded-md text-left font-medium transition-colors"
+                    className="text-xs bg-white border border-slate-200 hover:border-teal-700 hover:bg-teal-50/50 text-slate-700 px-2.5 py-1 rounded-md text-left font-medium transition-colors cursor-pointer"
                   >
                     {prompt}
                   </button>
@@ -436,13 +455,7 @@ export function HealthcareAssistantDrawer({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  language === "hi"
-                    ? "योजनाओं या पात्रता के बारे में पूछें..."
-                    : language === "kn"
-                    ? "ಯೋಜನೆಗಳು ಅಥವಾ ಅರ್ಹತೆಯ ಬಗ್ಗೆ ಕೇಳಿ..."
-                    : "Ask about your eligible schemes, documents, or gaps..."
-                }
+                placeholder={t("assistant.inputPlaceholder")}
                 rows={2}
                 disabled={isLoading}
                 className="flex-1 resize-none rounded-xl border border-slate-200 p-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-700 focus:border-teal-700 disabled:opacity-50"
@@ -450,8 +463,8 @@ export function HealthcareAssistantDrawer({
               <Button
                 onClick={() => handleSend()}
                 disabled={isLoading || !inputValue.trim()}
-                className="bg-teal-800 hover:bg-teal-900 text-white rounded-xl h-[42px] px-3.5 flex items-center justify-center shrink-0"
-                aria-label="Send message"
+                className="bg-teal-800 hover:bg-teal-900 text-white rounded-xl h-[42px] px-3.5 flex items-center justify-center shrink-0 cursor-pointer"
+                aria-label={t("assistant.sendBtn")}
               >
                 <Send className="w-4 h-4" />
               </Button>

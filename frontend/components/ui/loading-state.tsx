@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/i18n/i18n-context";
 
 export interface LoadingStateProps {
   message?: string;
@@ -7,9 +10,10 @@ export interface LoadingStateProps {
 }
 
 export function LoadingState({
-  message = "Loading information...",
+  message,
   className,
 }: LoadingStateProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -22,7 +26,7 @@ export function LoadingState({
       <div className="relative flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-teal-700 animate-spin" />
       </div>
-      <p className="mt-3 text-xs sm:text-sm text-slate-500 font-medium">{message}</p>
+      <p className="mt-3 text-xs sm:text-sm text-slate-500 font-medium">{message || t("common.loading")}</p>
       <span className="sr-only">Loading</span>
     </div>
   );

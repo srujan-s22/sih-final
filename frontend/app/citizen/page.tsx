@@ -585,10 +585,10 @@ export default function CitizenPage() {
               variant="outline"
               size="sm"
               onClick={() => setIsAssistantOpen(true)}
-              className="text-xs flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 shadow-2xs font-semibold"
+              className="text-xs flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 shadow-2xs font-semibold cursor-pointer"
             >
               <Bot className="w-3.5 h-3.5 text-teal-700" />
-              <span>Ask Assistant</span>
+              <span>{t("citizen.healthcareAssistantBtn")}</span>
             </Button>
             {household && (
               <Button
@@ -596,9 +596,9 @@ export default function CitizenPage() {
                 size="sm"
                 onClick={loadEligibility}
                 disabled={isEvaluating}
-                className="text-xs"
+                className="text-xs cursor-pointer"
               >
-                {isEvaluating ? "Evaluating..." : "Re-check Eligibility"}
+                {isEvaluating ? t("common.submitting") : t("citizen.recheckEligibilityBtn")}
               </Button>
             )}
             <Button
@@ -612,9 +612,9 @@ export default function CitizenPage() {
                   handleOpenAddMember();
                 }
               }}
-              className="text-xs font-semibold"
+              className="text-xs font-semibold cursor-pointer"
             >
-              {!household ? "Set Up Household" : "+ Add Member"}
+              {!household ? t("citizen.setUpHouseholdBtn") : t("citizen.addMemberBtn")}
             </Button>
           </div>
         }
@@ -624,14 +624,14 @@ export default function CitizenPage() {
           <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-xs sm:text-sm text-rose-800 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-bold">Notice</p>
+              <p className="font-bold">{t("common.notice")}</p>
               <p className="mt-0.5">{error}</p>
             </div>
             <button
               onClick={() => setError(null)}
-              className="text-xs text-rose-600 hover:text-rose-900 font-semibold"
+              className="text-xs text-rose-600 hover:text-rose-900 font-semibold cursor-pointer"
             >
-              Dismiss
+              {t("common.dismiss")}
             </button>
           </div>
         )}
@@ -663,13 +663,14 @@ export default function CitizenPage() {
             {activeTab === "overview" && (
               <div className="space-y-6">
                 {/* -------------------------------------------------------- */}
+                {/* -------------------------------------------------------- */}
                 {/* QUICK LANGUAGE SELECTOR BAR */}
                 {/* -------------------------------------------------------- */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-teal-600" />
-                    <span>Language / ಭಾಷೆ / भाषा:</span>
-                    <span className="text-slate-400 font-normal">Choose your preferred language</span>
+                    <span>{t("citizen.quickLangLabel")}</span>
+                    <span className="text-slate-400 font-normal">{t("citizen.quickLangSubtitle")}</span>
                   </div>
                   <LanguageSelector variant="pills" size="sm" />
                 </div>
@@ -680,10 +681,10 @@ export default function CitizenPage() {
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      What do you need help with?
+                      {t("citizen.helpSectionTitle")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Quick access to your health benefits, family records, and local ASHA worker.
+                      {t("citizen.helpSectionDesc")}
                     </p>
                   </div>
 
@@ -703,25 +704,25 @@ export default function CitizenPage() {
                           </div>
                           {eligibleCount > 0 ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              {eligibleCount} available
+                              {t("citizen.schemesCountBadge", { count: eligibleCount })}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
-                              {eligibilityResults.length} schemes
+                              {t("citizen.schemesTotalBadge", { count: eligibilityResults.length })}
                             </span>
                           )}
                         </div>
                         <div>
                           <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-teal-900 transition-colors">
-                            My Health Benefits
+                            {t("citizen.healthBenefits")}
                           </h3>
                           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            See government schemes you and your family may be eligible for.
+                            {t("citizen.healthBenefitsDesc")}
                           </p>
                         </div>
                       </div>
                       <div className="pt-4 mt-2 border-t border-slate-100 flex items-center text-xs font-semibold text-teal-700 group-hover:text-teal-800">
-                        <span>View benefits</span>
+                        <span>{t("common.viewBenefits")}</span>
                         <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </div>
@@ -740,20 +741,20 @@ export default function CitizenPage() {
                             <Users className="w-5 h-5" />
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                            {members.length} {members.length === 1 ? "member" : "members"}
+                            {t("citizen.memberCount", { count: members.length })}
                           </span>
                         </div>
                         <div>
                           <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-teal-900 transition-colors">
-                            My Family
+                            {t("citizen.myFamilyCardTitle")}
                           </h3>
                           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            View and manage your household members and demographics.
+                            {t("citizen.myFamilyCardDesc")}
                           </p>
                         </div>
                       </div>
                       <div className="pt-4 mt-2 border-t border-slate-100 flex items-center text-xs font-semibold text-teal-700 group-hover:text-teal-800">
-                        <span>Manage family</span>
+                        <span>{t("navigation.family")}</span>
                         <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </div>
@@ -774,27 +775,27 @@ export default function CitizenPage() {
                           {connectionStatus?.status === "ACTIVE" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                               <Check className="w-3 h-3 text-emerald-600" />
-                              Connected
+                              {t("common.active")}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                              Link with Code
+                              {t("citizen.connectButton")}
                             </span>
                           )}
                         </div>
                         <div>
                           <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-teal-900 transition-colors">
-                            Get ASHA Help
+                            {t("citizen.ashaCardTitle")}
                           </h3>
                           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                             {connectionStatus?.status === "ACTIVE" && connectionStatus.asha
-                              ? `Connected with ${connectionStatus.asha.displayName} for doorstep care.`
-                              : "Connect with your local community healthcare worker."}
+                              ? t("citizen.connectedAshaBanner", { name: connectionStatus.asha.displayName })
+                              : t("citizen.ashaCardDesc")}
                           </p>
                         </div>
                       </div>
                       <div className="pt-4 mt-2 border-t border-slate-100 flex items-center text-xs font-semibold text-teal-700 group-hover:text-teal-800">
-                        <span>ASHA support</span>
+                        <span>{t("citizen.requestAssistanceBtn")}</span>
                         <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
                       </div>
                     </div>
@@ -802,16 +803,17 @@ export default function CitizenPage() {
                 </section>
 
                 {/* -------------------------------------------------------- */}
+                {/* -------------------------------------------------------- */}
                 {/* SECTION 3: YOUR HEALTH BENEFITS */}
                 {/* -------------------------------------------------------- */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                        Your Health Benefits
+                        {t("citizen.healthBenefits")}
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-500">
-                        Government schemes based on your household information.
+                        {t("citizen.healthBenefitsDesc")}
                       </p>
                     </div>
                     {eligibilityResults.length > 0 && (
@@ -819,9 +821,9 @@ export default function CitizenPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setActiveTab("support")}
-                        className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50"
+                        className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50 cursor-pointer"
                       >
-                        View all schemes ({eligibilityResults.length})
+                        {t("common.viewBenefits")} ({eligibilityResults.length})
                       </Button>
                     )}
                   </div>
@@ -833,10 +835,10 @@ export default function CitizenPage() {
                       </div>
                       <div className="space-y-1 max-w-md mx-auto">
                         <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                          Set up your household to check benefits
+                          {t("citizen.setUpHouseholdBtn")}
                         </h3>
                         <p className="text-xs sm:text-sm text-slate-500">
-                          Enter your location and ration details to check eligibility for Ayushman Bharat, Janani Suraksha Yojana, and more.
+                          {t("home.step1Desc")}
                         </p>
                       </div>
                       <div className="pt-2">
@@ -847,9 +849,9 @@ export default function CitizenPage() {
                             setHouseholdFormError(null);
                             setIsHouseholdModalOpen(true);
                           }}
-                          className="text-xs font-semibold"
+                          className="text-xs font-semibold cursor-pointer"
                         >
-                          Set Up Household
+                          {t("citizen.setUpHouseholdBtn")}
                         </Button>
                       </div>
                     </div>
@@ -860,10 +862,10 @@ export default function CitizenPage() {
                       </div>
                       <div className="space-y-1 max-w-md mx-auto">
                         <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                          Add your family members
+                          {t("citizen.addMemberBtn")}
                         </h3>
                         <p className="text-xs sm:text-sm text-slate-500">
-                          Add family members to check individual eligibility for senior citizens, mothers, and children.
+                          {t("citizen.familyMembersDesc")}
                         </p>
                       </div>
                       <div className="pt-2">
@@ -871,9 +873,9 @@ export default function CitizenPage() {
                           variant="primary"
                           size="sm"
                           onClick={handleOpenAddMember}
-                          className="text-xs font-semibold"
+                          className="text-xs font-semibold cursor-pointer"
                         >
-                          + Add Family Member
+                          {t("citizen.addMemberBtn")}
                         </Button>
                       </div>
                     </div>
@@ -881,10 +883,10 @@ export default function CitizenPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8 text-center space-y-3">
                       <div className="space-y-1 max-w-md mx-auto">
                         <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                          No matching benefits found yet
+                          {t("citizen.noSchemesMessage")}
                         </h3>
                         <p className="text-xs sm:text-sm text-slate-500">
-                          Based on your current records, no matching national schemes were found. Your local ASHA worker can help check additional state programs.
+                          {t("citizen.noSchemesMessage")}
                         </p>
                       </div>
                     </div>
@@ -910,10 +912,10 @@ export default function CitizenPage() {
                                 }`}
                               >
                                 {result.status === "ELIGIBLE"
-                                  ? "✓ You may be eligible"
+                                  ? t("status.eligible")
                                   : result.status === "NEEDS_INFORMATION"
-                                  ? "A few details are needed"
-                                  : "Not eligible"}
+                                  ? t("status.action_required")
+                                  : t("status.declined")}
                               </span>
                             </div>
                             <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
@@ -928,9 +930,9 @@ export default function CitizenPage() {
                                 setExpandedSchemeId(result.schemeId);
                                 setActiveTab("support");
                               }}
-                              className="text-xs font-semibold text-teal-700 hover:text-teal-900 transition-colors"
+                              className="text-xs font-semibold text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
                             >
-                              View details →
+                              {t("common.viewDetails")} →
                             </button>
                             {connectionStatus?.status === "ACTIVE" && (
                               <Button
@@ -943,9 +945,9 @@ export default function CitizenPage() {
                                     result.schemeName
                                   )
                                 }
-                                className="text-xs border-teal-200 text-teal-800 hover:bg-teal-50 font-medium py-1 px-2.5"
+                                className="text-xs border-teal-200 text-teal-800 hover:bg-teal-50 font-medium py-1 px-2.5 cursor-pointer"
                               >
-                                Request Help
+                                {t("citizen.requestAssistanceBtn")}
                               </Button>
                             )}
                           </div>
@@ -961,10 +963,10 @@ export default function CitizenPage() {
                 <section className="space-y-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      Your Next Step
+                      {t("citizen.stepGuideTitle")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      The most important action for your healthcare access.
+                      {t("citizen.stepGuideSubtitle")}
                     </p>
                   </div>
 
@@ -1021,19 +1023,19 @@ export default function CitizenPage() {
                               variant="primary"
                               size="sm"
                               onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
-                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5"
+                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5 cursor-pointer"
                             >
                               <Send className="w-3.5 h-3.5" />
-                              <span>Request ASHA Help</span>
+                              <span>{t("citizen.requestAssistanceBtn")}</span>
                             </Button>
                           )}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setActiveTab("actions")}
-                            className="text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            className="text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                           >
-                            View all steps ({guidance.actionPlan.length})
+                            {t("citizen.viewActionPlanBtn")} ({guidance.actionPlan.length})
                           </Button>
                         </div>
                       </div>
@@ -1046,10 +1048,10 @@ export default function CitizenPage() {
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-slate-900">
-                            You're all caught up
+                            {t("status.completed")}
                           </h4>
                           <p className="text-xs text-slate-600 mt-0.5">
-                            Your current healthcare actions and verified records are complete.
+                            {t("citizen.portalSubtitle")}
                           </p>
                         </div>
                       </div>
@@ -1057,9 +1059,9 @@ export default function CitizenPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setActiveTab("actions")}
-                        className="text-xs font-semibold text-emerald-800 border-emerald-200 hover:bg-emerald-50 shrink-0"
+                        className="text-xs font-semibold text-emerald-800 border-emerald-200 hover:bg-emerald-50 shrink-0 cursor-pointer"
                       >
-                        View full plan
+                        {t("citizen.viewActionPlanBtn")}
                       </Button>
                     </div>
                   )}
@@ -1075,15 +1077,15 @@ export default function CitizenPage() {
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                           <UserCheck className="w-4 h-4 text-teal-700" />
-                          <span>Your Local ASHA Worker</span>
+                          <span>{t("citizen.ashaSectionTitle")}</span>
                         </h3>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setActiveTab("asha-connection")}
-                          className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50"
+                          className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50 cursor-pointer"
                         >
-                          View details
+                          {t("common.viewDetails")}
                         </Button>
                       </div>
 
@@ -1099,28 +1101,28 @@ export default function CitizenPage() {
                               </p>
                             </div>
                             <span className="font-mono text-[11px] font-bold bg-white px-2 py-0.5 rounded border border-emerald-200 text-slate-800">
-                              Code: {connectionStatus.asha.serviceCode}
+                              {t("common.code")}: {connectionStatus.asha.serviceCode}
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                            Your family is connected with your local ASHA worker for doorstep health support and scheme facilitation.
+                            {t("citizen.connectedAshaBanner", { name: connectionStatus.asha.displayName })}
                           </p>
                         </div>
                       ) : (
                         <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600 space-y-2">
                           <p className="font-semibold text-slate-900">
-                            Connect with a local ASHA worker
+                            {t("citizen.connectAshaPrompt")}
                           </p>
                           <p className="leading-relaxed">
-                            An ASHA worker can help with scheme enrollment, document verification, and doorstep healthcare support.
+                            {t("citizen.ashaCardDesc")}
                           </p>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setActiveTab("asha-connection")}
-                            className="text-xs font-semibold mt-1"
+                            className="text-xs font-semibold mt-1 cursor-pointer"
                           >
-                            Connect with ASHA
+                            {t("citizen.connectButton")}
                           </Button>
                         </div>
                       )}
@@ -1130,16 +1132,16 @@ export default function CitizenPage() {
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                         <span className="text-xs text-slate-500">
                           {pendingAssistanceCount > 0
-                            ? `${pendingAssistanceCount} pending request(s)`
-                            : "Need assistance?"}
+                            ? t("citizen.activeAssistanceCount", { count: pendingAssistanceCount })
+                            : t("citizen.helpSectionTitle")}
                         </span>
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={() => handleOpenAssistanceModal("SCHEME_ENROLLMENT")}
-                          className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white"
+                          className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                         >
-                          <Send className="w-3.5 h-3.5 mr-1" /> Request ASHA Help
+                          <Send className="w-3.5 h-3.5 mr-1" /> {t("citizen.requestAssistanceBtn")}
                         </Button>
                       </div>
                     )}
@@ -1151,7 +1153,7 @@ export default function CitizenPage() {
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                           <Phone className="w-4 h-4 text-teal-700" />
-                          <span>Need help?</span>
+                          <span>{t("common.help")}</span>
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
                           24/7 Helpline
@@ -1160,10 +1162,10 @@ export default function CitizenPage() {
 
                       <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 space-y-2 text-xs text-slate-600">
                         <p className="font-semibold text-slate-900">
-                          Talk to the SwasthyaSetu healthcare assistant
+                          {t("voice.helplineTitle")}
                         </p>
                         <p className="leading-relaxed">
-                          Call our helpline to ask about government health schemes, check your eligibility, or request ASHA assistance.
+                          {t("voice.helplineDesc")}
                         </p>
                         <div className="pt-2 flex items-center gap-2">
                           <div className="bg-white px-3 py-1.5 rounded-md border border-slate-200">
@@ -1183,18 +1185,18 @@ export default function CitizenPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setIsAssistantOpen(true)}
-                        className="text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                        className="text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
                       >
                         <Bot className="w-3.5 h-3.5 text-teal-700" />
-                        <span>Ask Online Assistant</span>
+                        <span>{t("citizen.healthcareAssistantBtn")}</span>
                       </Button>
                       <Button
                         type="button"
                         onClick={() => setIsVoiceCallModalOpen(true)}
-                        className="bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 py-1.5 px-3"
+                        className="bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 py-1.5 px-3 cursor-pointer"
                       >
                         <Phone className="w-3.5 h-3.5" />
-                        <span>Call SwasthyaSetu</span>
+                        <span>{t("citizen.voiceCallBtn")}</span>
                       </Button>
                     </div>
                   </div>
@@ -1210,10 +1212,10 @@ export default function CitizenPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      My Household
+                      {t("navigation.household")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Your household address, location, and ration details used for government healthcare support.
+                      {t("citizen.healthBenefitsDesc")}
                     </p>
                   </div>
                   {household && (
@@ -1224,10 +1226,10 @@ export default function CitizenPage() {
                         setHouseholdFormError(null);
                         setIsHouseholdModalOpen(true);
                       }}
-                      className="text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto text-teal-800 border-teal-200 hover:bg-teal-50"
+                      className="text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto text-teal-800 border-teal-200 hover:bg-teal-50 cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit Household</span>
+                      <span>{t("citizen.editHouseholdBtn")}</span>
                     </Button>
                   )}
                 </div>
@@ -1238,9 +1240,9 @@ export default function CitizenPage() {
                       <MapPin className="w-6 h-6" />
                     </div>
                     <div className="max-w-md mx-auto space-y-1">
-                      <h3 className="text-base font-bold text-slate-900">No household profile yet</h3>
+                      <h3 className="text-base font-bold text-slate-900">{t("citizen.setUpHouseholdBtn")}</h3>
                       <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-                        Add basic details about your family location and ration card category so we can discover available healthcare benefits.
+                        {t("home.step1Desc")}
                       </p>
                     </div>
                     <Button
@@ -1250,9 +1252,9 @@ export default function CitizenPage() {
                         setHouseholdFormError(null);
                         setIsHouseholdModalOpen(true);
                       }}
-                      className="font-semibold shadow-xs"
+                      className="font-semibold shadow-xs cursor-pointer"
                     >
-                      Set Up Household
+                      {t("citizen.setUpHouseholdBtn")}
                     </Button>
                   </div>
                 ) : (
@@ -1265,7 +1267,7 @@ export default function CitizenPage() {
                         </div>
                         <div>
                           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                            Household Head
+                            {t("citizen.headOfHousehold")}
                           </span>
                           <h3 className="text-base sm:text-lg font-bold text-slate-900">
                             {household.headOfHouseholdName}
@@ -1276,34 +1278,34 @@ export default function CitizenPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">
-                            Ration Category
+                            {t("citizen.incomeCategory")}
                           </span>
                           <span className="text-sm font-bold text-teal-900 block">
                             {household.incomeCategory === "BPL"
-                              ? "Below Poverty Line (BPL)"
+                              ? t("forms.categoryBPL")
                               : household.incomeCategory === "AAY"
-                              ? "Antyodaya Anna Yojana (AAY)"
+                              ? t("forms.categoryAntyodaya")
                               : household.incomeCategory === "APL"
-                              ? "Above Poverty Line (APL)"
+                              ? t("forms.categoryAPL")
                               : household.incomeCategory}
                           </span>
                         </div>
 
                         <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">
-                            Contact Phone
+                            {t("citizen.contactPhoneLabel")}
                           </span>
                           <span className="font-mono text-sm font-bold text-slate-900 block">
-                            {household.contactPhone || "Not Provided"}
+                            {household.contactPhone || t("common.notAvailable")}
                           </span>
                         </div>
 
                         <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">
-                            Ration Card Number
+                            {t("citizen.rationCardNumber")}
                           </span>
                           <span className="font-mono text-sm font-bold text-slate-900 block">
-                            {household.rationCardNumber || "Not Provided"}
+                            {household.rationCardNumber || t("common.notAvailable")}
                           </span>
                         </div>
                       </div>
@@ -1314,22 +1316,22 @@ export default function CitizenPage() {
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-teal-700" />
                         <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                          Location & Address
+                          {t("citizen.locationDetails")}
                         </h3>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                         <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                           <span className="text-slate-500 font-semibold block text-[10px] uppercase">
-                            Village / Town
+                            {t("citizen.villageLabel")}
                           </span>
                           <span className="font-semibold text-slate-900 text-sm mt-0.5 block">
-                            {household.village || "N/A"}
+                            {household.village || t("common.notAvailable")}
                           </span>
                         </div>
                         <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                           <span className="text-slate-500 font-semibold block text-[10px] uppercase">
-                            District
+                            {t("citizen.districtLabel")}
                           </span>
                           <span className="font-semibold text-slate-900 text-sm mt-0.5 block">
                             {household.district}
@@ -1337,7 +1339,7 @@ export default function CitizenPage() {
                         </div>
                         <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                           <span className="text-slate-500 font-semibold block text-[10px] uppercase">
-                            State
+                            {t("citizen.stateLabel")}
                           </span>
                           <span className="font-semibold text-slate-900 text-sm mt-0.5 block">
                             {household.state}
@@ -1345,7 +1347,7 @@ export default function CitizenPage() {
                         </div>
                         <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                           <span className="text-slate-500 font-semibold block text-[10px] uppercase">
-                            Postal Code
+                            {t("citizen.pincodeLabel")}
                           </span>
                           <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">
                             {household.pincode}
@@ -1358,10 +1360,10 @@ export default function CitizenPage() {
                     <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="space-y-0.5">
                         <h4 className="text-sm font-bold text-slate-900">
-                          Family Members in this Household
+                          {t("citizen.familyMembersTitle")}
                         </h4>
                         <p className="text-xs text-slate-600">
-                          {members.length} {members.length === 1 ? "member" : "members"} currently registered for healthcare benefit evaluation.
+                          {t("citizen.memberCount", { count: members.length })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1369,17 +1371,17 @@ export default function CitizenPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setActiveTab("family")}
-                          className="text-xs font-semibold text-teal-800 border-teal-300 hover:bg-teal-50"
+                          className="text-xs font-semibold text-teal-800 border-teal-300 hover:bg-teal-50 cursor-pointer"
                         >
-                          View Family Members →
+                          {t("navigation.family")} →
                         </Button>
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={handleOpenAddMember}
-                          className="text-xs font-semibold"
+                          className="text-xs font-semibold cursor-pointer"
                         >
-                          + Add Member
+                          {t("citizen.addMemberBtn")}
                         </Button>
                       </div>
                     </div>
@@ -1389,6 +1391,7 @@ export default function CitizenPage() {
             )}
 
             {/* ============================================================ */}
+            {/* ============================================================ */}
             {/* TAB: FAMILY MEMBERS (A3) */}
             {/* ============================================================ */}
             {activeTab === "family" && (
@@ -1396,10 +1399,10 @@ export default function CitizenPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                      Family Members ({members.length})
+                      {t("citizen.familyMembersTitle")} ({members.length})
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Add and manage household members evaluated for healthcare schemes and entitlements.
+                      {t("citizen.familyMembersDesc")}
                     </p>
                   </div>
                   {household && (
@@ -1407,17 +1410,17 @@ export default function CitizenPage() {
                       variant="primary"
                       size="sm"
                       onClick={handleOpenAddMember}
-                      className="text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto"
+                      className="text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Add Family Member</span>
+                      <span>{t("citizen.addMemberBtn")}</span>
                     </Button>
                   )}
                 </div>
 
                 {!household ? (
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-6 text-center text-xs sm:text-sm text-slate-500 space-y-3">
-                    <p>Set up your household first to add family members.</p>
+                    <p>{t("citizen.setUpHouseholdBtn")}</p>
                     <Button
                       variant="primary"
                       size="sm"
@@ -1425,9 +1428,9 @@ export default function CitizenPage() {
                         setHouseholdFormError(null);
                         setIsHouseholdModalOpen(true);
                       }}
-                      className="text-xs font-semibold"
+                      className="text-xs font-semibold cursor-pointer"
                     >
-                      Set Up Household
+                      {t("citizen.setUpHouseholdBtn")}
                     </Button>
                   </div>
                 ) : members.length === 0 ? (
@@ -1436,14 +1439,14 @@ export default function CitizenPage() {
                       <Users className="w-6 h-6" />
                     </div>
                     <div className="max-w-md mx-auto space-y-1">
-                      <h4 className="text-base font-bold text-slate-900">No family members added yet</h4>
+                      <h4 className="text-base font-bold text-slate-900">{t("citizen.familyMembersTitle")}</h4>
                       <p className="text-xs sm:text-sm text-slate-500">
-                        Add yourself and your family members with their age and healthcare profiles to check eligibility for government schemes.
+                        {t("citizen.familyMembersDesc")}
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button variant="primary" size="sm" onClick={handleOpenAddMember} className="text-xs font-semibold">
-                        + Add First Family Member
+                      <Button variant="primary" size="sm" onClick={handleOpenAddMember} className="text-xs font-semibold cursor-pointer">
+                        {t("citizen.addMemberBtn")}
                       </Button>
                     </div>
                   </div>
@@ -1470,7 +1473,7 @@ export default function CitizenPage() {
                                     {m.fullName}
                                   </h4>
                                   <span className="text-xs font-medium text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 inline-block mt-0.5">
-                                    {m.relationship || "Member"}
+                                    {m.relationship || t("common.member")}
                                   </span>
                                 </div>
                               </div>
@@ -1479,16 +1482,16 @@ export default function CitizenPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditMember(m)}
-                                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-md transition-colors"
-                                  title="Edit member"
+                                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-md transition-colors cursor-pointer"
+                                  title={t("citizen.editMemberBtn")}
                                 >
                                   <Edit3 className="w-4 h-4" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setRemovingMember(m)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                                  title="Remove member"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                                  title={t("citizen.removeMemberBtn")}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1498,9 +1501,9 @@ export default function CitizenPage() {
                             {/* Demographics details */}
                             <div className="pt-2 border-t border-slate-100 text-xs text-slate-600 space-y-1">
                               <div className="flex items-center justify-between">
-                                <span className="text-slate-400">Age & Gender:</span>
+                                <span className="text-slate-400">{t("forms.age")} & {t("forms.gender")}:</span>
                                 <span className="font-semibold text-slate-800 capitalize">
-                                  {m.age} years • {m.gender}
+                                  {t("citizen.ageYears", { age: m.age })} • {m.gender}
                                 </span>
                               </div>
                             </div>
@@ -1515,12 +1518,12 @@ export default function CitizenPage() {
                                 )}
                                 {isPregnant && (
                                   <span className="text-[10px] font-semibold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                                    Pregnant / Nursing Mother
+                                    {t("citizen.pregnantLabel")}
                                   </span>
                                 )}
                                 {isDisability && (
                                   <span className="text-[10px] font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                                    Benchmark Disability Support
+                                    {t("citizen.disabilityLabel")}
                                   </span>
                                 )}
                               </div>
@@ -1531,17 +1534,17 @@ export default function CitizenPage() {
                             <button
                               type="button"
                               onClick={() => handleOpenEditMember(m)}
-                              className="font-semibold text-teal-700 hover:text-teal-900 transition-colors"
+                              className="font-semibold text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
                             >
-                              Edit details
+                              {t("common.edit")}
                             </button>
                             {connectionStatus?.status === "ACTIVE" && (
                               <button
                                 type="button"
                                 onClick={() => handleOpenAssistanceModal("SCHEME_ENROLLMENT", undefined, undefined, m.id)}
-                                className="font-medium text-slate-600 hover:text-teal-800 transition-colors"
+                                className="font-medium text-slate-600 hover:text-teal-800 transition-colors cursor-pointer"
                               >
-                                Request ASHA Help →
+                                {t("citizen.requestAssistanceBtn")} →
                               </button>
                             )}
                           </div>
@@ -1554,16 +1557,17 @@ export default function CitizenPage() {
             )}
 
             {/* ============================================================ */}
+            {/* ============================================================ */}
             {/* TAB: MY ASHA WORKER (A4) */}
             {/* ============================================================ */}
             {activeTab === "asha-connection" && (
               <section className="space-y-6">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                    My ASHA Worker
+                    {t("citizen.ashaSectionTitle")}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500">
-                    Your local ASHA worker can help you access healthcare services, verify documents, and apply for government schemes.
+                    {t("citizen.ashaSectionDesc")}
                   </p>
                 </div>
 
@@ -1588,7 +1592,7 @@ export default function CitizenPage() {
                               {connectionStatus.asha.displayName}
                             </h3>
                             <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                              ✓ Connected
+                              ✓ {t("common.active")}
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
@@ -1600,7 +1604,7 @@ export default function CitizenPage() {
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">
-                            Service Code
+                            {t("common.code")}
                           </span>
                           <span className="text-xs font-mono font-bold text-slate-800">
                             {connectionStatus.asha.serviceCode}
@@ -1610,10 +1614,10 @@ export default function CitizenPage() {
                           variant="primary"
                           size="sm"
                           onClick={() => handleOpenAssistanceModal()}
-                          className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5 shadow-2xs"
+                          className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5 shadow-2xs cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5" />
-                          <span>Request ASHA Help</span>
+                          <span>{t("citizen.requestAssistanceBtn")}</span>
                         </Button>
                       </div>
                     </div>
@@ -1621,7 +1625,7 @@ export default function CitizenPage() {
                     <div className="text-xs text-slate-600 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>
-                        Your household is connected for doorstep healthcare facilitation, document collection, and scheme enrollment.
+                        {t("citizen.connectedAshaBanner", { name: connectionStatus.asha.displayName })}
                       </span>
                     </div>
                   </div>
@@ -1637,17 +1641,14 @@ export default function CitizenPage() {
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-sm font-bold text-slate-900">
-                            Connection Request Sent to {connectionStatus.asha.displayName}
+                            {t("citizen.connectionPendingApproval")}
                           </h4>
                           <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-                            Awaiting Worker Confirmation
+                            {t("status.pending")}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600">
-                          Service Code: <span className="font-mono font-semibold">{connectionStatus.asha.serviceCode}</span>
-                        </p>
-                        <p className="text-xs text-slate-500 pt-1">
-                          Your connection will become active once your ASHA worker reviews and accepts the request.
+                          {t("common.code")}: <span className="font-mono font-semibold">{connectionStatus.asha.serviceCode}</span>
                         </p>
                       </div>
                     </div>
@@ -1657,18 +1658,12 @@ export default function CitizenPage() {
                 {/* CONNECT WITH ASHA CODE FORM */}
                 {(connectionStatus?.status === "NONE" || connectionStatus?.status === "REJECTED" || !connectionStatus) && (
                   <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs space-y-4">
-                    {connectionStatus?.status === "REJECTED" && (
-                      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
-                        Previous connection request was not accepted. You can enter a new Service Code provided by your local ASHA worker below.
-                      </div>
-                    )}
-
                     <div className="space-y-1">
                       <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                        Connect with your local ASHA worker
+                        {t("citizen.connectAshaPrompt")}
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Ask your village or ward ASHA worker for their 10-character Service Code (e.g. <span className="font-mono font-semibold">ASHA-KA-7K42</span>) to link your household.
+                        {t("citizen.enterServiceCode")}
                       </p>
                     </div>
 
@@ -1686,17 +1681,11 @@ export default function CitizenPage() {
                         variant="primary"
                         size="md"
                         disabled={isResolvingAsha || !serviceCodeInput.trim() || !household}
-                        className="text-xs font-semibold whitespace-nowrap"
+                        className="text-xs font-semibold whitespace-nowrap cursor-pointer"
                       >
-                        {isResolvingAsha ? "Looking up..." : "Connect with ASHA"}
+                        {isResolvingAsha ? t("common.submitting") : t("citizen.connectButton")}
                       </Button>
                     </form>
-
-                    {!household && (
-                      <p className="text-[11px] text-amber-700">
-                        * Please set up your household profile first before connecting with an ASHA worker.
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -1706,10 +1695,10 @@ export default function CitizenPage() {
                     <div>
                       <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                         <MessageSquare className="w-4 h-4 text-teal-700" />
-                        <span>My Assistance Requests</span>
+                        <span>{t("citizen.assistanceHistoryTitle")}</span>
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Track progress on healthcare requests submitted to your ASHA worker.
+                        {t("citizen.stepGuideSubtitle")}
                       </p>
                     </div>
                     {connectionStatus?.status === "ACTIVE" && (
@@ -1717,9 +1706,9 @@ export default function CitizenPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenAssistanceModal()}
-                        className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50"
+                        className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50 cursor-pointer"
                       >
-                        + New Request
+                        + {t("citizen.requestAssistanceBtn")}
                       </Button>
                     )}
                   </div>
@@ -1727,10 +1716,7 @@ export default function CitizenPage() {
                   {assistanceRequests.length === 0 ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 space-y-2">
                       <HelpCircle className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="font-semibold text-slate-700">No assistance requests yet</p>
-                      <p className="max-w-sm mx-auto">
-                        Need help with document verification, card issuance, or healthcare registration? Submit a request to your connected ASHA worker.
-                      </p>
+                      <p className="font-semibold text-slate-700">{t("citizen.noAssistanceRequests")}</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -2043,16 +2029,16 @@ export default function CitizenPage() {
                                 }`}
                               >
                                 {isEligible
-                                  ? "✓ You may be eligible"
+                                  ? t("status.eligible")
                                   : isNeedsInfo
-                                  ? "A few details are needed"
-                                  : "Not eligible based on current info"}
+                                  ? t("status.action_required")
+                                  : t("status.declined")}
                               </span>
 
                               <button
                                 type="button"
                                 aria-label="Toggle details"
-                                className="text-slate-400 hover:text-slate-700 p-1"
+                                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
                               >
                                 {isExpanded ? (
                                   <ChevronUp className="w-4 h-4" />
@@ -2069,7 +2055,7 @@ export default function CitizenPage() {
                               {/* Why this applies */}
                               <div className="rounded-lg bg-slate-50 p-3.5 border border-slate-200 space-y-1.5">
                                 <span className="font-bold text-slate-800 block text-xs uppercase tracking-wide">
-                                  Eligibility Explanation:
+                                  {t("citizen.healthBenefits")}
                                 </span>
                                 <p className="text-slate-600 leading-relaxed">
                                   {isEligible
@@ -2096,7 +2082,7 @@ export default function CitizenPage() {
                                         ? (() => {
                                             const senior = members.find((m) => m.age >= 70);
                                             return senior
-                                              ? `Eligible Beneficiary: ${senior.fullName} (Age ${senior.age}, ${senior.relationship || "Member"})`
+                                              ? `${t("forms.relGrandparent")}: ${senior.fullName} (${t("citizen.ageYears", { age: senior.age })})`
                                               : "Senior Citizen (70+) Entitlement";
                                           })()
                                         : result.schemeId === "jsy"
@@ -2105,14 +2091,14 @@ export default function CitizenPage() {
                                               (m) => m.gender === "female" && (m.maternalStatus === "pregnant" || (m.age >= 18 && m.age <= 45))
                                             );
                                             return mom
-                                              ? `Eligible Beneficiary: ${mom.fullName} (${mom.maternalStatus === "pregnant" ? "Pregnant Mother" : "Maternal Care Candidate"}, Age ${mom.age})`
+                                              ? `${t("citizen.pregnantLabel")}: ${mom.fullName} (${t("citizen.ageYears", { age: mom.age })})`
                                               : "Maternal Care Entitlement";
                                           })()
-                                        : "Eligible Household Pathway"}
+                                        : t("citizen.coverageVerified")}
                                     </span>
                                   </div>
                                   <span className="text-[10px] uppercase font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded">
-                                    Verified Criteria
+                                    {t("status.verified")}
                                   </span>
                                 </div>
                               )}
@@ -2122,7 +2108,7 @@ export default function CitizenPage() {
                                 <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-1">
                                   <span className="font-bold text-slate-800 block text-xs uppercase tracking-wide flex items-center gap-1.5">
                                     <ArrowRight className="w-3.5 h-3.5 text-teal-700" />
-                                    <span>What you should do next:</span>
+                                    <span>{t("citizen.stepGuideTitle")}:</span>
                                   </span>
                                   <p className="text-slate-600 text-xs leading-relaxed">
                                     {result.schemeId === "ab-pmjay"
@@ -2140,9 +2126,9 @@ export default function CitizenPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => setActiveTab("actions")}
-                                  className="text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                  className="text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                                 >
-                                  View Next Steps →
+                                  {t("citizen.viewActionPlanBtn")} →
                                 </Button>
 
                                 {isEligible && (
@@ -2160,15 +2146,15 @@ export default function CitizenPage() {
                                             <div className="flex items-center gap-2">
                                               <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200 flex items-center gap-1">
                                                 <Clock3 className="w-3.5 h-3.5 text-teal-700" />
-                                                <span>Assistance: In Progress</span>
+                                                <span>{t("status.in_progress")}</span>
                                               </span>
                                               <Button
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => setActiveTab("asha-connection")}
-                                                className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50"
+                                                className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50 cursor-pointer"
                                               >
-                                                Track Progress
+                                                {t("common.track")}
                                               </Button>
                                             </div>
                                           );
@@ -2185,15 +2171,15 @@ export default function CitizenPage() {
                                             <div className="flex items-center gap-2">
                                               <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                                                <span>Assistance Completed</span>
+                                                <span>{t("status.completed")}</span>
                                               </span>
                                               <Button
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => setActiveTab("asha-connection")}
-                                                className="text-xs font-semibold border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                                                className="text-xs font-semibold border-emerald-200 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
                                               >
-                                                View History
+                                                {t("citizen.assistanceHistoryTitle")}
                                               </Button>
                                             </div>
                                           );
@@ -2218,24 +2204,24 @@ export default function CitizenPage() {
                                                 matchedMem?.id
                                               )
                                             }
-                                            className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white"
+                                            className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                                           >
-                                            <Send className="w-3.5 h-3.5 mr-1" /> Ask My ASHA for Help
+                                            <Send className="w-3.5 h-3.5 mr-1" /> {t("citizen.requestAssistanceBtn")}
                                           </Button>
                                         );
                                       })()
                                     ) : (
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-slate-500">
-                                          Need doorstep help?
+                                          {t("citizen.helpSectionTitle")}
                                         </span>
                                         <Button
                                           variant="outline"
                                           size="sm"
                                           onClick={() => setActiveTab("asha-connection")}
-                                          className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50"
+                                          className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50 cursor-pointer"
                                         >
-                                          <Link2 className="w-3.5 h-3.5 mr-1" /> Connect ASHA
+                                          <Link2 className="w-3.5 h-3.5 mr-1" /> {t("citizen.connectButton")}
                                         </Button>
                                       </div>
                                     )}
@@ -2259,18 +2245,18 @@ export default function CitizenPage() {
               <section className="space-y-6">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                    Next Steps
+                    {t("navigation.nextSteps")}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500">
-                    Your step-by-step guide to completing requirements and accessing healthcare benefits.
+                    {t("citizen.stepGuideSubtitle")}
                   </p>
                 </div>
 
                 {!household ? (
                   <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs sm:text-sm text-slate-500 space-y-3">
-                    <p className="font-semibold text-slate-800">Set up your household first</p>
+                    <p className="font-semibold text-slate-800">{t("citizen.setUpHouseholdBtn")}</p>
                     <p className="max-w-sm mx-auto">
-                      Complete household onboarding to generate your personalized action plan.
+                      {t("home.step1Desc")}
                     </p>
                     <Button
                       variant="primary"
@@ -2279,9 +2265,9 @@ export default function CitizenPage() {
                         setHouseholdFormError(null);
                         setIsHouseholdModalOpen(true);
                       }}
-                      className="text-xs font-semibold"
+                      className="text-xs font-semibold cursor-pointer"
                     >
-                      Set Up Household
+                      {t("citizen.setUpHouseholdBtn")}
                     </Button>
                   </div>
                 ) : !guidance || !guidance.actionPlan || guidance.actionPlan.length === 0 ? (
@@ -2290,9 +2276,9 @@ export default function CitizenPage() {
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <div className="space-y-1 max-w-md mx-auto">
-                      <h3 className="text-base font-bold text-slate-900">You're all caught up</h3>
+                      <h3 className="text-base font-bold text-slate-900">{t("status.completed")}</h3>
                       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                        Your current healthcare actions and verified records are complete. No urgent steps are pending.
+                        {t("citizen.portalSubtitle")}
                       </p>
                     </div>
                   </div>
@@ -2303,7 +2289,7 @@ export default function CitizenPage() {
                       <div className="rounded-xl border-2 border-teal-600 bg-white p-5 sm:p-6 shadow-xs space-y-4">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                            Current Priority Step
+                            {t("status.urgent")}
                           </span>
                           <span className="text-xs font-semibold text-slate-500">
                             Step 1 of {guidance.actionPlan.length}
@@ -2411,6 +2397,7 @@ export default function CitizenPage() {
         )}
 
         {/* ============================================================ */}
+        {/* ============================================================ */}
         {/* MODALS */}
         {/* ============================================================ */}
 
@@ -2418,8 +2405,8 @@ export default function CitizenPage() {
         <Modal
           isOpen={isHouseholdModalOpen}
           onClose={() => setIsHouseholdModalOpen(false)}
-          title={household ? "Edit Household Details" : "Set Up Household Profile"}
-          description="Provide your family location and ration category to evaluate healthcare entitlements."
+          title={household ? t("citizen.editHouseholdBtn") : t("citizen.setUpHouseholdBtn")}
+          description={t("citizen.healthBenefitsDesc")}
         >
           <form onSubmit={handleHouseholdSubmit} className="space-y-5">
             {householdFormError && (
@@ -2431,11 +2418,11 @@ export default function CitizenPage() {
             {/* Section 1: Household Head */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Household Head & Contact
+                {t("citizen.headOfHousehold")} & {t("citizen.contactPhoneLabel")}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Head of Household Name"
+                  label={t("citizen.headOfHousehold")}
                   required
                   value={householdForm.headOfHouseholdName}
                   onChange={(e) =>
@@ -2444,7 +2431,7 @@ export default function CitizenPage() {
                   placeholder="e.g. Ramesh Kumar"
                 />
                 <Input
-                  label="Contact Phone"
+                  label={t("citizen.contactPhoneLabel")}
                   value={householdForm.contactPhone}
                   onChange={(e) =>
                     setHouseholdForm({ ...householdForm, contactPhone: e.target.value })
@@ -2457,18 +2444,18 @@ export default function CitizenPage() {
             {/* Section 2: Location */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Location Details
+                {t("citizen.locationDetails")}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="State"
+                  label={t("citizen.stateLabel")}
                   required
                   value={householdForm.state}
                   onChange={(e) => setHouseholdForm({ ...householdForm, state: e.target.value })}
                   placeholder="e.g. Karnataka"
                 />
                 <Input
-                  label="District"
+                  label={t("citizen.districtLabel")}
                   required
                   value={householdForm.district}
                   onChange={(e) =>
@@ -2480,7 +2467,7 @@ export default function CitizenPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Village / Town"
+                  label={t("citizen.villageLabel")}
                   required
                   value={householdForm.village}
                   onChange={(e) =>
@@ -2489,7 +2476,7 @@ export default function CitizenPage() {
                   placeholder="e.g. Devanahalli"
                 />
                 <Input
-                  label="Postal Code (Pincode)"
+                  label={t("citizen.pincodeLabel")}
                   required
                   value={householdForm.pincode}
                   onChange={(e) =>
@@ -2503,11 +2490,11 @@ export default function CitizenPage() {
             {/* Section 3: Ration Details */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Ration & Identification
+                {t("citizen.incomeCategory")} & {t("citizen.rationCardNumber")}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Select
-                  label="Ration Card Category"
+                  label={t("citizen.incomeCategory")}
                   value={householdForm.incomeCategory}
                   onChange={(e) =>
                     setHouseholdForm({
@@ -2518,7 +2505,7 @@ export default function CitizenPage() {
                   options={INCOME_OPTIONS}
                 />
                 <Input
-                  label="Ration Card Number"
+                  label={t("citizen.rationCardNumber")}
                   value={householdForm.rationCardNumber}
                   onChange={(e) =>
                     setHouseholdForm({ ...householdForm, rationCardNumber: e.target.value })
@@ -2533,11 +2520,12 @@ export default function CitizenPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsHouseholdModalOpen(false)}
+                className="cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" disabled={householdSubmitting}>
-                {householdSubmitting ? "Saving..." : "Save Household"}
+              <Button type="submit" variant="primary" disabled={householdSubmitting} className="cursor-pointer">
+                {householdSubmitting ? t("common.submitting") : t("common.save")}
               </Button>
             </div>
           </form>
@@ -2547,8 +2535,8 @@ export default function CitizenPage() {
         <Modal
           isOpen={isMemberModalOpen}
           onClose={() => setIsMemberModalOpen(false)}
-          title={editingMemberId ? "Edit Family Member" : "Add Family Member"}
-          description="Enter member age and health profile details for entitlement evaluation."
+          title={editingMemberId ? t("citizen.editMemberBtn") : t("citizen.addMemberBtn")}
+          description={t("citizen.familyMembersDesc")}
         >
           <form onSubmit={handleMemberSubmit} className="space-y-4">
             {memberFormError && (
@@ -2560,7 +2548,7 @@ export default function CitizenPage() {
             {/* Basic Info */}
             <div className="space-y-3">
               <Input
-                label="Full Name"
+                label={t("forms.fullName")}
                 required
                 value={memberForm.fullName}
                 onChange={(e) => setMemberForm({ ...memberForm, fullName: e.target.value })}
@@ -2569,7 +2557,7 @@ export default function CitizenPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Input
-                  label="Age (Years)"
+                  label={t("forms.age")}
                   type="number"
                   min="0"
                   max="120"
@@ -2580,7 +2568,7 @@ export default function CitizenPage() {
                   }
                 />
                 <Select
-                  label="Gender"
+                  label={t("forms.gender")}
                   value={memberForm.gender}
                   onChange={(e) =>
                     setMemberForm({ ...memberForm, gender: e.target.value as Gender })
@@ -2588,7 +2576,7 @@ export default function CitizenPage() {
                   options={GENDER_OPTIONS}
                 />
                 <Select
-                  label="Relationship"
+                  label={t("forms.relationship")}
                   value={memberForm.relationship}
                   onChange={(e) =>
                     setMemberForm({ ...memberForm, relationship: e.target.value })
@@ -2601,7 +2589,7 @@ export default function CitizenPage() {
             {/* Special Demographics */}
             <div className="space-y-3 pt-3 border-t border-slate-100">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
-                Healthcare Profile (Optional)
+                {t("forms.healthCondition")}
               </span>
 
               <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer p-2 rounded-lg bg-slate-50 border border-slate-200">
@@ -2613,7 +2601,7 @@ export default function CitizenPage() {
                   }
                   className="rounded text-teal-700 focus:ring-teal-700"
                 />
-                <span className="font-medium">Person with benchmark disability</span>
+                <span className="font-medium">{t("citizen.disabilityLabel")}</span>
               </label>
 
               {memberForm.gender === "female" && (
@@ -2629,7 +2617,7 @@ export default function CitizenPage() {
                     }
                     className="rounded text-purple-700 focus:ring-purple-700"
                   />
-                  <span className="font-medium text-purple-900">Currently pregnant or nursing mother</span>
+                  <span className="font-medium text-purple-900">{t("citizen.pregnantLabel")}</span>
                 </label>
               )}
             </div>
@@ -2639,11 +2627,12 @@ export default function CitizenPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsMemberModalOpen(false)}
+                className="cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" disabled={memberSubmitting}>
-                {memberSubmitting ? "Saving..." : "Save Member"}
+              <Button type="submit" variant="primary" disabled={memberSubmitting} className="cursor-pointer">
+                {memberSubmitting ? t("common.submitting") : t("common.save")}
               </Button>
             </div>
           </form>
@@ -2653,25 +2642,26 @@ export default function CitizenPage() {
         <Modal
           isOpen={Boolean(removingMember)}
           onClose={() => setRemovingMember(null)}
-          title="Remove Family Member"
-          description={`Are you sure you want to remove ${removingMember?.fullName} from your household?`}
+          title={t("citizen.removeMemberBtn")}
+          description={removingMember ? t("dialogs.removeMemberConfirm", { name: removingMember.fullName }) : ""}
         >
           <div className="pt-4 flex justify-end gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => setRemovingMember(null)}
+              className="cursor-pointer"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleConfirmRemoveMember}
               disabled={removeSubmitting}
-              className="bg-rose-600 text-white hover:bg-rose-700 border-rose-600"
+              className="bg-rose-600 text-white hover:bg-rose-700 border-rose-600 cursor-pointer"
             >
-              {removeSubmitting ? "Removing..." : "Confirm Remove"}
+              {removeSubmitting ? t("common.submitting") : t("common.delete")}
             </Button>
           </div>
         </Modal>
@@ -2683,8 +2673,8 @@ export default function CitizenPage() {
             setIsConnectionModalOpen(false);
             setResolvedAsha(null);
           }}
-          title="Confirm ASHA Connection"
-          description="Please review the details of the ASHA worker who will be linked to your family."
+          title={t("citizen.ashaSectionTitle")}
+          description={t("citizen.ashaSectionDesc")}
         >
           {resolvedAsha && (
             <div className="space-y-4 pt-2">
@@ -2701,11 +2691,11 @@ export default function CitizenPage() {
 
                 <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Service Code</span>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">{t("common.code")}</span>
                     <span className="font-mono font-bold text-slate-800">{resolvedAsha.serviceCode}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Assigned Area</span>
+                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">{t("asha.coverageArea")}</span>
                     <span className="text-slate-700">{resolvedAsha.serviceArea || "Village Jurisdiction"}</span>
                   </div>
                 </div>
@@ -2714,7 +2704,7 @@ export default function CitizenPage() {
               <div className="p-3 bg-teal-50/70 rounded-lg border border-teal-200 text-xs text-teal-800 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
                 <span>
-                  By requesting connection, this verified ASHA worker will be notified and can assist your household with official doorstep health access.
+                  {t("citizen.connectedAshaBanner", { name: resolvedAsha.displayName })}
                 </span>
               </div>
 
@@ -2726,17 +2716,18 @@ export default function CitizenPage() {
                     setIsConnectionModalOpen(false);
                     setResolvedAsha(null);
                   }}
+                  className="cursor-pointer"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="button"
                   variant="primary"
                   onClick={handleConfirmConnection}
                   disabled={isConnecting}
-                  className="font-semibold"
+                  className="font-semibold cursor-pointer"
                 >
-                  {isConnecting ? "Sending Request..." : "Request Connection"}
+                  {isConnecting ? t("common.submitting") : t("citizen.connectButton")}
                 </Button>
               </div>
             </div>
@@ -2747,8 +2738,8 @@ export default function CitizenPage() {
         <Modal
           isOpen={isAssistanceModalOpen}
           onClose={() => setIsAssistanceModalOpen(false)}
-          title="Request ASHA Assistance"
-          description={`Submit a request to ${connectionStatus?.asha?.displayName || "your ASHA worker"} for doorstep support, document verification, or scheme enrollment.`}
+          title={t("citizen.requestAssistanceBtn")}
+          description={t("citizen.ashaCardDesc")}
         >
           <form onSubmit={handleAssistanceSubmit} className="space-y-4">
             {assistanceError && (
@@ -2758,7 +2749,7 @@ export default function CitizenPage() {
             )}
 
             <Select
-              label="Assistance Category"
+              label={t("forms.assistanceType")}
               value={assistanceForm.category}
               onChange={(e) =>
                 setAssistanceForm({
@@ -2769,30 +2760,9 @@ export default function CitizenPage() {
               options={ASSISTANCE_CATEGORIES}
             />
 
-            {/* Beneficiary Member Selector */}
-            {members.length > 0 && (
-              <Select
-                label="Target Family Member (Beneficiary)"
-                value={assistanceForm.beneficiaryMemberId}
-                onChange={(e) =>
-                  setAssistanceForm({
-                    ...assistanceForm,
-                    beneficiaryMemberId: e.target.value,
-                  })
-                }
-                options={[
-                  { value: "", label: "Entire Household / General" },
-                  ...members.map((m) => ({
-                    value: m.id,
-                    label: `${m.fullName} (${m.relationship || "Member"}, Age ${m.age}${m.maternalStatus === "pregnant" ? ", Pregnant" : ""})`,
-                  })),
-                ]}
-              />
-            )}
-
             {/* Priority Selector */}
             <Select
-              label="Urgency / Priority"
+              label={t("forms.priority")}
               value={assistanceForm.priority}
               onChange={(e) =>
                 setAssistanceForm({
@@ -2801,23 +2771,23 @@ export default function CitizenPage() {
                 })
               }
               options={[
-                { value: "NORMAL", label: "Normal (Standard doorstep assistance)" },
-                { value: "HIGH", label: "High (Upcoming hospital visit / deadline)" },
-                { value: "URGENT", label: "Urgent (Immediate maternal / senior care)" },
-                { value: "LOW", label: "Low (General enquiry)" },
+                { value: "NORMAL", label: t("forms.priorityNormal") },
+                { value: "HIGH", label: t("forms.priorityHigh") },
+                { value: "URGENT", label: t("forms.priorityUrgent") },
+                { value: "LOW", label: t("forms.priorityLow") },
               ]}
             />
 
             {assistanceForm.schemeName && (
               <div className="p-3 bg-teal-50 rounded-lg border border-teal-200 text-xs text-teal-900">
-                <span className="font-bold block uppercase text-[10px]">Associated Government Scheme:</span>
+                <span className="font-bold block uppercase text-[10px]">{t("citizen.healthBenefits")}:</span>
                 <span className="font-semibold">{assistanceForm.schemeName}</span>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Details / Message for ASHA Worker *
+                {t("forms.notes")} *
               </label>
               <textarea
                 required
@@ -2826,7 +2796,7 @@ export default function CitizenPage() {
                 onChange={(e) =>
                   setAssistanceForm({ ...assistanceForm, message: e.target.value })
                 }
-                placeholder="Please describe what help or documents you need..."
+                placeholder={t("forms.notesPlaceholder")}
                 className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-700 focus:border-teal-700"
               />
             </div>
@@ -2836,16 +2806,17 @@ export default function CitizenPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsAssistanceModalOpen(false)}
+                className="cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
                 variant="primary"
                 disabled={assistanceSubmitting || !assistanceForm.message.trim()}
-                className="bg-teal-800 hover:bg-teal-900 text-white font-semibold"
+                className="bg-teal-800 hover:bg-teal-900 text-white font-semibold cursor-pointer"
               >
-                {assistanceSubmitting ? "Submitting..." : "Send Request to ASHA"}
+                {assistanceSubmitting ? t("common.submitting") : t("citizen.requestAssistanceBtn")}
               </Button>
             </div>
           </form>
@@ -2858,7 +2829,7 @@ export default function CitizenPage() {
           className="fixed bottom-6 right-6 z-40 bg-teal-800 hover:bg-teal-900 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 border border-teal-700 cursor-pointer"
         >
           <Bot className="w-4 h-4 text-teal-200" />
-          <span>Ask Assistant</span>
+          <span>{t("citizen.healthcareAssistantBtn")}</span>
         </button>
 
         {/* SwasthyaSetu Healthcare Assistant Drawer */}

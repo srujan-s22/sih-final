@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Shell } from "@/components/layout/shell";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTranslation } from "@/i18n/i18n-context";
 import { schemeService } from "@/services/scheme-service";
 import { Scheme } from "@shared/types/eligibility";
 import {
@@ -18,12 +19,12 @@ import {
   CheckCircle2,
   HeartHandshake,
   ChevronRight,
-  ExternalLink,
   Info,
 } from "lucide-react";
 
 export default function HomePage() {
   const { isAuthenticated, role, userProfile } = useAuth();
+  const { t } = useTranslation();
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [loadingSchemes, setLoadingSchemes] = useState(false);
 
@@ -57,9 +58,9 @@ export default function HomePage() {
     : "/auth/sign-in";
 
   const getPortalLabel = () => {
-    if (role === "ADMIN") return "Admin Console";
-    if (role === "ASHA") return "ASHA Workspace";
-    return "Citizen Portal";
+    if (role === "ADMIN") return t("navigation.adminConsole");
+    if (role === "ASHA") return t("navigation.ashaWorkspace");
+    return t("navigation.citizenPortal");
   };
 
   return (
@@ -74,14 +75,17 @@ export default function HomePage() {
             <div className="flex items-center gap-2 text-xs sm:text-sm">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>
-                Signed in as <strong className="font-semibold">{userProfile?.displayName || userProfile?.email}</strong> ({role || "CITIZEN"})
+                {t("home.activeSessionNotice", {
+                  name: userProfile?.displayName || userProfile?.email || "Citizen",
+                  role: role || "CITIZEN",
+                })}
               </span>
             </div>
             <Link
               href={getStartedHref}
               className="inline-flex items-center gap-1 text-xs sm:text-sm font-semibold text-emerald-300 hover:text-white transition-colors"
             >
-              <span>Go to your {getPortalLabel()}</span>
+              <span>{t("home.goToWorkspaceBtn", { portal: getPortalLabel() })}</span>
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
@@ -96,15 +100,15 @@ export default function HomePage() {
             <div className="lg:col-span-7 flex flex-col items-start space-y-5 sm:space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200/80 shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />
-                <span>Public Healthcare Access Platform</span>
+                <span>{t("home.badge")}</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.16]">
-                Find healthcare support for your family.
+                {t("home.heroTitle")}
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                SwasthyaSetu helps you discover official government healthcare schemes your family qualifies for and understand the exact steps to receive benefits.
+                {t("home.heroSubtitle")}
               </p>
 
               {/* Action Buttons */}
@@ -113,15 +117,15 @@ export default function HomePage() {
                   <Button
                     variant="primary"
                     size="lg"
-                    className="w-full sm:w-auto text-base shadow-sm font-semibold flex items-center justify-center gap-2 group"
+                    className="w-full sm:w-auto text-base shadow-sm font-semibold flex items-center justify-center gap-2 group cursor-pointer"
                   >
-                    <span>{isAuthenticated ? `Open ${getPortalLabel()}` : "Check eligibility"}</span>
+                    <span>{isAuthenticated ? getPortalLabel() : t("home.getStartedBtn")}</span>
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                   </Button>
                 </Link>
                 <a href="#how-it-works" className="w-full sm:w-auto">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto text-base">
-                    How it works
+                    {t("navigation.howItWorks")}
                   </Button>
                 </a>
               </div>
@@ -164,14 +168,14 @@ export default function HomePage() {
                     </div>
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Verified
+                      {t("status.verified")}
                     </span>
                   </div>
 
                   {/* Scheme Matches Box */}
                   <div className="space-y-2.5">
                     <span className="text-xs font-semibold text-slate-700 block">
-                      Healthcare Support Identified:
+                      {t("citizen.healthBenefits")}:
                     </span>
 
                     {/* Item 1 */}
@@ -188,7 +192,7 @@ export default function HomePage() {
                         </div>
                       </div>
                       <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                        Eligible
+                        {t("status.eligible")}
                       </span>
                     </div>
 
@@ -206,7 +210,7 @@ export default function HomePage() {
                         </div>
                       </div>
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 shrink-0">
-                        Info Needed
+                        {t("status.action_required")}
                       </span>
                     </div>
                   </div>
@@ -233,10 +237,10 @@ export default function HomePage() {
             Simple 3-Step Process
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            How it works
+            {t("home.howItWorksTitle")}
           </h2>
           <p className="text-sm sm:text-base text-slate-600 mt-1.5 leading-relaxed">
-            Discover verified healthcare entitlements for your household without complicated paperwork.
+            {t("home.howItWorksSubtitle")}
           </p>
         </div>
 
@@ -251,10 +255,10 @@ export default function HomePage() {
                 <span className="text-xs font-bold text-slate-400 font-mono">01</span>
               </div>
               <h3 className="text-lg font-bold text-slate-900">
-                1. Add Basic Family Details
+                {t("home.step1Title")}
               </h3>
               <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                Provide household location, ration card category, and family member ages to evaluate eligibility pathways.
+                {t("home.step1Desc")}
               </p>
             </div>
           </div>
@@ -269,10 +273,10 @@ export default function HomePage() {
                 <span className="text-xs font-bold text-slate-400 font-mono">02</span>
               </div>
               <h3 className="text-lg font-bold text-slate-900">
-                2. Check Entitlements
+                {t("home.step2Title")}
               </h3>
               <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                Deterministic rules evaluate applicable central and state programs with clear, source-backed justifications.
+                {t("home.step2Desc")}
               </p>
             </div>
           </div>
@@ -287,10 +291,10 @@ export default function HomePage() {
                 <span className="text-xs font-bold text-slate-400 font-mono">03</span>
               </div>
               <h3 className="text-lg font-bold text-slate-900">
-                3. Follow Next Steps
+                {t("home.step3Title")}
               </h3>
               <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                Receive an actionable roadmap of required e-KYC verifications, document requirements, and local ASHA touchpoints.
+                {t("home.step3Desc")}
               </p>
             </div>
           </div>
@@ -304,10 +308,10 @@ export default function HomePage() {
             Government Programs
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Healthcare support for families
+            {t("home.schemesSectionTitle")}
           </h2>
           <p className="text-sm sm:text-base text-slate-600 mt-1.5 leading-relaxed">
-            Key public health initiatives verified from official government sources and gazettes.
+            {t("home.schemesSectionSubtitle")}
           </p>
         </div>
 
@@ -397,10 +401,10 @@ export default function HomePage() {
                 Citizen Privacy & Trust
               </span>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                Your data is protected and privacy-first
+                {t("home.ctaTitle")}
               </h2>
               <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                SwasthyaSetu evaluates household information solely to determine eligible healthcare entitlements and guide your family toward verified benefits.
+                {t("home.ctaSubtitle")}
               </p>
             </div>
 
@@ -433,11 +437,11 @@ export default function HomePage() {
             <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Link href={getStartedHref}>
                 <Button variant="primary" size="md" className="font-semibold shadow-xs">
-                  {isAuthenticated ? `Go to ${getPortalLabel()}` : "Check your healthcare benefits"}
+                  {isAuthenticated ? `Go to ${getPortalLabel()}` : t("home.getStartedBtn")}
                 </Button>
               </Link>
               <Link href="/auth/consent" className="text-xs font-medium text-teal-800 hover:text-teal-900 underline underline-offset-2">
-                Review Privacy & Consent Policy
+                {t("navigation.privacyConsent")}
               </Link>
             </div>
           </div>
