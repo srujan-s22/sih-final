@@ -772,21 +772,42 @@ export default function AshaWorkspacePage() {
     }
   };
 
-  const pendingAssistanceCount = assistanceRequests.filter(
-    (r) => r.status === "PENDING" || r.status === "IN_PROGRESS"
-  ).length;
+  // --- Single Source of Truth: Unified Selectors & State Derivations ---
+  const totalAssignedHouseholds = cases.length;
 
-  const totalRequestsBadge = pendingAssistanceCount + connectionRequests.length;
-  const totalFollowUpBadge = (followUpSummary?.overdue || 0) + (followUpSummary?.dueToday || 0);
+  // Active (Actionable) Assistance Requests (excluding terminal statuses: RESOLVED, CLOSED, DECLINED)
+  const activeAssistanceRequests = assistanceRequests.filter(
+    (r) => !["RESOLVED", "CLOSED", "DECLINED"].includes(r.status)
+  );
+  const activeAssistanceCount = activeAssistanceRequests.length;
+  const pendingConnectionCount = connectionRequests.length;
+  const totalActiveRequestsCount = activeAssistanceCount + pendingConnectionCount;
+  const totalAllRequestsCount = assistanceRequests.length + connectionRequests.length;
+
+  // Proactive Attention Signals (Single source of truth for Needs Attention & Entitlement Opportunities)
+  const totalAttentionSignalsCount = attentionSignals.length;
+
+  // Follow-up Counts & Actionable Badges
+  const overdueFollowUpsCount = followUpSummary?.overdue ?? 0;
+  const dueTodayFollowUpsCount = followUpSummary?.dueToday ?? 0;
+  const upcomingFollowUpsCount = followUpSummary?.upcoming ?? 0;
+  const completedFollowUpsCount = followUpSummary?.completed ?? 0;
+  const cancelledFollowUpsCount =
+    followUpSummary?.cancelled ??
+    (followUpSummary?.followUps?.filter((f) => f.status === "CANCELLED").length ?? 0);
+  const totalFollowUpsCount =
+    followUpSummary?.total ?? (followUpSummary?.followUps?.length ?? 0);
+
+  const actionableFollowUpBadge = overdueFollowUpsCount + dueTodayFollowUpsCount;
 
   const navTabs = [
-    { id: "overview", label: "Overview", icon: Activity },
-    { id: "cases", label: "Caseload", icon: Users },
-    { id: "requests", label: `Requests (${totalRequestsBadge})`, icon: Inbox },
-    { id: "attention", label: `Needs Attention (${attentionSignals.length})`, icon: AlertCircle },
+    { id: "overview", label: "Dashboard", icon: Activity },
+    { id: "cases", label: `My Households (${totalAssignedHouseholds})`, icon: Users },
+    { id: "requests", label: `Requests (${totalActiveRequestsCount})`, icon: Inbox },
+    { id: "attention", label: `Needs Attention (${totalAttentionSignalsCount})`, icon: AlertCircle },
     {
       id: "followups",
-      label: `Follow-ups${totalFollowUpBadge > 0 ? ` (${totalFollowUpBadge})` : ""}`,
+      label: `Follow-ups${actionableFollowUpBadge > 0 ? ` (${actionableFollowUpBadge})` : ""}`,
       icon: Clock,
     },
   ];
@@ -814,8 +835,28 @@ export default function AshaWorkspacePage() {
     <ProtectedRoute allowedRoles={["ASHA", "ADMIN"]}>
       <AuthenticatedShell
         role="ASHA"
-        title="ASHA Operational Workspace"
-        description="Manage assigned households, monitor healthcare access gaps, schedule follow-ups, and assist families with government health programs."
+        title={
+          activeTab === "cases"
+            ? "My Assigned Households"
+            : activeTab === "requests"
+            ? "Incoming Citizen Requests"
+            : activeTab === "attention"
+            ? "Needs Attention Queue"
+            : activeTab === "followups"
+            ? "Follow-up & Visit Tasks"
+            : `Welcome, ${userProfile?.displayName || "ASHA Worker"} 👋`
+        }
+        description={
+          activeTab === "cases"
+            ? "View assigned family profiles, monitor verified entitlements, and initiate doorstep assistance."
+            : activeTab === "requests"
+            ? "Respond to scheme enrollment, document verification, and household connection requests."
+            : activeTab === "attention"
+            ? "Proactive intelligence signals highlighting senior citizens, maternal care, and blocked tasks."
+            : activeTab === "followups"
+            ? "Scheduled home visits, documentation verification checks, and health outreach tasks."
+            : "Here's what needs your attention today across your assigned households."
+        }
         navTabs={navTabs}
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId)}
@@ -916,228 +957,416 @@ export default function AshaWorkspacePage() {
         ) : (
           <div>
             {/* ============================================================ */}
-            {/* 1. OVERVIEW TAB */}
+            {/* 1. DASHBOARD TAB (B1) */}
             {/* ============================================================ */}
             {activeTab === "overview" && (
               <div className="space-y-6">
-                {/* Metric Summary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+                {/* Compact Operational Summary Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                   <div
                     onClick={() => setActiveTab("cases")}
-                    className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs cursor-pointer hover:border-emerald-300 transition-colors"
+                    className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs cursor-pointer hover:border-emerald-300 hover:shadow-xs transition-all"
                   >
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Assigned Cases</p>
-                    <p className="text-2xl font-bold text-slate-900 mt-1">{summary?.totalAssigned ?? cases.length}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Persisted households</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Assigned Households
+                      </span>
+                      <Users className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 mt-1.5">
+                      {totalAssignedHouseholds}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">Persisted family records</p>
                   </div>
+
                   <div
                     onClick={() => setActiveTab("attention")}
-                    className="bg-white rounded-xl border border-amber-200/80 p-4 shadow-2xs bg-amber-50/20 cursor-pointer hover:border-amber-300 transition-colors"
+                    className="bg-amber-50/40 rounded-xl border border-amber-200 p-4 shadow-2xs cursor-pointer hover:border-amber-400 hover:bg-amber-50/70 transition-all"
                   >
-                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Needs Attention</p>
-                    <p className="text-2xl font-bold text-amber-900 mt-1">{summary?.needsAttentionCount ?? needsAttentionCases.length}</p>
-                    <p className="text-xs text-amber-600 mt-0.5">Identified healthcare gaps</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                        Needs Attention
+                      </span>
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-black text-amber-950 mt-1.5">
+                      {totalAttentionSignalsCount}
+                    </p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      {totalAttentionSignalsCount === 1 ? "1 item requires action" : `${totalAttentionSignalsCount} items require action`}
+                    </p>
                   </div>
+
                   <div
                     onClick={() => setActiveTab("followups")}
-                    className="bg-white rounded-xl border border-blue-200/80 p-4 shadow-2xs bg-blue-50/20 cursor-pointer hover:border-blue-300 transition-colors"
+                    className="bg-rose-50/30 rounded-xl border border-rose-200 p-4 shadow-2xs cursor-pointer hover:border-rose-300 hover:bg-rose-50/60 transition-all"
                   >
-                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Upcoming Tasks</p>
-                    <p className="text-2xl font-bold text-blue-900 mt-1">{summary?.upcomingFollowUpsCount ?? upcomingFollowUpCases.length}</p>
-                    <p className="text-xs text-blue-600 mt-0.5">Scheduled follow-ups</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wider">
+                        Follow-ups Due
+                      </span>
+                      <Clock className="w-4 h-4 text-rose-600" />
+                    </div>
+                    <p className="text-2xl font-black text-rose-950 mt-1.5">
+                      {actionableFollowUpBadge}
+                    </p>
+                    <p className="text-xs text-rose-700 mt-0.5">
+                      {overdueFollowUpsCount} overdue, {dueTodayFollowUpsCount} today
+                    </p>
                   </div>
+
                   <div
                     onClick={() => setActiveTab("requests")}
-                    className="bg-white rounded-xl border border-teal-200/80 p-4 shadow-2xs bg-teal-50/20 cursor-pointer hover:border-teal-300 transition-colors"
+                    className="bg-teal-50/30 rounded-xl border border-teal-200 p-4 shadow-2xs cursor-pointer hover:border-teal-300 hover:bg-teal-50/60 transition-all"
                   >
-                    <p className="text-xs font-semibold text-teal-700 uppercase tracking-wider">Citizen Requests</p>
-                    <p className="text-2xl font-bold text-teal-900 mt-1">{totalRequestsBadge}</p>
-                    <p className="text-xs text-teal-600 mt-0.5">{pendingAssistanceCount} assistance, {connectionRequests.length} connect</p>
-                  </div>
-                  <div
-                    onClick={() => setActiveTab("cases")}
-                    className="bg-white rounded-xl border border-emerald-200/80 p-4 shadow-2xs bg-emerald-50/20 cursor-pointer hover:border-emerald-300 transition-colors"
-                  >
-                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Resolved</p>
-                    <p className="text-2xl font-bold text-emerald-900 mt-1">
-                      {summary?.resolvedCount ?? cases.filter((c) => c.status === "RESOLVED" || c.status === "CLOSED").length}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
+                        Active Requests
+                      </span>
+                      <Inbox className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <p className="text-2xl font-black text-teal-950 mt-1.5">
+                      {totalActiveRequestsCount}
                     </p>
-                    <p className="text-xs text-emerald-600 mt-0.5">Completed cases</p>
+                    <p className="text-xs text-teal-700 mt-0.5">
+                      {activeAssistanceCount} assistance, {pendingConnectionCount} connect
+                    </p>
                   </div>
                 </div>
 
-                {/* Main Highlights Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Needs Immediate Attention */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600" />
-                        <span>Action Opportunities & Attention Queue</span>
-                      </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setActiveTab("attention")}
-                        className="text-xs font-semibold text-amber-800 border-amber-200 hover:bg-amber-50"
-                      >
-                        View All ({attentionSignals.length})
-                      </Button>
-                    </div>
+                {/* Quick Action Navigation Bar */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                    Quick Field Navigation:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("cases")}
+                      className="text-xs font-semibold bg-white border-slate-200 hover:bg-slate-100"
+                    >
+                      <Search className="w-3.5 h-3.5 mr-1 text-slate-500" /> Find Household
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("requests")}
+                      className="text-xs font-semibold bg-white border-teal-200 text-teal-900 hover:bg-teal-50"
+                    >
+                      <Inbox className="w-3.5 h-3.5 mr-1 text-teal-700" /> Citizen Requests ({totalActiveRequestsCount})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("followups")}
+                      className="text-xs font-semibold bg-white border-rose-200 text-rose-900 hover:bg-rose-50"
+                    >
+                      <Clock className="w-3.5 h-3.5 mr-1 text-rose-700" /> Due Follow-ups ({actionableFollowUpBadge})
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setRegisterError(null);
+                        setIsRegisterModalOpen(true);
+                      }}
+                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" /> + Register Household
+                    </Button>
+                  </div>
+                </div>
 
-                    {attentionSignals.length === 0 ? (
-                      <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500">
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1.5" />
-                        <span>No households currently require attention.</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {attentionSignals.slice(0, 3).map((sig) => (
-                          <div
-                            key={sig.id}
-                            className="p-3 bg-slate-50 hover:bg-amber-50/50 rounded-lg border border-slate-200/80 space-y-2 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  sig.priority === "URGENT"
-                                    ? "bg-red-100 text-red-800"
-                                    : sig.priority === "HIGH"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-blue-100 text-blue-800"
-                                }`}
-                              >
-                                {sig.priority}
-                              </span>
-                              <span className="text-[10px] font-semibold text-slate-400">
-                                {sig.category.replace(/_/g, " ")}
-                              </span>
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-900">{sig.title}</h4>
-                              <p className="text-[11px] text-slate-600 mt-0.5">{sig.subtitle}</p>
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                              <span className="text-[10px] text-emerald-800 font-medium">
-                                {sig.headOfHouseholdName} • {sig.district}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
-                                  <Button
-                                    variant="primary"
-                                    size="sm"
-                                    disabled={initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`}
-                                    onClick={() =>
-                                      handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
-                                    }
-                                    className="text-[11px] font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white"
-                                  >
-                                    {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
-                                      ? "Starting..."
-                                      : "Start Assistance"}
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openCaseDetail(sig.caseId)}
-                                  className="text-[11px] font-semibold py-1 px-2.5"
-                                >
-                                  Open Household
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                {/* TODAY'S PRIORITIES — HERO ACTION SECTION */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <span>Today&apos;s Field Priorities</span>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                          Action Required
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        High-urgency citizen tasks, scheme enrollments, and scheduled doorstep visits needing attention today.
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Citizen Assistance Requests Quickview */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        <Inbox className="w-4 h-4 text-teal-700" />
-                        <span>Incoming Citizen Requests</span>
-                      </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setActiveTab("requests")}
-                        className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50"
-                      >
-                        Requests Queue
-                      </Button>
-                    </div>
-
-                    {assistanceRequests.length === 0 && connectionRequests.length === 0 ? (
-                      <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500">
-                        <Inbox className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
-                        <span>No incoming assistance or connection requests pending.</span>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Column 1: Action Opportunities & Gaps */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600" />
+                          <h4 className="text-sm font-bold text-slate-900">
+                            Entitlement Opportunities ({totalAttentionSignalsCount})
+                          </h4>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveTab("attention")}
+                          className="text-xs font-semibold text-amber-900 border-amber-200 hover:bg-amber-50"
+                        >
+                          View All Queue
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {assistanceRequests.slice(0, 2).map((req) => (
-                          <div
-                            key={req.id}
-                            onClick={() => {
-                              setRequestsSubTab("assistance");
-                              setActiveTab("requests");
-                            }}
-                            className="p-3 bg-teal-50/50 hover:bg-teal-50 rounded-lg border border-teal-100 flex items-center justify-between cursor-pointer transition-colors"
-                          >
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-900">{req.headOfHouseholdName}</span>
-                                <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-1.5 py-0.2 rounded">
-                                  {req.category.replace(/_/g, " ")}
+
+                      {totalAttentionSignalsCount === 0 ? (
+                        <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
+                          <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+                          <p className="font-semibold text-slate-700">All household entitlements up to date</p>
+                          <p className="text-slate-500">No unaddressed senior or maternal schemes in your caseload.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {attentionSignals.slice(0, 3).map((sig) => (
+                            <div
+                              key={sig.id}
+                              className="p-3.5 bg-slate-50/70 hover:bg-amber-50/40 rounded-xl border border-slate-200 space-y-2.5 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                    sig.priority === "URGENT"
+                                      ? "bg-rose-100 text-rose-800"
+                                      : sig.priority === "HIGH"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {sig.priority}
+                                </span>
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                                  {sig.category.replace(/_/g, " ")}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-600 line-clamp-1">{req.message}</p>
-                            </div>
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full uppercase">
-                              {req.status}
-                            </span>
-                          </div>
-                        ))}
 
-                        {connectionRequests.slice(0, 2).map((req) => (
-                          <div
-                            key={req.id}
-                            onClick={() => {
-                              setRequestsSubTab("connections");
-                              setActiveTab("requests");
-                            }}
-                            className="p-3 bg-emerald-50/50 hover:bg-emerald-50 rounded-lg border border-emerald-100 flex items-center justify-between cursor-pointer transition-colors"
-                          >
-                            <div>
-                              <span className="text-xs font-bold text-slate-900">{req.headOfHouseholdName}</span>
-                              <p className="text-[11px] text-slate-500">Household Connection Request</p>
+                              <div>
+                                <h5 className="text-xs font-bold text-slate-900">{sig.title}</h5>
+                                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{sig.subtitle}</p>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                                <span className="text-[11px] font-semibold text-slate-700">
+                                  {sig.headOfHouseholdName} • {sig.district}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      disabled={initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`}
+                                      onClick={() =>
+                                        handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
+                                      }
+                                      className="text-xs font-bold py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white"
+                                    >
+                                      {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
+                                        ? "Starting..."
+                                        : "Start Assistance"}
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openCaseDetail(sig.caseId)}
+                                    className="text-xs font-semibold py-1 px-2.5 text-slate-700 hover:bg-white"
+                                  >
+                                    Open Case
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
-                              Pending Connect
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Column 2: Incoming Requests & Due Visits */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <Inbox className="w-4 h-4 text-teal-700" />
+                          <h4 className="text-sm font-bold text-slate-900">
+                            Citizen Requests & Due Visits
+                          </h4>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveTab("requests")}
+                          className="text-xs font-semibold text-teal-900 border-teal-200 hover:bg-teal-50"
+                        >
+                          View Requests ({totalActiveRequestsCount})
+                        </Button>
                       </div>
-                    )}
+
+                      {(() => {
+                        const todayIsoStr = new Date().toISOString().split("T")[0];
+                        const dueTodayFollowUpsList = (followUpSummary?.followUps || []).filter(
+                          (f) =>
+                            f.status === "PENDING" &&
+                            (f.isOverdue ||
+                              (f.dueAt && f.dueAt.startsWith(todayIsoStr)) ||
+                              (f.scheduledAt && f.scheduledAt.startsWith(todayIsoStr)))
+                        );
+
+                        if (activeAssistanceRequests.length === 0 && dueTodayFollowUpsList.length === 0) {
+                          return (
+                            <div className="py-8 text-center bg-slate-50 rounded-lg text-xs text-slate-500 space-y-1">
+                              <Inbox className="w-6 h-6 text-slate-300 mx-auto mb-1" />
+                              <p className="font-semibold text-slate-700">No pending citizen requests or visits</p>
+                              <p className="text-slate-500">All assistance inquiries and daily scheduled visits are clear.</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-3">
+                            {/* Active Assistance Requests snippet */}
+                            {activeAssistanceRequests.slice(0, 2).map((req) => (
+                              <div
+                                key={req.id}
+                                className="p-3.5 bg-teal-50/30 rounded-xl border border-teal-200 space-y-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-900">{req.headOfHouseholdName}</span>
+                                    <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.2 rounded">
+                                      {req.category.replace(/_/g, " ")}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full uppercase">
+                                    {req.status}
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-slate-600 line-clamp-2 italic bg-white p-2 rounded border border-teal-100">
+                                  &ldquo;{req.message}&rdquo;
+                                </p>
+
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="text-[11px] text-slate-500">
+                                    {req.schemeName || "General Doorstep Assistance"}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {req.status === "PENDING" && (
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => handleAcceptAssistance(req.id)}
+                                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5"
+                                      >
+                                        Accept & Open
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setRequestsSubTab("assistance");
+                                        setActiveTab("requests");
+                                      }}
+                                      className="text-xs font-semibold py-1 px-2.5"
+                                    >
+                                      View Details
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Due Today Follow-up snippet */}
+                            {dueTodayFollowUpsList.slice(0, 2).map((f) => (
+                              <div
+                                key={f.id}
+                                className="p-3.5 bg-amber-50/30 rounded-xl border border-amber-200 space-y-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-bold text-slate-900">
+                                    {f.headOfHouseholdName || "Assigned Family"}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                      f.isOverdue ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"
+                                    }`}
+                                  >
+                                    {f.isOverdue ? "Overdue Visit" : "Due Today"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-700 font-medium">{f.title || f.reason}</p>
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="text-[11px] text-slate-500">
+                                    Due: {new Date(f.dueAt || f.scheduledAt).toLocaleDateString()}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() => handleOpenCompleteModal(f)}
+                                      className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-1 px-2.5"
+                                    >
+                                      Mark Done
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openCaseDetail(f.caseId)}
+                                      className="text-xs font-semibold py-1 px-2.5"
+                                    >
+                                      Open Case
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* ============================================================ */}
-            {/* 2. CASELOAD TAB */}
+            {/* 2. MY ASSIGNED HOUSEHOLDS TAB (B2) */}
             {/* ============================================================ */}
             {activeTab === "cases" && (
-              <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      My Assigned Households ({cases.length})
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      View assigned family profiles, monitor verified entitlements, and initiate doorstep assistance.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setRegisterError(null);
+                      setIsRegisterModalOpen(true);
+                    }}
+                    className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white self-start sm:self-auto shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Register Household</span>
+                  </Button>
+                </div>
+
                 {/* Search & Filter Controls */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center gap-3">
                   <div className="relative flex-1 w-full">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                     <input
                       type="text"
-                      placeholder="Search households by head name, district, or case ID..."
+                      placeholder="Search households by head name, district, village, or case ID..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
@@ -1151,7 +1380,7 @@ export default function AshaWorkspacePage() {
                     >
                       <option value="ALL">All Statuses</option>
                       <option value="NEW">New</option>
-                      <option value="ACTIVE">Active</option>
+                      <option value="ACTIVE">Active Journey</option>
                       <option value="NEEDS_ATTENTION">Needs Attention</option>
                       <option value="FOLLOW_UP">Follow Up</option>
                       <option value="RESOLVED">Resolved</option>
@@ -1164,166 +1393,188 @@ export default function AshaWorkspacePage() {
                       className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
                     >
                       <option value="ALL">All Priorities</option>
-                      <option value="LOW">Low</option>
-                      <option value="NORMAL">Normal</option>
-                      <option value="HIGH">High</option>
                       <option value="URGENT">Urgent</option>
+                      <option value="HIGH">High</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="LOW">Low</option>
                     </select>
                   </div>
                 </div>
 
+                {/* Card-Based Household Roster */}
                 {filteredCases.length === 0 ? (
-                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
-                    <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <h3 className="text-sm font-bold text-slate-800">No Matching Cases Found</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-2">
+                    <Users className="w-9 h-9 text-slate-300 mx-auto mb-1" />
+                    <h3 className="text-sm font-bold text-slate-800">No Matching Households Found</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
                       No assigned cases match your current search and filter criteria.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                            <th className="py-3 px-4">Head of Household</th>
-                            <th className="py-3 px-4">District</th>
-                            <th className="py-3 px-4">Ration Tier</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4">Priority</th>
-                            <th className="py-3 px-4">Gaps Identified</th>
-                            <th className="py-3 px-4 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredCases.map((c) => (
-                            <tr
-                              key={c.id}
-                              className="hover:bg-slate-50/80 cursor-pointer transition-colors"
-                              onClick={() => openCaseDetail(c.id)}
-                            >
-                              <td className="py-3.5 px-4">
-                                <div className="font-bold text-slate-900">{c.headOfHouseholdName}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{c.id}</div>
-                              </td>
-                              <td className="py-3.5 px-4 text-slate-600">
-                                {c.district}, {c.state}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 font-semibold rounded text-[10px]">
-                                  {c.incomeCategory}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                                    c.status === "NEEDS_ATTENTION"
-                                      ? "bg-amber-100 text-amber-800"
-                                      : c.status === "ACTIVE"
-                                      ? "bg-blue-100 text-blue-800"
-                                      : c.status === "RESOLVED"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-slate-100 text-slate-700"
-                                  }`}
-                                >
-                                  {c.status.replace("_", " ")}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                                    c.priority === "URGENT"
-                                      ? "bg-red-100 text-red-800"
-                                      : c.priority === "HIGH"
-                                      ? "bg-amber-100 text-amber-800"
-                                      : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {c.priority}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-4 text-slate-700">
-                                {c.detectedGapsCount > 0 ? (
-                                  <span className="text-amber-700 font-bold">
-                                    {c.detectedGapsCount} gap{c.detectedGapsCount === 1 ? "" : "s"}
-                                  </span>
-                                ) : (
-                                  <span className="text-emerald-600 font-medium">None</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 text-right">
-                                <Button variant="outline" size="sm" className="text-xs font-semibold py-1 px-2.5">
-                                  View Case
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredCases.map((c) => {
+                      const isResolved = c.status === "RESOLVED" || c.status === "CLOSED";
+                      const isNeedsAttention = c.status === "NEEDS_ATTENTION" || c.detectedGapsCount > 0;
+
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => openCaseDetail(c.id)}
+                          className={`rounded-xl border p-5 shadow-2xs space-y-4 flex flex-col justify-between cursor-pointer hover:border-emerald-400 hover:shadow-xs transition-all ${
+                            isResolved
+                              ? "bg-slate-50/60 border-slate-200"
+                              : isNeedsAttention
+                              ? "bg-amber-50/20 border-amber-200"
+                              : "bg-white border-slate-200"
+                          }`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center justify-center text-sm shrink-0">
+                                  {c.headOfHouseholdName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                    {c.headOfHouseholdName}
+                                  </h4>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {c.district}, {c.state}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  c.priority === "URGENT"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : c.priority === "HIGH"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {c.priority}
+                              </span>
+                            </div>
+
+                            {/* Ration Category & Status Badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                                Ration: {c.incomeCategory}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  isResolved
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : c.status === "ACTIVE"
+                                    ? "bg-blue-50 text-blue-800 border-blue-200"
+                                    : isNeedsAttention
+                                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                                    : "bg-slate-50 text-slate-700 border-slate-200"
+                                }`}
+                              >
+                                {c.status.replace(/_/g, " ")}
+                              </span>
+                            </div>
+
+                            {/* Active Scheme or Gap detail */}
+                            <div className="pt-2 border-t border-slate-100 text-xs">
+                              {c.schemeName ? (
+                                <div className="p-2 bg-teal-50/50 rounded-lg border border-teal-100 text-teal-950 font-semibold text-[11px] flex items-center gap-1.5">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                                  <span className="truncate">{c.schemeName}</span>
+                                </div>
+                              ) : c.detectedGapsCount > 0 ? (
+                                <div className="p-2 bg-amber-50/50 rounded-lg border border-amber-100 text-amber-900 font-semibold text-[11px] flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                  <span>{c.detectedGapsCount} Entitlement Gap Identified</span>
+                                </div>
+                              ) : (
+                                <div className="text-slate-500 text-[11px] flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Entitlements up to date</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Case: {c.id.slice(0, 10)}...
+                            </span>
+                            <span className="font-bold text-emerald-800 flex items-center gap-1 hover:text-emerald-950">
+                              <span>Open Household</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
 
             {/* ============================================================ */}
-            {/* 3. REQUESTS TAB (ASSISTANCE & CONNECTIONS) */}
+            {/* 3. ASSISTANCE REQUESTS TAB (B3) */}
             {/* ============================================================ */}
             {activeTab === "requests" && (
-              <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      Incoming Citizen Requests
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      Respond to scheme enrollment, document verification, and household connection requests.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Subtab Switcher */}
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
                   <button
                     onClick={() => setRequestsSubTab("assistance")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                       requestsSubTab === "assistance"
-                        ? "bg-teal-800 text-white"
+                        ? "bg-teal-800 text-white shadow-2xs"
                         : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
-                    Citizen Assistance Requests ({assistanceRequests.length})
+                    Citizen Assistance Requests ({activeAssistanceCount} Active / {assistanceRequests.length} Total)
                   </button>
                   <button
                     onClick={() => setRequestsSubTab("connections")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                       requestsSubTab === "connections"
-                        ? "bg-emerald-700 text-white"
+                        ? "bg-emerald-700 text-white shadow-2xs"
                         : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
-                    Household Connection Requests ({connectionRequests.length})
+                    Household Connection Requests ({pendingConnectionCount})
                   </button>
                 </div>
 
                 {/* SUBTAB A: CITIZEN ASSISTANCE REQUESTS */}
                 {requestsSubTab === "assistance" && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
-                      <div>
-                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                          <MessageSquare className="w-5 h-5 text-teal-700" />
-                          <span>Citizen Assistance Queue</span>
-                          <span className="text-xs font-bold px-2 py-0.5 bg-teal-100 text-teal-800 rounded-full">
-                            {pendingAssistanceCount} Active
-                          </span>
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Requests from connected citizens requesting scheme enrollment, document help, or health facility guidance.
-                        </p>
-                      </div>
-                    </div>
-
                     {assistanceRequests.length === 0 ? (
-                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8">
-                        <MessageSquare className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8 space-y-2">
+                        <MessageSquare className="w-9 h-9 text-slate-300 mx-auto mb-1" />
                         <h3 className="text-base font-bold text-slate-800">No Assistance Requests</h3>
-                        <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                          When connected citizens request help with schemes or documents, their requests will appear here with one-click case access.
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          When connected citizens request help with schemes or documents, their requests will appear here for one-click case activation.
                         </p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {assistanceRequests.map((req) => {
+                        {[...assistanceRequests].sort((a, b) => {
+                          const aActive = !["RESOLVED", "CLOSED", "DECLINED"].includes(a.status);
+                          const bActive = !["RESOLVED", "CLOSED", "DECLINED"].includes(b.status);
+                          if (aActive && !bActive) return -1;
+                          if (!aActive && bActive) return 1;
+                          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                        }).map((req) => {
                           const isResolved = req.status === "RESOLVED" || req.status === "CLOSED";
                           const isDeclined = req.status === "DECLINED";
                           const isPending = req.status === "PENDING" || req.status === "REQUESTED";
@@ -1337,7 +1588,7 @@ export default function AshaWorkspacePage() {
                                   : isDeclined
                                   ? "border-rose-200 bg-rose-50/20"
                                   : isPending
-                                  ? "border-teal-300 bg-teal-50/15 ring-2 ring-teal-200/50"
+                                  ? "border-teal-300 bg-teal-50/20 ring-2 ring-teal-200/50"
                                   : "border-slate-200 bg-white"
                               }`}
                             >
@@ -1349,17 +1600,6 @@ export default function AshaWorkspacePage() {
                                       <span className="text-[10px] font-bold text-teal-900 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                                         {req.category.replace(/_/g, " ")}
                                       </span>
-                                      {req.priority && req.priority !== "NORMAL" && (
-                                        <span
-                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                                            req.priority === "URGENT"
-                                              ? "bg-rose-100 text-rose-800 border border-rose-300 animate-pulse"
-                                              : "bg-amber-100 text-amber-800 border border-amber-300"
-                                          }`}
-                                        >
-                                          {req.priority} PRIORITY
-                                        </span>
-                                      )}
                                     </div>
                                     <p className="text-xs text-slate-500 mt-0.5">
                                       {req.district}, {req.state} • {new Date(req.createdAt).toLocaleDateString()}
@@ -1382,25 +1622,27 @@ export default function AshaWorkspacePage() {
 
                                 {/* Beneficiary Member Tag */}
                                 {req.beneficiaryName && (
-                                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 flex items-center justify-between text-xs text-emerald-950">
+                                  <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-2.5 flex items-center justify-between text-xs text-emerald-950">
                                     <div className="flex items-center gap-1.5 font-semibold">
                                       <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
                                       <span>Target Beneficiary: {req.beneficiaryName}</span>
                                     </div>
-                                    <span className="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded font-mono">
+                                    <span className="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-mono">
                                       {req.beneficiaryRelationship || "Member"}{req.beneficiaryAge ? `, ${req.beneficiaryAge} yrs` : ""}
                                     </span>
                                   </div>
                                 )}
 
                                 {req.schemeName && (
-                                  <div className="p-2 bg-slate-50 rounded border border-slate-200 text-xs text-slate-700 font-medium">
+                                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-800">
                                     Associated Scheme: <strong>{req.schemeName}</strong>
                                   </div>
                                 )}
 
                                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-800">
-                                  <span className="font-semibold block text-[10px] text-slate-400 uppercase">Citizen Request Message:</span>
+                                  <span className="font-semibold block text-[10px] text-slate-400 uppercase">
+                                    Citizen Request Message:
+                                  </span>
                                   <p className="mt-0.5 leading-relaxed">&ldquo;{req.message}&rdquo;</p>
                                 </div>
 
@@ -1418,7 +1660,7 @@ export default function AshaWorkspacePage() {
                                   </div>
                                 )}
 
-                                {/* Decline reason input if active */}
+                                {/* Decline reason input */}
                                 {decliningRequestId === req.id && (
                                   <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 space-y-2">
                                     <label className="text-xs font-semibold text-rose-900 block">
@@ -1507,7 +1749,7 @@ export default function AshaWorkspacePage() {
                                           size="sm"
                                           disabled={isUpdatingAssistance === req.id}
                                           onClick={() => handleAcceptAssistance(req.id)}
-                                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1"
+                                          className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 shadow-2xs"
                                         >
                                           <Check className="w-3.5 h-3.5" /> Accept & Open Case
                                         </Button>
@@ -1519,7 +1761,7 @@ export default function AshaWorkspacePage() {
                                         size="sm"
                                         disabled={isUpdatingAssistance === req.id}
                                         onClick={() => handleUpdateAssistance(req.id, "RESOLVED")}
-                                        className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold"
+                                        className="text-xs bg-teal-800 hover:bg-teal-900 text-white font-semibold shadow-2xs"
                                       >
                                         Resolve Request
                                       </Button>
@@ -1548,20 +1790,17 @@ export default function AshaWorkspacePage() {
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
                       <div>
-                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                          <Inbox className="w-5 h-5 text-emerald-700" />
-                          <span>Household Connection Requests</span>
-                          <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
-                            {connectionRequests.length} Pending
-                          </span>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                          <Inbox className="w-4 h-4 text-emerald-700" />
+                          <span>Household Connection Requests ({connectionRequests.length})</span>
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-0.5">
                           Citizens who entered your ASHA Service Code to link their households for doorstep healthcare guidance.
                         </p>
                       </div>
 
                       {userProfile?.ashaServiceCode && (
-                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                           <span className="text-[11px] font-semibold text-slate-500">Your Shareable ID:</span>
                           <span className="text-xs font-mono font-bold text-slate-900">{userProfile.ashaServiceCode}</span>
                           <button
@@ -1575,11 +1814,11 @@ export default function AshaWorkspacePage() {
                     </div>
 
                     {connectionRequests.length === 0 ? (
-                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8">
-                        <Inbox className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-8 space-y-2">
+                        <Inbox className="w-9 h-9 text-slate-300 mx-auto mb-1" />
                         <h3 className="text-base font-bold text-slate-800">No Pending Requests</h3>
-                        <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                          When families in your assigned area enter your Service Code <span className="font-mono font-bold text-slate-700">{userProfile?.ashaServiceCode || "ASHA-KA-XXXX"}</span>, their requests will appear here for one-click verification and enrollment.
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          When families in your area enter your Service Code <span className="font-mono font-bold text-slate-700">{userProfile?.ashaServiceCode || "ASHA-KA-XXXX"}</span>, their requests will appear here for one-click verification and enrollment.
                         </p>
                       </div>
                     ) : (
@@ -1609,7 +1848,7 @@ export default function AshaWorkspacePage() {
 
                               {req.responseNote && (
                                 <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 italic">
-                                  "{req.responseNote}"
+                                  &ldquo;{req.responseNote}&rdquo;
                                 </p>
                               )}
                             </div>
@@ -1627,7 +1866,7 @@ export default function AshaWorkspacePage() {
                                 variant="primary"
                                 size="sm"
                                 onClick={() => handleAcceptRequest(req.id)}
-                                className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"
+                                className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-2xs"
                               >
                                 <Check className="w-3.5 h-3.5 mr-1" /> Accept & Add to Caseload
                               </Button>
@@ -1642,7 +1881,7 @@ export default function AshaWorkspacePage() {
             )}
 
             {/* ============================================================ */}
-            {/* 4. NEEDS ATTENTION TAB */}
+            {/* 4. NEEDS ATTENTION QUEUE */}
             {/* ============================================================ */}
             {activeTab === "attention" && (
               <div className="space-y-4">
@@ -1651,7 +1890,7 @@ export default function AshaWorkspacePage() {
                   <div>
                     <p className="font-bold">Proactive Healthcare Access Intelligence</p>
                     <p className="mt-0.5 text-amber-800">
-                      These signals are deterministically calculated across your assigned households to highlight senior citizens eligible for PM-JAY, pregnant mothers needing maternal care (JSY), overdue home visits, and blocked tasks.
+                      These signals highlight senior citizens eligible for PM-JAY (70+), pregnant mothers needing maternal care (JSY), overdue home visits, and blocked tasks across your assigned households.
                     </p>
                   </div>
                 </div>
@@ -1662,10 +1901,10 @@ export default function AshaWorkspacePage() {
                     <p className="text-xs text-slate-500 font-medium">Evaluating proactive household signals...</p>
                   </div>
                 ) : attentionSignals.length === 0 ? (
-                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2 opacity-80" />
-                    <p className="text-sm font-bold text-slate-800">No households currently require attention.</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                  <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-1">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-1 opacity-80" />
+                    <p className="text-sm font-bold text-slate-800">No households currently require attention</p>
+                    <p className="text-xs text-slate-500">
                       All assigned households have active, addressed entitlements and up-to-date follow-ups.
                     </p>
                   </div>
@@ -1708,7 +1947,7 @@ export default function AshaWorkspacePage() {
                         </div>
 
                         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <span className="text-[11px] text-slate-400 font-mono">Case ID: {sig.caseId}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">Case: {sig.caseId.slice(0, 10)}...</span>
                           <div className="flex items-center gap-2">
                             {sig.actionType === "INITIATE_SCHEME" && sig.schemeId && (
                               <Button
@@ -1718,7 +1957,7 @@ export default function AshaWorkspacePage() {
                                 onClick={() =>
                                   handleInitiateScheme(sig.caseId, sig.schemeId!, sig.beneficiaryMemberId)
                                 }
-                                className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5"
+                                className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs"
                               >
                                 <Send className="w-3.5 h-3.5" />
                                 <span>
@@ -1746,10 +1985,29 @@ export default function AshaWorkspacePage() {
             )}
 
             {/* ============================================================ */}
-            {/* 5. FOLLOW-UPS TAB (PHASE 10) */}
+            {/* 5. FOLLOW-UPS TAB (B5) */}
             {/* ============================================================ */}
             {activeTab === "followups" && (
               <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                      Follow-up &amp; Visit Tasks
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      Scheduled home visits, documentation verification checks, and health outreach tasks.
+                    </p>
+                  </div>
+                  <button
+                    onClick={loadFollowUps}
+                    disabled={isFollowUpsLoading}
+                    className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer self-start sm:self-auto bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"
+                  >
+                    <Activity className={`w-3.5 h-3.5 ${isFollowUpsLoading ? "animate-spin" : ""}`} />
+                    <span>Refresh Roster</span>
+                  </button>
+                </div>
+
                 {/* Top Metrics Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   <div
@@ -1764,7 +2022,7 @@ export default function AshaWorkspacePage() {
                       <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Due Today</span>
                       <Calendar className="w-4 h-4 text-amber-600" />
                     </div>
-                    <p className="text-2xl font-extrabold text-amber-950 mt-1">{followUpSummary?.dueToday || 0}</p>
+                    <p className="text-2xl font-extrabold text-amber-950 mt-1">{dueTodayFollowUpsCount}</p>
                     <p className="text-[11px] text-amber-700 mt-0.5">Visits scheduled today</p>
                   </div>
 
@@ -1780,7 +2038,7 @@ export default function AshaWorkspacePage() {
                       <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Overdue</span>
                       <AlertTriangle className="w-4 h-4 text-rose-600" />
                     </div>
-                    <p className="text-2xl font-extrabold text-rose-950 mt-1">{followUpSummary?.overdue || 0}</p>
+                    <p className="text-2xl font-extrabold text-rose-950 mt-1">{overdueFollowUpsCount}</p>
                     <p className="text-[11px] text-rose-700 mt-0.5">Urgent pending action</p>
                   </div>
 
@@ -1796,7 +2054,7 @@ export default function AshaWorkspacePage() {
                       <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">Upcoming</span>
                       <Clock className="w-4 h-4 text-sky-600" />
                     </div>
-                    <p className="text-2xl font-extrabold text-sky-950 mt-1">{followUpSummary?.upcoming || 0}</p>
+                    <p className="text-2xl font-extrabold text-sky-950 mt-1">{upcomingFollowUpsCount}</p>
                     <p className="text-[11px] text-sky-700 mt-0.5">Scheduled in next 14 days</p>
                   </div>
 
@@ -1812,28 +2070,28 @@ export default function AshaWorkspacePage() {
                       <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Completed</span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     </div>
-                    <p className="text-2xl font-extrabold text-emerald-950 mt-1">{followUpSummary?.completed || 0}</p>
+                    <p className="text-2xl font-extrabold text-emerald-950 mt-1">{completedFollowUpsCount}</p>
                     <p className="text-[11px] text-emerald-700 mt-0.5">Visits successfully done</p>
                   </div>
                 </div>
 
                 {/* Filter Pills Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
                   <div className="flex items-center gap-1.5 overflow-x-auto">
                     {[
-                      { id: "ALL", label: `All Follow-ups (${followUpSummary?.total || 0})` },
-                      { id: "OVERDUE", label: `Overdue (${followUpSummary?.overdue || 0})` },
-                      { id: "DUE_TODAY", label: `Due Today (${followUpSummary?.dueToday || 0})` },
-                      { id: "UPCOMING", label: `Upcoming (${followUpSummary?.upcoming || 0})` },
-                      { id: "COMPLETED", label: `Completed (${followUpSummary?.completed || 0})` },
-                      { id: "CANCELLED", label: `Cancelled (${followUpSummary?.cancelled || (followUpSummary?.followUps?.filter((f) => f.status === "CANCELLED").length || 0)})` },
+                      { id: "ALL", label: `All Follow-ups (${totalFollowUpsCount})` },
+                      { id: "OVERDUE", label: `Overdue (${overdueFollowUpsCount})` },
+                      { id: "DUE_TODAY", label: `Due Today (${dueTodayFollowUpsCount})` },
+                      { id: "UPCOMING", label: `Upcoming (${upcomingFollowUpsCount})` },
+                      { id: "COMPLETED", label: `Completed (${completedFollowUpsCount})` },
+                      { id: "CANCELLED", label: `Cancelled (${cancelledFollowUpsCount})` },
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setFollowUpFilter(tab.id as any)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
                           followUpFilter === tab.id
-                            ? "bg-slate-900 text-white"
+                            ? "bg-slate-900 text-white shadow-2xs"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
@@ -1841,30 +2099,21 @@ export default function AshaWorkspacePage() {
                       </button>
                     ))}
                   </div>
-
-                  <button
-                    onClick={loadFollowUps}
-                    disabled={isFollowUpsLoading}
-                    className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Activity className={`w-3.5 h-3.5 ${isFollowUpsLoading ? "animate-spin" : ""}`} />
-                    <span>Refresh Roster</span>
-                  </button>
                 </div>
 
                 {/* Follow-up Cards List */}
                 {(() => {
                   const allFollowUps = followUpSummary?.followUps || [];
-                  const todayStr = new Date().toISOString().split("T")[0];
+                  const todayIsoStr = new Date().toISOString().split("T")[0];
 
                   const filtered = allFollowUps.filter((f) => {
                     const dueDateStr = f.dueAt || f.scheduledAt;
-                    const dateOnlyStr = dueDateStr ? dueDateStr.split("T")[0] : "";
-                    const isToday = dateOnlyStr === todayStr;
+                    const dateOnlyStr = dueDateStr ? new Date(dueDateStr).toISOString().split("T")[0] : "";
+                    const isToday = dateOnlyStr === todayIsoStr;
 
                     if (followUpFilter === "ALL") return true;
                     if (followUpFilter === "DUE_TODAY") return f.status === "PENDING" && isToday;
-                    if (followUpFilter === "OVERDUE") return f.isOverdue === true;
+                    if (followUpFilter === "OVERDUE") return f.status === "PENDING" && f.isOverdue === true && !isToday;
                     if (followUpFilter === "UPCOMING") return f.status === "PENDING" && !isToday && !f.isOverdue;
                     if (followUpFilter === "COMPLETED") return f.status === "COMPLETED";
                     if (followUpFilter === "CANCELLED") return f.status === "CANCELLED";
@@ -1873,10 +2122,10 @@ export default function AshaWorkspacePage() {
 
                   if (filtered.length === 0) {
                     return (
-                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6">
+                      <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-1">
                         <Clock className="w-9 h-9 text-slate-300 mx-auto mb-2.5" />
                         <h3 className="text-sm font-bold text-slate-800">No Follow-ups in this Category</h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
                           {followUpFilter === "OVERDUE"
                             ? "Great job! There are no overdue household follow-ups."
                             : followUpFilter === "DUE_TODAY"
@@ -1893,8 +2142,8 @@ export default function AshaWorkspacePage() {
                     <div className="space-y-3">
                       {filtered.map((f) => {
                         const dueDateStr = f.dueAt || f.scheduledAt;
-                        const dateOnlyStr = dueDateStr ? dueDateStr.split("T")[0] : "";
-                        const isToday = dateOnlyStr === todayStr;
+                        const dateOnlyStr = dueDateStr ? new Date(dueDateStr).toISOString().split("T")[0] : "";
+                        const isToday = dateOnlyStr === todayIsoStr;
 
                         return (
                           <div
@@ -2012,7 +2261,7 @@ export default function AshaWorkspacePage() {
                                       variant="primary"
                                       size="sm"
                                       onClick={() => handleOpenCompleteModal(f)}
-                                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1 cursor-pointer"
+                                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1 cursor-pointer shadow-2xs"
                                     >
                                       <Check className="w-3.5 h-3.5" />
                                       <span>Mark Done</span>
