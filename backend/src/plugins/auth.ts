@@ -26,6 +26,11 @@ import { ConnectionRepository } from "../repositories/connection.repository.js";
 import { ConnectionService } from "../services/connection.service.js";
 import { AssistanceRepository } from "../repositories/assistance.repository.js";
 import { AssistanceService } from "../services/assistance.service.js";
+import { VoiceSessionRepository } from "../repositories/voice-session.repository.js";
+import { SarvamService } from "../services/telephony/sarvam.service.js";
+import { ExotelService } from "../services/telephony/exotel.service.js";
+import { VoiceActionService } from "../services/telephony/voice-action.service.js";
+import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 
 declare module "fastify" {
@@ -54,6 +59,11 @@ declare module "fastify" {
     intelligenceService: IntelligenceService;
     geminiService: GeminiService;
     assistantService: AssistantService;
+    voiceSessionRepository: VoiceSessionRepository;
+    sarvamService: SarvamService;
+    exotelService: ExotelService;
+    voiceActionService: VoiceActionService;
+    voiceGatewayService: VoiceGatewayService;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
@@ -144,6 +154,29 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
   const privilegedAuthService = new PrivilegedAuthService();
 
+  const voiceSessionRepository = new VoiceSessionRepository(firestoreInstance);
+  const sarvamService = new SarvamService();
+  const exotelService = new ExotelService();
+  const voiceActionService = new VoiceActionService(
+    schemeService,
+    householdRepository,
+    eligibilityService,
+    assistanceService,
+    caseRepository,
+    connectionRepository,
+    userRepository
+  );
+  const voiceGatewayService = new VoiceGatewayService(
+    voiceSessionRepository,
+    sarvamService,
+    exotelService,
+    voiceActionService,
+    caseRepository,
+    householdRepository,
+    userRepository,
+    automationService
+  );
+
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
   fastify.decorate("privilegedAuthService", privilegedAuthService);
@@ -168,6 +201,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("intelligenceService", intelligenceService);
   fastify.decorate("geminiService", geminiService);
   fastify.decorate("assistantService", assistantService);
+  fastify.decorate("voiceSessionRepository", voiceSessionRepository);
+  fastify.decorate("sarvamService", sarvamService);
+  fastify.decorate("exotelService", exotelService);
+  fastify.decorate("voiceActionService", voiceActionService);
+  fastify.decorate("voiceGatewayService", voiceGatewayService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 

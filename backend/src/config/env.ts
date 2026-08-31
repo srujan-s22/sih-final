@@ -41,6 +41,28 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   GEMINI_TIMEOUT_MS: z.coerce.number().default(15000),
   GEMINI_MAX_OUTPUT_TOKENS: z.coerce.number().default(2048),
+
+  // Phase 10 n8n Automation & Webhooks
+  N8N_WEBHOOK_URL: z.string().optional(),
+  N8N_WEBHOOK_SECRET: z.string().optional(),
+
+  // Phase 11 Sarvam AI + Exotel Voice / Call Assist (Server-Side Only)
+  SARVAM_API_KEY: z.string().optional(),
+  SARVAM_BASE_URL: z.string().default("https://api.sarvam.ai"),
+  SARVAM_MODEL: z.string().default("saaras:v3"),
+  SARVAM_TTS_MODEL: z.string().default("bulbul:v3"),
+  SARVAM_TTS_SPEAKER: z.string().default("roopa"),
+  SARVAM_TIMEOUT_MS: z.coerce.number().default(10000),
+  EXOTEL_ACCOUNT_SID: z.string().optional(),
+  EXOTEL_API_KEY: z.string().optional(),
+  EXOTEL_API_TOKEN: z.string().optional(),
+  EXOTEL_BASE_URL: z.string().default("https://api.exotel.com"),
+  EXOTEL_VIRTUAL_NUMBER: z.string().optional(),
+  EXOTEL_CALLER_ID: z.string().optional(),
+  VOICE_ENABLED: z.coerce.boolean().default(true),
+  VOICE_PROVIDER_MODE: z.enum(["real", "test"]).default("real"),
+  VOICE_MAX_TURNS: z.coerce.number().default(10),
+  VOICE_MAX_CALL_DURATION_SEC: z.coerce.number().default(300),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

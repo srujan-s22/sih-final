@@ -11,6 +11,7 @@ import { assistantRoutes } from "./assistant.js";
 import { caseRoutes } from "./case.js";
 import { connectionRoutes } from "./connection.js";
 import { assistanceRoutes } from "./assistance.js";
+import { voiceRoutes } from "./voice.js";
 import { testAuthRoutes } from "./test-auth.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
@@ -49,6 +50,9 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Register Citizen <-> ASHA assistance request routes
   await fastify.register(assistanceRoutes);
+
+  // Register Voice & Telephony routes (Phase 11)
+  await fastify.register(voiceRoutes);
 
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);

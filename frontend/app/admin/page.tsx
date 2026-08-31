@@ -10,9 +10,11 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { Scheme } from "@shared/types/eligibility";
 import { EvidenceRecord } from "@shared/types/evidence";
 import { AshaCase, CaseFollowUp, AutomationHealthResponse, AutomationDomainEvent } from "@shared/types/case";
+import { VoiceHealthResponse } from "@shared/types/voice";
 import { schemeService } from "@/services/scheme-service";
 import { evidenceService } from "@/services/evidence-service";
 import { caseService } from "@/services/case-service";
+import { voiceService } from "@/services/voice-service";
 import {
   Building2,
   ShieldCheck,
@@ -33,6 +35,8 @@ import {
   Clock,
   AlertTriangle,
   Calendar,
+  PhoneCall,
+  Mic,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -46,6 +50,7 @@ export default function AdminPage() {
   const [adminCases, setAdminCases] = useState<AshaCase[]>([]);
   const [automationHealth, setAutomationHealth] = useState<AutomationHealthResponse | null>(null);
   const [adminFollowUps, setAdminFollowUps] = useState<CaseFollowUp[]>([]);
+  const [voiceTelemetry, setVoiceTelemetry] = useState<VoiceHealthResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("schemes");
   const [searchFilter, setSearchFilter] = useState("");
@@ -61,12 +66,13 @@ export default function AdminPage() {
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [schemesRes, conflictsRes, casesRes, automationRes, followUpsRes] = await Promise.all([
+      const [schemesRes, conflictsRes, casesRes, automationRes, followUpsRes, voiceRes] = await Promise.all([
         schemeService.getActiveSchemes(),
         evidenceService.getEvidenceConflicts(),
         caseService.listAllCasesForAdmin(),
         caseService.getAutomationHealth(),
         caseService.listAllFollowUpsForAdmin(),
+        voiceService.getVoiceTelemetry(),
       ]);
 
       if (schemesRes.success && schemesRes.data) {
@@ -84,6 +90,9 @@ export default function AdminPage() {
       }
       if (followUpsRes.success && followUpsRes.data) {
         setAdminFollowUps(followUpsRes.data.followUps || []);
+      }
+      if (voiceRes.success && voiceRes.data) {
+        setVoiceTelemetry(voiceRes.data);
       }
     } catch {
       // Non-blocking
@@ -653,6 +662,103 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Voice Telemetry & Telephony Health (Phase 11) */}
+                <div className="space-y-4 pt-6 border-t border-slate-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <PhoneCall className="w-4 h-4 text-emerald-700" />
+                      <span>Sarvam AI & Exotel Voice Telephony Engine</span>
+                    </h3>
+                    <span className="text-xs text-slate-500 font-mono">
+                      Virtual Number: {voiceTelemetry?.virtualNumber || "+91-1800-SWASTHYA"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                        Sarvam STT / TTS
+                      </span>
+                      <p className={`text-base font-bold ${voiceTelemetry?.sarvamConfigured ? "text-emerald-700" : "text-amber-700"}`}>
+                        {voiceTelemetry?.sarvamConfigured ? "Active (saaras:v2)" : "Unconfigured (Fallback)"}
+                      </p>
+                      <p className="text-[11px] text-slate-400">Multilingual Speech Engine</p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                        Exotel Telephony
+                      </span>
+                      <p className={`text-base font-bold ${voiceTelemetry?.exotelConfigured ? "text-emerald-700" : "text-amber-700"}`}>
+                        {voiceTelemetry?.exotelConfigured ? "Connected (PSTN)" : "Unconfigured (Test Mode)"}
+                      </p>
+                      <p className="text-[11px] text-slate-400">Carrier Outbound / IVR</p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                      <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
+                        Calls Today
+                      </span>
+                      <p className="text-2xl font-bold text-blue-900">
+                        {voiceTelemetry?.totalCallsToday || 0}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {voiceTelemetry?.completedCallsToday || 0} completed, {voiceTelemetry?.noAnswerCallsToday || 0} no answer
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                      <span className="text-[11px] font-semibold text-teal-700 uppercase tracking-wide">
+                        Avg Call Duration
+                      </span>
+                      <p className="text-2xl font-bold text-teal-900">
+                        {voiceTelemetry?.averageDurationSeconds || 0}s
+                      </p>
+                      <p className="text-[11px] text-slate-400">Cost Controlled (Max 300s)</p>
+                    </div>
+                  </div>
+
+                  {/* Recent Voice Sessions Table */}
+                  {voiceTelemetry?.recentSessions && voiceTelemetry.recentSessions.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+                      <div className="p-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center gap-2">
+                        <Mic className="w-3.5 h-3.5 text-teal-700" />
+                        <h4 className="text-xs font-bold text-slate-900">Recent Voice Helpline & Reminder Sessions</h4>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                            <tr>
+                              <th className="py-2.5 px-4">Session / Call SID</th>
+                              <th className="py-2.5 px-4">Direction</th>
+                              <th className="py-2.5 px-4">Caller (Masked)</th>
+                              <th className="py-2.5 px-4">Intent</th>
+                              <th className="py-2.5 px-4">Duration</th>
+                              <th className="py-2.5 px-4">Outcome</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {voiceTelemetry.recentSessions.map((s) => (
+                              <tr key={s.id} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-4 font-mono text-[11px] text-slate-800">{s.callSid}</td>
+                                <td className="py-2.5 px-4 font-semibold text-slate-700">{s.direction}</td>
+                                <td className="py-2.5 px-4 font-mono text-slate-600">{s.maskedNumber}</td>
+                                <td className="py-2.5 px-4 text-teal-800 font-semibold">{s.intent || "GENERAL"}</td>
+                                <td className="py-2.5 px-4 text-slate-600">{s.durationSeconds ? `${s.durationSeconds}s` : "--"}</td>
+                                <td className="py-2.5 px-4">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
+                                    {s.outcome || s.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </section>
             )}
 

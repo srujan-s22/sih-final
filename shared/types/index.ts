@@ -12,3 +12,4 @@ export * from "./assistant.js";
 export * from "./case.js";
 export * from "./connection.js";
 export * from "./assistance.js";
+export * from "./voice.js";

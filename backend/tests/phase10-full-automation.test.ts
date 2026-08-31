@@ -27,33 +27,53 @@ describe("Phase 10: Actions, Follow-ups & n8n Automation Engine", () => {
   const adminProfile: UserProfile = {
     uid: "admin-phase10-uid",
     email: "admin@test.swasthyasetu.gov.in",
+    phoneNumber: "+919999900001",
     displayName: "Admin Officer",
     role: "ADMIN",
-    consentGiven: true,
+    consentStatus: "accepted",
+    consentVersion: "1.0",
+    consentedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const ashaProfile: UserProfile = {
     uid: "asha-phase10-uid",
     email: "asha@test.swasthyasetu.gov.in",
+    phoneNumber: "+919999900002",
     displayName: "Sunita ASHA",
     role: "ASHA",
-    consentGiven: true,
+    consentStatus: "accepted",
+    consentVersion: "1.0",
+    consentedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const otherAshaProfile: UserProfile = {
     uid: "other-asha-uid",
     email: "other@test.swasthyasetu.gov.in",
+    phoneNumber: "+919999900003",
     displayName: "Other ASHA",
     role: "ASHA",
-    consentGiven: true,
+    consentStatus: "accepted",
+    consentVersion: "1.0",
+    consentedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const citizenProfile: UserProfile = {
     uid: "citizen-phase10-uid",
     email: "citizen@test.swasthyasetu.gov.in",
+    phoneNumber: "+919999900004",
     displayName: "Devendra Verma",
     role: "CITIZEN",
-    consentGiven: true,
+    consentStatus: "accepted",
+    consentVersion: "1.0",
+    consentedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const testHousehold: Household = {
@@ -125,7 +145,7 @@ describe("Phase 10: Actions, Follow-ups & n8n Automation Engine", () => {
     );
 
     // Seed mock data
-    await householdRepo.createHousehold(testHousehold, citizenProfile.uid);
+    await householdRepo.createHousehold(testHousehold);
     await householdRepo.createMember(testHousehold.id, seniorMember);
     await householdRepo.createMember(testHousehold.id, pregnantMember);
 
@@ -139,9 +159,15 @@ describe("Phase 10: Actions, Follow-ups & n8n Automation Engine", () => {
       headOfHouseholdName: testHousehold.headOfHouseholdName,
       district: testHousehold.district,
       state: testHousehold.state,
+      incomeCategory: "BPL",
+      memberCount: 3,
       assignedAshaUid: ashaProfile.uid,
       status: "ACTIVE",
       priority: "NORMAL",
+      detectedGapsCount: 0,
+      eligibleSchemesCount: 1,
+      lastContactAt: null,
+      nextFollowUpAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

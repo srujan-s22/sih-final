@@ -1,0 +1,202 @@
+import { FastifyPluginAsync } from "fastify";
+import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
+import { VoiceSessionRepository } from "../repositories/voice-session.repository.js";
+import { SarvamService } from "../services/telephony/sarvam.service.js";
+import { ExotelService } from "../services/telephony/exotel.service.js";
+import { VoiceActionService } from "../services/telephony/voice-action.service.js";
+import { SchemeService } from "../services/scheme.service.js";
+import { SchemeRepository } from "../repositories/scheme.repository.js";
+import { HouseholdRepository } from "../repositories/household.repository.js";
+import { EligibilityService } from "../services/eligibility/eligibility.service.js";
+import { AssistanceService } from "../services/assistance.service.js";
+import { AssistanceRepository } from "../repositories/assistance.repository.js";
+import { CaseRepository } from "../repositories/case.repository.js";
+import { ConnectionRepository } from "../repositories/connection.repository.js";
+import { UserRepository } from "../repositories/user.repository.js";
+import { AutomationService } from "../services/automation/automation.service.js";
+import {
+  VoiceTurnInputSchema,
+  VerifyCallerIdentityInputSchema,
+  InitiateOutboundCallInputSchema,
+  ExotelInboundWebhookSchema,
+  ExotelStatusCallbackSchema,
+} from "../../../shared/schemas/voice.schema.js";
+import { requireAuth, requireRole } from "../plugins/guards.js";
+import { env } from "../config/env.js";
+
+export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
+  const db = (fastify as any).firestore || null;
+
+  // Repositories
+  const sessionRepo = fastify.voiceSessionRepository || new VoiceSessionRepository(db);
+  const schemeRepo = fastify.schemeRepository || new SchemeRepository(db);
+  const householdRepo = fastify.householdRepository || new HouseholdRepository(db);
+  const assistanceRepo = fastify.assistanceRepository || new AssistanceRepository(db);
+  const caseRepo = fastify.caseRepository || new CaseRepository(db);
+  const connectionRepo = fastify.connectionRepository || new ConnectionRepository(db);
+  const userRepo = fastify.userRepository || new UserRepository(db);
+
+  // Services
+  const sarvamService = fastify.sarvamService || new SarvamService();
+  const exotelService = fastify.exotelService || new ExotelService();
+  const schemeService = fastify.schemeService || new SchemeService(schemeRepo);
+  const eligibilityService = fastify.eligibilityService || new EligibilityService(schemeRepo, householdRepo);
+  const assistanceService = fastify.assistanceService || new AssistanceService(assistanceRepo, connectionRepo, householdRepo, caseRepo);
+  const automationService = fastify.automationService || new AutomationService();
+
+  const voiceActionService = fastify.voiceActionService || new VoiceActionService(
+    schemeService,
+    householdRepo,
+    eligibilityService,
+    assistanceService,
+    caseRepo,
+    connectionRepo,
+    userRepo
+  );
+
+  const gatewayService = fastify.voiceGatewayService || new VoiceGatewayService(
+    sessionRepo,
+    sarvamService,
+    exotelService,
+    voiceActionService,
+    caseRepo,
+    householdRepo,
+    userRepo,
+    automationService
+  );
+
+  // 1. Exotel Inbound Call Webhook
+  fastify.post("/v1/voice/webhooks/exotel/inbound", async (request, reply) => {
+    try {
+      const payload = request.body as any;
+      const result = await gatewayService.handleExotelInboundWebhook(payload);
+      return reply.type("text/plain").send(result.responseXmlOrText);
+    } catch (err: any) {
+      fastify.log.error(err, "Failed to handle Exotel inbound webhook");
+      return reply.type("text/plain").send("Welcome to SwasthyaSetu. Please stay on the line.");
+    }
+  });
+
+  // 2. Exotel Call Status Callback
+  fastify.post("/v1/voice/callbacks/exotel/status", async (request, reply) => {
+    try {
+      const payload = request.body as any;
+      const session = await gatewayService.handleStatusCallback(payload);
+      return reply.send({ success: true, data: session });
+    } catch (err: any) {
+      fastify.log.error(err, "Failed to handle Exotel status callback");
+      return reply.send({ success: false, error: { code: "CALLBACK_ERROR", message: err.message } });
+    }
+  });
+
+  // 3. Initialize Voice Session
+  fastify.post("/v1/voice/sessions", async (request, reply) => {
+    try {
+      const body = (request.body || {}) as any;
+      const callerPhone = body.callerPhone || "+919876543210";
+      const language = body.language || "hi-IN";
+
+      const session = await gatewayService.createInboundSession(callerPhone, undefined, language);
+      return reply.send({ success: true, data: session });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: { code: "SESSION_CREATE_FAILED", message: err.message } });
+    }
+  });
+
+  // 4. Get Voice Session Metadata
+  fastify.get<{ Params: { id: string } }>("/v1/voice/sessions/:id", async (request, reply) => {
+    const { id } = request.params;
+    const session = await sessionRepo.getSessionById(id);
+    if (!session) {
+      return reply.status(404).send({ success: false, error: { code: "NOT_FOUND", message: "Voice session not found." } });
+    }
+    return reply.send({ success: true, data: session });
+  });
+
+  // 5. Process Conversational Voice Turn
+  fastify.post<{ Params: { id: string } }>("/v1/voice/sessions/:id/turn", async (request, reply) => {
+    const { id } = request.params;
+    const parseResult = VoiceTurnInputSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Invalid voice turn payload.", details: parseResult.error.format() },
+      });
+    }
+
+    try {
+      const turnResponse = await gatewayService.processTurn(id, parseResult.data);
+      return reply.send({ success: true, data: turnResponse });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: { code: "TURN_ERROR", message: err.message } });
+    }
+  });
+
+  // 6. Verify Caller Identity Challenge
+  fastify.post<{ Params: { id: string } }>("/v1/voice/sessions/:id/verify", async (request, reply) => {
+    const { id } = request.params;
+    const parseResult = VerifyCallerIdentityInputSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Invalid verification code payload.", details: parseResult.error.format() },
+      });
+    }
+
+    try {
+      const turnResponse = await gatewayService.verifyCaller(id, parseResult.data.verificationCode);
+      return reply.send({ success: true, data: turnResponse });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: { code: "VERIFY_ERROR", message: err.message } });
+    }
+  });
+
+  // 7. Initiate Authorized Outbound Call (RBAC: ASHA / ADMIN or internal secret)
+  fastify.post("/v1/voice/outbound", async (request, reply) => {
+    // Check either internal secret or authenticated user role
+    const secretHeader = request.headers["x-swasthya-secret"] || request.headers["x-n8n-webhook-secret"];
+    const isSecretAuthorized = Boolean(
+      secretHeader && secretHeader === (env.N8N_WEBHOOK_SECRET || "swasthyasetu-prod-automation-key-2026")
+    );
+
+    if (!isSecretAuthorized) {
+      // Must be authenticated ASHA or ADMIN
+      if (!request.user || (request.user.role !== "ASHA" && request.user.role !== "ADMIN")) {
+        return reply.status(403).send({
+          success: false,
+          error: { code: "FORBIDDEN", message: "Only authorized ASHA workers, Admins, or automation secret can initiate outbound reminder calls." },
+        });
+      }
+    }
+
+    const parseResult = InitiateOutboundCallInputSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Invalid outbound call dispatch request.", details: parseResult.error.format() },
+      });
+    }
+
+    try {
+      const { followUpId, caseId, reason } = parseResult.data;
+      const result = await gatewayService.initiateOutboundFollowUpCall(followUpId, caseId, reason);
+      return reply.send({ success: true, data: result });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: { code: "OUTBOUND_CALL_FAILED", message: err.message } });
+    }
+  });
+
+  // 8. Admin Voice Telemetry & Telephony Health
+  fastify.get(
+    "/v1/admin/voice/telemetry",
+    { preHandler: [requireAuth, requireRole(["ADMIN"])] },
+    async (_request, reply) => {
+      try {
+        const telemetry = await gatewayService.getHealthAndTelemetry();
+        return reply.send({ success: true, data: telemetry });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "TELEMETRY_ERROR", message: err.message } });
+      }
+    }
+  );
+};

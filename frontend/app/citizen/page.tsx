@@ -823,7 +823,67 @@ export default function CitizenPage() {
                   </div>
                 </div>
 
-                {/* 3. Top Eligible Schemes */}
+                {/* 3. SwasthyaSetu Voice Helpline & IVR Guide (Phase 11) */}
+                <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 p-5 shadow-2xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-lg bg-emerald-700 text-white shadow-2xs">
+                        <Phone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                            SwasthyaSetu Voice Helpline & Call Assist
+                          </h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            PSTN / IVR
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          Dial our toll-free multilingual helpline from any phone for instant scheme eligibility, application tracking, and ASHA assistance.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="shrink-0 bg-white px-3.5 py-2 rounded-lg border border-emerald-300 text-center shadow-2xs">
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">Toll-Free Helpline</span>
+                      <span className="font-mono text-sm sm:text-base font-bold text-emerald-800 tracking-wider">1800-SWASTHYA</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-emerald-100 text-xs">
+                    <div className="rounded-lg bg-white/80 border border-slate-200 p-3 space-y-1">
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                        Multilingual AI (Sarvam)
+                      </p>
+                      <p className="text-slate-600 text-[11px]">
+                        Speak naturally in Hindi, Kannada, Tamil, Telugu, Marathi, Bengali, Gujarati, or English.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-white/80 border border-slate-200 p-3 space-y-1">
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-teal-600" />
+                        Ration Card Verification
+                      </p>
+                      <p className="text-slate-600 text-[11px]">
+                        For privacy, the voice system will request the last 4 digits of your Ration Card before discussing family records.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-white/80 border border-slate-200 p-3 space-y-1">
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        Automated ASHA Reminders
+                      </p>
+                      <p className="text-slate-600 text-[11px]">
+                        Your ASHA worker can dispatch automated reminder calls to your registered phone for upcoming doorstep visits.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Top Eligible Schemes */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>

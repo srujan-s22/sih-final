@@ -38,10 +38,12 @@ import {
   CalendarDays,
   FileCheck,
   Sparkles,
+  PhoneCall,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
 import { connectionService } from "@/services/connection-service";
 import { assistanceService } from "@/services/assistance-service";
+import { voiceService } from "@/services/voice-service";
 import {
   AshaCase,
   CaseDetailResponse,
@@ -138,6 +140,9 @@ export default function AshaWorkspacePage() {
   const [cancellingFollowUp, setCancellingFollowUp] = useState<CaseFollowUp | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancellingSubmitting, setIsCancellingSubmitting] = useState(false);
+
+  // Voice Reminder Call State (Phase 11)
+  const [isVoiceCallingId, setIsVoiceCallingId] = useState<string | null>(null);
 
   // Field Registration Modal
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -571,6 +576,27 @@ export default function AshaWorkspacePage() {
       setErrorMessage("Failed to cancel follow-up.");
     } finally {
       setIsCancellingSubmitting(false);
+    }
+  };
+
+  // Trigger Outbound Voice Reminder Call (Phase 11)
+  const handleTriggerVoiceCall = async (followUp: CaseFollowUp) => {
+    try {
+      setIsVoiceCallingId(followUp.id);
+      const res = await voiceService.initiateOutboundCall({
+        followUpId: followUp.id,
+        caseId: followUp.caseId,
+        reason: `Doorstep visit reminder: ${followUp.title || followUp.reason}`,
+      });
+      if (res.success) {
+        setSuccessBanner(`Automated voice reminder call queued with Exotel telephony for "${followUp.title || followUp.reason}"`);
+      } else {
+        setErrorMessage(res.error?.message || "Failed to trigger voice reminder call.");
+      }
+    } catch {
+      setErrorMessage("Failed to initiate voice reminder call.");
+    } finally {
+      setIsVoiceCallingId(null);
     }
   };
 
@@ -1991,6 +2017,16 @@ export default function AshaWorkspacePage() {
                                     >
                                       <span>Cancel</span>
                                     </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleTriggerVoiceCall(f)}
+                                      disabled={isVoiceCallingId === f.id}
+                                      className="text-xs font-semibold text-emerald-800 border-emerald-300 hover:bg-emerald-50 flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <PhoneCall className={`w-3 h-3 text-emerald-700 ${isVoiceCallingId === f.id ? "animate-spin" : ""}`} />
+                                      <span>{isVoiceCallingId === f.id ? "Calling..." : "Voice Reminder"}</span>
+                                    </Button>
                                   </>
                                 )}
                                 <Button
@@ -3306,6 +3342,16 @@ export default function AshaWorkspacePage() {
                                         className="text-xs text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
                                       >
                                         Cancel
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleTriggerVoiceCall(f)}
+                                        disabled={isVoiceCallingId === f.id}
+                                        className="text-xs font-semibold text-emerald-800 border-emerald-300 hover:bg-emerald-50 flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <PhoneCall className={`w-3 h-3 text-emerald-700 ${isVoiceCallingId === f.id ? "animate-spin" : ""}`} />
+                                        <span>{isVoiceCallingId === f.id ? "Calling..." : "Call"}</span>
                                       </Button>
                                     </div>
                                   )}

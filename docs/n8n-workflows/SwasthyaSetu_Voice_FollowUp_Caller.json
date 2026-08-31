@@ -1,0 +1,192 @@
+{
+  "name": "SwasthyaSetu — Automated Voice Follow-Up Caller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-voice-trigger",
+      "name": "Schedule Trigger (Every 2 Hours)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3000/api/v1/automation/followups/due",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-swasthya-secret",
+              "value": "swasthyasetu-prod-automation-key-2026"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-get-due-followups",
+      "name": "Fetch Due Follow-ups from Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-is-high-or-overdue",
+              "leftValue": "={{ $json.isOverdue || $json.priority === 'HIGH' || $json.priority === 'URGENT' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-filter-high-priority",
+      "name": "Filter High-Priority & Overdue",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/v1/voice/outbound",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-swasthya-secret",
+              "value": "swasthyasetu-prod-automation-key-2026"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"followUpId\": \"{{ $json.id }}\",\n  \"caseId\": \"{{ $json.caseId }}\",\n  \"reason\": \"Automated doorstep visit reminder dispatched by n8n orchestrator\"\n}",
+        "options": {}
+      },
+      "id": "node-trigger-outbound-voice",
+      "name": "Trigger Outbound Voice Call via Exotel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        940,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/v1/automation/inbound",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-swasthya-secret",
+              "value": "swasthyasetu-prod-automation-key-2026"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"n8n_voice_disp_{{ Date.now() }}\",\n  \"eventType\": \"OUTBOUND_CALL_INITIATED\",\n  \"followUpId\": \"{{ $json.id }}\",\n  \"caseId\": \"{{ $json.caseId }}\",\n  \"action\": \"REMINDER_SENT\",\n  \"notes\": \"Automated voice reminder queued for doorstep beneficiary.\"\n}",
+        "options": {}
+      },
+      "id": "node-log-automation-outcome",
+      "name": "Record Telephony Dispatch Outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1180,
+        280
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Every 2 Hours)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Due Follow-ups from Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Due Follow-ups from Backend": {
+      "main": [
+        [
+          {
+            "node": "Filter High-Priority & Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High-Priority & Overdue": {
+      "main": [
+        [
+          {
+            "node": "Trigger Outbound Voice Call via Exotel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Outbound Voice Call via Exotel": {
+      "main": [
+        [
+          {
+            "node": "Record Telephony Dispatch Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
