@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import {
   Users,
@@ -863,6 +864,7 @@ export default function AshaWorkspacePage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
+            <LanguageSelector size="sm" />
             {userProfile?.ashaServiceCode && (
               <button
                 onClick={copyServiceCode}

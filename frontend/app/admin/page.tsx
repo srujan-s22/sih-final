@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -542,6 +543,7 @@ export default function AdminPage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
+            <LanguageSelector size="sm" />
             <Button
               variant="outline"
               size="sm"

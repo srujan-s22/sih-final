@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
 import {
   Users,
-  ShieldCheck,
   Building2,
   LogOut,
   Menu,
@@ -46,7 +45,6 @@ export function AuthenticatedShell({
   actions,
 }: AuthenticatedShellProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const { userProfile, signOut } = useAuth();
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -117,7 +115,7 @@ export function AuthenticatedShell({
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white shadow-2xs">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Brand & Role Identifier */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <Link
               href={roleConfig.homeHref}
               className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 rounded-lg p-1 -m-1"
@@ -137,7 +135,7 @@ export function AuthenticatedShell({
           {navTabs && navTabs.length > 0 && (
             <nav
               aria-label="Portal Navigation"
-              className="hidden lg:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80"
+              className="hidden xl:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80"
             >
               {navTabs.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -161,12 +159,12 @@ export function AuthenticatedShell({
             </nav>
           )}
 
-          {/* Language Selector, User Profile & Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right Action Group: Language Selector, User Profile & Sign Out */}
+          <div className="hidden md:flex items-center gap-3 shrink-0">
             <LanguageSelector size="sm" />
 
             <div className="flex flex-col text-right">
-              <span className="text-xs font-bold text-slate-800 max-w-[160px] truncate">
+              <span className="text-xs font-bold text-slate-800 max-w-[140px] truncate">
                 {userProfile?.displayName || userProfile?.email || "Authenticated User"}
               </span>
               <span className="text-[10px] font-mono text-slate-500 font-medium">
@@ -185,7 +183,7 @@ export function AuthenticatedShell({
             </Button>
           </div>
 
-          {/* Mobile Controls (Language + Hamburger) */}
+          {/* Mobile Controls (Always visible on mobile & tablet) */}
           <div className="flex md:hidden items-center gap-2">
             <LanguageSelector size="sm" />
             <Button
@@ -201,6 +199,33 @@ export function AuthenticatedShell({
           </div>
         </div>
 
+        {/* Tablet Navigation Bar (Visible between 768px and 1280px) */}
+        {navTabs && navTabs.length > 0 && (
+          <div className="hidden md:flex xl:hidden border-t border-slate-100 bg-slate-50/90 px-4 py-1.5 overflow-x-auto">
+            <nav aria-label="Portal Navigation (Tablet)" className="flex items-center gap-1.5 mx-auto">
+              {navTabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => onTabChange?.(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer select-none ${
+                      isActive
+                        ? "bg-white text-teal-900 shadow-2xs border border-slate-200"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    }`}
+                  >
+                    {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-4 shadow-lg animate-in slide-in-from-top-2 duration-150">
@@ -212,6 +237,14 @@ export function AuthenticatedShell({
                 <p className="text-[10px] text-slate-500 font-mono">{userProfile?.email}</p>
               </div>
               <div>{roleConfig.portalBadge}</div>
+            </div>
+
+            {/* Prominent Language Switcher inside Mobile Drawer */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                Language / ಭಾಷೆ / भाषा
+              </p>
+              <LanguageSelector variant="pills" className="w-full justify-between" />
             </div>
 
             {navTabs && navTabs.length > 0 && (
@@ -289,16 +322,20 @@ export function AuthenticatedShell({
         {children}
       </main>
 
-      {/* 3. Lightweight Authenticated Footer */}
+      {/* 3. Lightweight Authenticated Footer with Language Selector */}
       <footer className="border-t border-slate-200 bg-white py-3.5 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
             <span className="font-semibold text-slate-700">SwasthyaSetu Portal</span>
             <span className="text-slate-300">•</span>
             <span>Official Government Health Entitlements</span>
           </div>
-          <div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-500">Language:</span>
+              <LanguageSelector variant="pills" size="sm" />
+            </div>
             <Link
               href="/"
               className="hover:text-teal-800 transition-colors font-medium text-slate-500"

@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -579,6 +580,7 @@ export default function CitizenPage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
+            <LanguageSelector size="sm" />
             <Button
               variant="outline"
               size="sm"
@@ -659,7 +661,19 @@ export default function CitizenPage() {
             {/* TAB: OVERVIEW */}
             {/* ============================================================ */}
             {activeTab === "overview" && (
-              <div className="space-y-8">
+              <div className="space-y-6">
+                {/* -------------------------------------------------------- */}
+                {/* QUICK LANGUAGE SELECTOR BAR */}
+                {/* -------------------------------------------------------- */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                    <span className="w-2 h-2 rounded-full bg-teal-600" />
+                    <span>Language / ಭಾಷೆ / भाषा:</span>
+                    <span className="text-slate-400 font-normal">Choose your preferred language</span>
+                  </div>
+                  <LanguageSelector variant="pills" size="sm" />
+                </div>
+
                 {/* -------------------------------------------------------- */}
                 {/* SECTION 2: WHAT DO YOU NEED HELP WITH? */}
                 {/* -------------------------------------------------------- */}
