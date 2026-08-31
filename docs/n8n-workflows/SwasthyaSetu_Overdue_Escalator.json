@@ -1,0 +1,135 @@
+{
+  "name": "SwasthyaSetu - Overdue Follow-up Escalator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily 9:00 AM Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/due-follow-ups",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Platform Due Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.dueFollowUps",
+        "options": {}
+      },
+      "name": "Split Tasks",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $now.toMillis() - new Date($json.dueAt).getTime() }}",
+              "operation": "larger",
+              "value2": 172800000
+            }
+          ]
+        }
+      },
+      "name": "Is Overdue > 48 Hours?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"esc_\" + $json.id + \"_\" + $now.toMillis(),\n  \"eventType\": \"FOLLOWUP_OVERDUE\",\n  \"caseId\": $json.caseId,\n  \"followUpId\": $json.id,\n  \"action\": \"ESCALATE\",\n  \"notes\": \"Follow-up is overdue by >48 hours without closure. Escalated to ASHA supervisor attention queue.\",\n  \"timestamp\": $now.toISO()\n}"
+      },
+      "name": "Record Escalation Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 240]
+    }
+  ],
+  "connections": {
+    "Daily 9:00 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Platform Due Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Platform Due Tasks": {
+      "main": [
+        [
+          {
+            "node": "Split Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Tasks": {
+      "main": [
+        [
+          {
+            "node": "Is Overdue > 48 Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Overdue > 48 Hours?": {
+      "main": [
+        [
+          {
+            "node": "Record Escalation Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

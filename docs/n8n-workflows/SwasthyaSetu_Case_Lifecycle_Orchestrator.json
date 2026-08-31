@@ -1,0 +1,81 @@
+{
+  "name": "SwasthyaSetu - Case Lifecycle & Resolution Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "swasthyasetu-lifecycle-events",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Lifecycle Event Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "swasthyasetu-lifecycle-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.eventType }}",
+              "operation": "equal",
+              "value2": "CASE_RESOLVED"
+            }
+          ]
+        }
+      },
+      "name": "Is Case Resolved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"halt_\" + $json.body.caseId + \"_\" + $now.toMillis(),\n  \"eventType\": \"AUTOMATION_TRIGGERED\",\n  \"caseId\": $json.body.caseId,\n  \"action\": \"STATUS_CHECK\",\n  \"notes\": \"Case resolved; all scheduled reminders and polling queues successfully cancelled and halted.\",\n  \"timestamp\": $now.toISO()\n}"
+      },
+      "name": "Halt Running Reminders & Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 240]
+    }
+  ],
+  "connections": {
+    "Lifecycle Event Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is Case Resolved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Case Resolved?": {
+      "main": [
+        [
+          {
+            "node": "Halt Running Reminders & Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

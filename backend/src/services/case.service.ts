@@ -16,6 +16,7 @@ import {
   AshaAttentionSignalsResponse,
   InitiateSchemeAssistanceInput,
   InitiateSchemeAssistanceResponse,
+  AutomationHealthResponse,
 } from "../../../shared/types/case.js";
 import { UserProfile } from "../../../shared/types/auth.js";
 import { Household, Member } from "../../../shared/types/household.js";
@@ -30,6 +31,8 @@ import {
   UpdateCaseFollowUpInput,
   CompleteCaseFollowUpInput,
   RescheduleCaseFollowUpInput,
+  CancelCaseFollowUpInput,
+  InboundAutomationWebhookInput,
 } from "../../../shared/schemas/case.schema.js";
 
 import { CaseRepository } from "../repositories/case.repository.js";
@@ -180,13 +183,14 @@ export class CaseService {
     const members = await this.householdRepo.getMembers(c.householdId);
 
     // Deterministic Level 1 & 2 Engine Evaluations
-    const [eligibilityResults, guidance, notes, followUps, activities, tasks] = await Promise.all([
+    const [eligibilityResults, guidance, notes, followUps, activities, tasks, assistanceRequests] = await Promise.all([
       this.eligibilityService.evaluateHouseholdForSchemes(household, members),
       this.guidanceService.getHouseholdGuidance(household, members),
       this.caseRepo.getNotes(caseId),
       this.caseRepo.getFollowUps(caseId),
       this.caseRepo.getActivities(caseId),
       this.caseRepo.getTasks(caseId),
+      this.assistanceRepo ? this.assistanceRepo.listRequestsByHouseholdId(c.householdId) : Promise.resolve([]),
     ]);
 
     // Keep case gap and scheme counts in sync if changed
@@ -223,6 +227,7 @@ export class CaseService {
       notes,
       followUps,
       activities,
+      assistanceRequests,
     };
   }
 
@@ -650,6 +655,288 @@ export class CaseService {
     }
 
     return updated;
+  }
+
+  /**
+   * Cancels a scheduled follow-up with mandatory reason
+   */
+  public async cancelFollowUp(
+    caseId: string,
+    followUpId: string,
+    input: CancelCaseFollowUpInput,
+    userProfile: UserProfile
+  ): Promise<CaseFollowUp> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    this.authorizeCaseAccess(c, userProfile);
+
+    const now = new Date().toISOString();
+    const updated = await this.caseRepo.updateFollowUp(caseId, followUpId, {
+      status: "CANCELLED",
+      cancelledAt: now,
+      cancelledBy: userProfile.displayName || "ASHA Worker",
+      cancelReason: input.reason.trim(),
+    });
+
+    if (!updated) {
+      throw new CaseServiceError(
+        "Follow-up task not found.",
+        HTTP_STATUS.NOT_FOUND,
+        "FOLLOWUP_NOT_FOUND"
+      );
+    }
+
+    // Recalculate next upcoming follow-up on case
+    const allFollowUps = await this.caseRepo.getFollowUps(caseId);
+    const nextPending = allFollowUps.find((f) => f.status === "PENDING");
+    await this.caseRepo.updateCase(caseId, {
+      nextFollowUpAt: nextPending ? (nextPending.dueAt || nextPending.scheduledAt) : null,
+    });
+
+    // Record audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "FOLLOWUP_CANCELLED",
+      description: `Follow-up cancelled by ${userProfile.displayName || "ASHA Worker"}: ${input.reason}`,
+      metadata: { followUpId, reason: input.reason },
+      timestamp: now,
+    });
+
+    // Emit domain event to automation service
+    if (this.automationService) {
+      this.automationService.emitDomainEvent("FOLLOWUP_CANCELLED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId: c.schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          followUpId,
+          reason: input.reason,
+        },
+      }).catch(() => {});
+    }
+
+    return updated;
+  }
+
+  /**
+   * Lists all follow-ups across the entire platform for Administrator view
+   */
+  public async listAllFollowUpsForAdmin(
+    userProfile: UserProfile
+  ): Promise<FollowUpSummaryResponse> {
+    if (userProfile.role !== "ADMIN") {
+      throw new CaseServiceError(
+        "Access denied. Only Administrators can view platform-wide follow-ups.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_RESOURCE"
+      );
+    }
+
+    const followUps = await this.caseRepo.listAllFollowUpsForAdmin();
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    let dueToday = 0;
+    let upcoming = 0;
+    let overdue = 0;
+    let completed = 0;
+    let cancelled = 0;
+
+    const enrichedFollowUps = followUps.map((f) => {
+      const dueDateStr = f.dueAt || f.scheduledAt;
+      const dueDate = new Date(dueDateStr);
+      const isPending = f.status === "PENDING";
+      const isPast = dueDate.getTime() < now.getTime();
+      const dateOnlyStr = dueDate.toISOString().split("T")[0];
+      const isToday = dateOnlyStr === todayStr;
+
+      const isOverdue = isPending && isPast && !isToday;
+
+      if (f.status === "COMPLETED") {
+        completed++;
+      } else if (f.status === "CANCELLED") {
+        cancelled++;
+      } else if (isPending) {
+        if (isToday) {
+          dueToday++;
+        } else if (isOverdue) {
+          overdue++;
+        } else {
+          upcoming++;
+        }
+      }
+
+      return {
+        ...f,
+        dueAt: dueDateStr,
+        scheduledAt: dueDateStr,
+        isOverdue,
+      };
+    });
+
+    return {
+      total: enrichedFollowUps.length,
+      dueToday,
+      upcoming,
+      overdue,
+      completed,
+      cancelled,
+      followUps: enrichedFollowUps,
+    };
+  }
+
+  /**
+   * Retrieves automation health telemetry for Admin Dashboard
+   */
+  public async getAutomationHealth(
+    userProfile: UserProfile
+  ): Promise<AutomationHealthResponse> {
+    if (userProfile.role !== "ADMIN") {
+      throw new CaseServiceError(
+        "Access denied. Only Administrators can access automation telemetry.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_RESOURCE"
+      );
+    }
+
+    const followUpSummary = await this.listAllFollowUpsForAdmin(userProfile);
+    const healthStatus = this.automationService?.getHealthStatus() || {
+      webhookConfigured: false,
+      webhookUrl: null,
+      status: "UNCONFIGURED" as const,
+      recentEvents: [],
+    };
+
+    return {
+      webhookConfigured: healthStatus.webhookConfigured,
+      webhookUrl: healthStatus.webhookUrl,
+      status: healthStatus.status,
+      totalFollowUps: followUpSummary.total,
+      activeFollowUps: followUpSummary.dueToday + followUpSummary.upcoming,
+      overdueFollowUps: followUpSummary.overdue,
+      completedFollowUps: followUpSummary.completed,
+      cancelledFollowUps: followUpSummary.cancelled || 0,
+      recentEvents: healthStatus.recentEvents,
+    };
+  }
+
+  /**
+   * Processes inbound webhook callbacks from n8n orchestrator
+   */
+  public async handleInboundAutomationWebhook(
+    input: InboundAutomationWebhookInput,
+    rawSecretOrAuthHeader?: string
+  ): Promise<{ success: boolean; eventId: string; status: string; duplicate?: boolean; reason?: string }> {
+    if (!this.automationService) {
+      throw new CaseServiceError("Automation service is unavailable.", HTTP_STATUS.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE");
+    }
+
+    // Verify authenticity
+    const isAuthentic = this.automationService.verifyInboundWebhook(rawSecretOrAuthHeader);
+    if (!isAuthentic) {
+      throw new CaseServiceError("Invalid webhook signature or authorization secret.", HTTP_STATUS.UNAUTHORIZED, "UNAUTHORIZED_WEBHOOK");
+    }
+
+    // Idempotency check
+    if (this.automationService.isEventProcessed(input.eventId)) {
+      return {
+        success: true,
+        eventId: input.eventId,
+        status: "IGNORED_DUPLICATE",
+        duplicate: true,
+        reason: `Event '${input.eventId}' was already processed.`,
+      };
+    }
+
+    this.automationService.recordProcessedEvent(input.eventId);
+
+    const now = new Date().toISOString();
+
+    if (input.followUpId && input.caseId) {
+      const followUp = await this.caseRepo.getFollowUpById(input.caseId, input.followUpId);
+      if (followUp && followUp.status === "PENDING") {
+        if (input.action === "REMINDER_SENT") {
+          await this.caseRepo.createActivity(input.caseId, {
+            id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            caseId: input.caseId,
+            actorUid: "system-n8n-automation",
+            actorRole: "ADMIN",
+            actorName: "n8n Automation Orchestrator",
+            type: "AUTOMATION_DISPATCHED",
+            description: `Automated reminder dispatched: ${input.notes || followUp.title || followUp.reason}`,
+            metadata: { eventId: input.eventId, followUpId: input.followUpId, action: input.action },
+            timestamp: now,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      eventId: input.eventId,
+      status: "PROCESSED",
+      duplicate: false,
+    };
+  }
+
+  /**
+   * Retrieves due follow-ups across all active cases for n8n polling workflow
+   */
+  public async getDueFollowUpsForAutomation(): Promise<{ dueFollowUps: CaseFollowUp[]; count: number }> {
+    const allFollowUps = await this.caseRepo.listAllFollowUpsForAdmin({ status: "PENDING" });
+    const now = new Date();
+
+    const dueList: CaseFollowUp[] = [];
+    for (const f of allFollowUps) {
+      const dueDate = new Date(f.dueAt || f.scheduledAt);
+      if (dueDate.getTime() <= now.getTime()) {
+        const c = await this.caseRepo.getCaseById(f.caseId);
+        if (c && !["RESOLVED", "CLOSED"].includes(c.status)) {
+          dueList.push(f);
+        }
+      }
+    }
+
+    return {
+      dueFollowUps: dueList,
+      count: dueList.length,
+    };
+  }
+
+  /**
+   * Inspects follow-up and case status for n8n before executing reminders
+   */
+  public async getFollowUpStatusForAutomation(
+    caseId: string,
+    followUpId: string
+  ): Promise<{ followUp: CaseFollowUp | null; caseStatus: string | null; shouldHalt: boolean }> {
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      return { followUp: null, caseStatus: null, shouldHalt: true };
+    }
+
+    const f = await this.caseRepo.getFollowUpById(caseId, followUpId);
+    if (!f) {
+      return { followUp: null, caseStatus: c.status, shouldHalt: true };
+    }
+
+    const shouldHalt = ["RESOLVED", "CLOSED"].includes(c.status) || f.status !== "PENDING";
+
+    return {
+      followUp: f,
+      caseStatus: c.status,
+      shouldHalt,
+    };
   }
 
   /**

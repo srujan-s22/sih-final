@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Scheme } from "@shared/types/eligibility";
 import { EvidenceRecord } from "@shared/types/evidence";
-import { AshaCase } from "@shared/types/case";
+import { AshaCase, CaseFollowUp, AutomationHealthResponse, AutomationDomainEvent } from "@shared/types/case";
 import { schemeService } from "@/services/scheme-service";
 import { evidenceService } from "@/services/evidence-service";
 import { caseService } from "@/services/case-service";
@@ -27,6 +27,12 @@ import {
   RefreshCw,
   Bot,
   Users,
+  Activity,
+  Cpu,
+  Workflow,
+  Clock,
+  AlertTriangle,
+  Calendar,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -38,10 +44,14 @@ export default function AdminPage() {
   const [evidenceList, setEvidenceList] = useState<EvidenceRecord[]>([]);
   const [conflictsCount, setConflictsCount] = useState(0);
   const [adminCases, setAdminCases] = useState<AshaCase[]>([]);
+  const [automationHealth, setAutomationHealth] = useState<AutomationHealthResponse | null>(null);
+  const [adminFollowUps, setAdminFollowUps] = useState<CaseFollowUp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("schemes");
   const [searchFilter, setSearchFilter] = useState("");
   const [caseSearchFilter, setCaseSearchFilter] = useState("");
+  const [followUpSearchFilter, setFollowUpSearchFilter] = useState("");
+  const [followUpStatusFilter, setFollowUpStatusFilter] = useState<string>("ALL");
   const [selectedSchemeId, setSelectedSchemeId] = useState<string>("ab-pmjay");
   const [schemeEvidence, setSchemeEvidence] = useState<EvidenceRecord[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
@@ -51,10 +61,12 @@ export default function AdminPage() {
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [schemesRes, conflictsRes, casesRes] = await Promise.all([
+      const [schemesRes, conflictsRes, casesRes, automationRes, followUpsRes] = await Promise.all([
         schemeService.getActiveSchemes(),
         evidenceService.getEvidenceConflicts(),
         caseService.listAllCasesForAdmin(),
+        caseService.getAutomationHealth(),
+        caseService.listAllFollowUpsForAdmin(),
       ]);
 
       if (schemesRes.success && schemesRes.data) {
@@ -66,6 +78,12 @@ export default function AdminPage() {
       }
       if (casesRes.success && casesRes.data) {
         setAdminCases(casesRes.data.cases || []);
+      }
+      if (automationRes.success && automationRes.data) {
+        setAutomationHealth(automationRes.data);
+      }
+      if (followUpsRes.success && followUpsRes.data) {
+        setAdminFollowUps(followUpsRes.data.followUps || []);
       }
     } catch {
       // Non-blocking
@@ -104,6 +122,7 @@ export default function AdminPage() {
     { id: "schemes", label: "Schemes Registry", icon: Layers },
     { id: "evidence", label: "Evidence & Provenance", icon: ShieldCheck },
     { id: "cases", label: `Platform Caseload (${adminCases.length})`, icon: Users },
+    { id: "automation", label: "Automation & Follow-ups", icon: Activity },
     { id: "governance", label: "System Governance", icon: Lock },
   ];
 
@@ -432,7 +451,212 @@ export default function AdminPage() {
               </section>
             )}
 
-            {/* 5. System Governance Tab */}
+            {/* 5. Automation & Follow-up Health Tab (Phase 10) */}
+            {(activeTab === "overview" || activeTab === "automation") && (
+              <section className="space-y-6">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-teal-700" />
+                    <span>Automation & Follow-up Engine Telemetry</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Live operational telemetry, non-blocking n8n webhook dispatcher, and platform-wide follow-up tracking.
+                  </p>
+                </div>
+
+                {/* Automation Status Card */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1.5">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      Orchestrator Status
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          automationHealth?.status === "OPERATIONAL"
+                            ? "bg-emerald-500 animate-pulse"
+                            : automationHealth?.status === "DEGRADED"
+                            ? "bg-amber-500"
+                            : "bg-slate-400"
+                        }`}
+                      />
+                      <p className="text-base font-bold text-slate-900">
+                        {automationHealth?.status === "OPERATIONAL"
+                          ? "Operational"
+                          : automationHealth?.status === "DEGRADED"
+                          ? "Degraded"
+                          : "Unconfigured (Safe Fallback)"}
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {automationHealth?.webhookUrl || "Local fallback active (no remote endpoint)"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                      Active Follow-ups
+                    </span>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {automationHealth?.activeFollowUps || 0}
+                    </p>
+                    <p className="text-[11px] text-teal-700 font-medium">Due Today & Upcoming</p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-semibold text-rose-700 uppercase tracking-wide">
+                      Overdue Visits
+                    </span>
+                    <p className="text-2xl font-bold text-rose-700">
+                      {automationHealth?.overdueFollowUps || 0}
+                    </p>
+                    <p className="text-[11px] text-rose-600 font-medium">Requires ASHA Attention</p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">
+                      Completed & Resolved
+                    </span>
+                    <p className="text-2xl font-bold text-emerald-700">
+                      {automationHealth?.completedFollowUps || 0}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {automationHealth?.cancelledFollowUps || 0} Cancelled
+                    </p>
+                  </div>
+                </div>
+
+                {/* Follow-ups Table */}
+                <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-600" />
+                      <h3 className="text-sm font-bold text-slate-900">Platform Follow-up Tasks</h3>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative w-48 sm:w-64">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          placeholder="Search follow-ups..."
+                          value={followUpSearchFilter}
+                          onChange={(e) => setFollowUpSearchFilter(e.target.value)}
+                          className="pl-8 text-xs h-8 bg-white"
+                        />
+                      </div>
+                      <select
+                        value={followUpStatusFilter}
+                        onChange={(e) => setFollowUpStatusFilter(e.target.value)}
+                        className="text-xs h-8 px-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING">Active / Pending</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                        <tr>
+                          <th className="py-3 px-4">Task & Scheme</th>
+                          <th className="py-3 px-4">Household & Beneficiary</th>
+                          <th className="py-3 px-4">Assigned ASHA</th>
+                          <th className="py-3 px-4">Due Date</th>
+                          <th className="py-3 px-4">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {adminFollowUps
+                          .filter((f) => {
+                            if (followUpStatusFilter !== "ALL" && f.status !== followUpStatusFilter) return false;
+                            if (!followUpSearchFilter) return true;
+                            const q = followUpSearchFilter.toLowerCase();
+                            return (
+                              (f.title && f.title.toLowerCase().includes(q)) ||
+                              f.reason.toLowerCase().includes(q) ||
+                              (f.headOfHouseholdName && f.headOfHouseholdName.toLowerCase().includes(q)) ||
+                              (f.beneficiaryName && f.beneficiaryName.toLowerCase().includes(q))
+                            );
+                          })
+                          .map((f) => (
+                            <tr key={f.id} className="hover:bg-slate-50">
+                              <td className="py-3 px-4">
+                                <p className="font-bold text-slate-900">{f.title || f.reason}</p>
+                                {f.schemeName && (
+                                  <span className="text-[10px] text-teal-800 font-semibold bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200">
+                                    {f.schemeName}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4">
+                                <p className="font-semibold text-slate-800">{f.headOfHouseholdName || "Family"}</p>
+                                {f.beneficiaryName && <p className="text-[11px] text-slate-500">Beneficiary: {f.beneficiaryName}</p>}
+                              </td>
+                              <td className="py-3 px-4 font-mono text-slate-600">{f.assignedAshaUid}</td>
+                              <td className="py-3 px-4 text-slate-700">
+                                {new Date(f.dueAt || f.scheduledAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                    f.status === "COMPLETED"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : f.status === "CANCELLED"
+                                      ? "bg-slate-200 text-slate-700"
+                                      : f.isOverdue
+                                      ? "bg-rose-100 text-rose-800"
+                                      : "bg-sky-100 text-sky-800"
+                                  }`}
+                                >
+                                  {f.status === "COMPLETED" ? "COMPLETED" : f.status === "CANCELLED" ? "CANCELLED" : f.isOverdue ? "OVERDUE" : "PENDING"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Recent Event Logs */}
+                {automationHealth?.recentEvents && automationHealth.recentEvents.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 flex items-center gap-2 bg-slate-50/50">
+                      <Workflow className="w-4 h-4 text-teal-700" />
+                      <h3 className="text-sm font-bold text-slate-900">Recent Domain Automation Dispatches</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-4">Event ID</th>
+                            <th className="py-2.5 px-4">Event Type</th>
+                            <th className="py-2.5 px-4">Case ID</th>
+                            <th className="py-2.5 px-4">ASHA UID</th>
+                            <th className="py-2.5 px-4">Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {automationHealth.recentEvents.slice(0, 10).map((evt) => (
+                            <tr key={evt.eventId} className="hover:bg-slate-50">
+                              <td className="py-2.5 px-4 font-mono text-[11px] text-slate-700">{evt.eventId}</td>
+                              <td className="py-2.5 px-4 font-semibold text-teal-900">{evt.eventType}</td>
+                              <td className="py-2.5 px-4 font-mono text-slate-600">{evt.caseId}</td>
+                              <td className="py-2.5 px-4 font-mono text-slate-600">{evt.assignedAshaUid}</td>
+                              <td className="py-2.5 px-4 text-slate-500">{new Date(evt.timestamp).toLocaleTimeString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* 6. System Governance Tab */}
             {(activeTab === "overview" || activeTab === "governance") && (
               <section className="space-y-4">
                 <div>

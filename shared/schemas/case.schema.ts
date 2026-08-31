@@ -106,6 +106,21 @@ export const RescheduleCaseFollowUpInputSchema = z.object({
   reason: z.string().min(1, "Reschedule reason is required").max(500).trim(),
 });
 
+export const CancelCaseFollowUpInputSchema = z.object({
+  reason: z.string().min(1, "Cancellation reason is required").max(500).trim(),
+});
+
+export const InboundAutomationWebhookInputSchema = z.object({
+  eventId: z.string().min(1, "Event ID is required").trim(),
+  eventType: z.string().min(1, "Event type is required").trim(),
+  followUpId: z.string().optional().nullable(),
+  caseId: z.string().optional().nullable(),
+  householdId: z.string().optional().nullable(),
+  action: z.enum(["REMINDER_SENT", "STATUS_CHECK", "ESCALATE"]).optional().default("REMINDER_SENT"),
+  notes: z.string().max(1000).optional().nullable(),
+  timestamp: z.string().optional(),
+});
+
 export const AssignCaseInputSchema = z.object({
   householdId: z.string().min(1, "Household ID is required").trim(),
   ashaUid: z.string().min(1, "ASHA UID is required").trim(),
@@ -127,6 +142,8 @@ export type CreateCaseFollowUpInput = z.infer<typeof CreateCaseFollowUpInputSche
 export type UpdateCaseFollowUpInput = z.infer<typeof UpdateCaseFollowUpInputSchema>;
 export type CompleteCaseFollowUpInput = z.infer<typeof CompleteCaseFollowUpInputSchema>;
 export type RescheduleCaseFollowUpInput = z.infer<typeof RescheduleCaseFollowUpInputSchema>;
+export type CancelCaseFollowUpInput = z.infer<typeof CancelCaseFollowUpInputSchema>;
+export type InboundAutomationWebhookInput = z.infer<typeof InboundAutomationWebhookInputSchema>;
 export type AssignCaseInput = z.infer<typeof AssignCaseInputSchema>;
 export type InitiateSchemeAssistanceInput = z.infer<typeof InitiateSchemeAssistanceInputSchema>;
 

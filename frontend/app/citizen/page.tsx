@@ -61,6 +61,7 @@ import {
   MessageSquare,
   HelpCircle,
   Calendar,
+  Check,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -1856,39 +1857,101 @@ export default function CitizenPage() {
                   <div className="space-y-4">
                     {/* Action Items List */}
                     <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs divide-y divide-slate-100">
-                      {guidance.actionPlan.map((action, index) => (
-                        <div key={action.id || index} className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5">
-                          <div className="w-7 h-7 rounded-full bg-teal-50 text-teal-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                            {action.stepNumber || index + 1}
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <h4 className="text-sm font-bold text-slate-900">
-                                {action.title}
-                              </h4>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                                  action.priority === "REQUIRED"
-                                    ? "bg-rose-50 text-rose-800 border border-rose-200"
-                                    : action.priority === "IMPORTANT"
-                                    ? "bg-amber-50 text-amber-800 border border-amber-200"
-                                    : "bg-slate-100 text-slate-700"
-                                }`}
-                              >
-                                {action.priority}
-                              </span>
+                      {guidance.actionPlan.map((action, index) => {
+                        const isActionAssisted = assistanceRequests.some(
+                          (r) =>
+                            ["RESOLVED", "CLOSED"].includes(r.status) &&
+                            ((r.schemeId === "ab-pmjay" &&
+                              (action.title.toLowerCase().includes("ayushman") ||
+                                action.title.toLowerCase().includes("pm-jay") ||
+                                action.title.toLowerCase().includes("pmjay") ||
+                                action.description.toLowerCase().includes("pmjay"))) ||
+                              (r.schemeId === "jsy" &&
+                                (action.title.toLowerCase().includes("maternal") ||
+                                  action.title.toLowerCase().includes("jsy") ||
+                                  action.title.toLowerCase().includes("anc") ||
+                                  action.description.toLowerCase().includes("mcp"))))
+                        );
+
+                        const isActionInProgress =
+                          !isActionAssisted &&
+                          assistanceRequests.some(
+                            (r) =>
+                              !["RESOLVED", "CLOSED", "DECLINED"].includes(r.status) &&
+                              ((r.schemeId === "ab-pmjay" &&
+                                (action.title.toLowerCase().includes("ayushman") ||
+                                  action.title.toLowerCase().includes("pm-jay") ||
+                                  action.title.toLowerCase().includes("pmjay") ||
+                                  action.description.toLowerCase().includes("pmjay"))) ||
+                                (r.schemeId === "jsy" &&
+                                  (action.title.toLowerCase().includes("maternal") ||
+                                    action.title.toLowerCase().includes("jsy") ||
+                                    action.title.toLowerCase().includes("anc") ||
+                                    action.description.toLowerCase().includes("mcp"))))
+                          );
+
+                        return (
+                          <div
+                            key={action.id || index}
+                            className="py-3.5 first:pt-0 last:pb-0 flex items-start gap-3.5"
+                          >
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 ${
+                                isActionAssisted
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : isActionInProgress
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-teal-50 text-teal-800"
+                              }`}
+                            >
+                              {isActionAssisted ? (
+                                <Check className="w-3.5 h-3.5" />
+                              ) : (
+                                action.stepNumber || index + 1
+                              )}
                             </div>
-                            <p className="text-xs text-slate-600 leading-relaxed">
-                              {action.description}
-                            </p>
-                            {action.reason && (
-                              <p className="text-[11px] text-teal-800 font-medium">
-                                Why: {action.reason}
+                            <div className="flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h4 className="text-sm font-bold text-slate-900">
+                                  {action.title}
+                                </h4>
+                                <div className="flex items-center gap-1.5">
+                                  {isActionAssisted ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                      <span>Assistance Completed</span>
+                                    </span>
+                                  ) : isActionInProgress ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-100 text-blue-800 border border-blue-200">
+                                      ● In Progress
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                                        action.priority === "REQUIRED"
+                                          ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                          : action.priority === "IMPORTANT"
+                                          ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                          : "bg-slate-100 text-slate-700"
+                                      }`}
+                                    >
+                                      {action.priority}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-600 leading-relaxed">
+                                {action.description}
                               </p>
-                            )}
+                              {action.reason && (
+                                <p className="text-[11px] text-teal-800 font-medium">
+                                  Why: {action.reason}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Assistance trigger */}

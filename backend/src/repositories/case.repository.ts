@@ -394,6 +394,53 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
     );
   }
 
+  public async listAllFollowUpsForAdmin(
+    filter?: { status?: string }
+  ): Promise<CaseFollowUp[]> {
+    if (this.isUnitTestMode()) {
+      const results: CaseFollowUp[] = [];
+      for (const [caseId, followUpMap] of this.memoryFollowUps.entries()) {
+        const c = this.memoryCases.get(caseId);
+        for (const f of followUpMap.values()) {
+          if (filter?.status && f.status !== filter.status) continue;
+          results.push({
+            ...f,
+            householdId: f.householdId || c?.householdId,
+            headOfHouseholdName: f.headOfHouseholdName || c?.headOfHouseholdName,
+            assignedAshaUid: f.assignedAshaUid || c?.assignedAshaUid,
+            schemeId: f.schemeId || c?.schemeId,
+            schemeName: f.schemeName || c?.schemeName,
+          });
+        }
+      }
+      return results.sort(
+        (a, b) => new Date(a.dueAt || a.scheduledAt).getTime() - new Date(b.dueAt || b.scheduledAt).getTime()
+      );
+    }
+
+    const allCases = await this.listAllCases();
+    const results: CaseFollowUp[] = [];
+
+    for (const c of allCases) {
+      const caseFollowUps = await this.getFollowUps(c.id);
+      for (const f of caseFollowUps) {
+        if (filter?.status && f.status !== filter.status) continue;
+        results.push({
+          ...f,
+          householdId: f.householdId || c.householdId,
+          headOfHouseholdName: f.headOfHouseholdName || c.headOfHouseholdName,
+          assignedAshaUid: f.assignedAshaUid || c.assignedAshaUid,
+          schemeId: f.schemeId || c.schemeId,
+          schemeName: f.schemeName || c.schemeName,
+        });
+      }
+    }
+
+    return results.sort(
+      (a, b) => new Date(a.dueAt || a.scheduledAt).getTime() - new Date(b.dueAt || b.scheduledAt).getTime()
+    );
+  }
+
   // ============================================================================
   // CASE ACTIVITIES (AUDIT TRAIL) SUBCOLLECTION
   // ============================================================================

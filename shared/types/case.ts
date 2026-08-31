@@ -2,6 +2,7 @@ import { UserRole } from "./auth.js";
 import { Household, Member, IncomeCategory, Gender, CreateHouseholdInput } from "./household.js";
 import { EligibilityResult } from "./eligibility.js";
 import { GuidanceResponse } from "./guidance.js";
+import { AshaAssistanceRequest } from "./assistance.js";
 
 export interface FieldRegistrationInput extends Omit<CreateHouseholdInput, "rationCardNumber"> {
   rationCardNumber?: string;
@@ -144,6 +145,9 @@ export interface CaseFollowUp {
   notes?: string | null;
   rescheduledAt?: string | null;
   rescheduleReason?: string | null;
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
   sourceTaskId?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -172,6 +176,7 @@ export interface CaseDetailResponse {
   notes: CaseNote[];
   followUps: CaseFollowUp[];
   activities: CaseActivity[];
+  assistanceRequests?: AshaAssistanceRequest[];
 }
 
 export interface CaseSummaryResponse {
@@ -188,7 +193,31 @@ export interface FollowUpSummaryResponse {
   upcoming: number;
   overdue: number;
   completed: number;
+  cancelled?: number;
   followUps: CaseFollowUp[];
+}
+
+export interface AutomationHealthResponse {
+  webhookConfigured: boolean;
+  webhookUrl: string | null;
+  status: "OPERATIONAL" | "UNCONFIGURED" | "DEGRADED";
+  totalFollowUps: number;
+  activeFollowUps: number;
+  overdueFollowUps: number;
+  completedFollowUps: number;
+  cancelledFollowUps: number;
+  recentEvents: AutomationDomainEvent[];
+}
+
+export interface InboundAutomationWebhookInput {
+  eventId: string;
+  eventType: DomainEventType | string;
+  followUpId?: string;
+  caseId?: string;
+  householdId?: string;
+  action?: "REMINDER_SENT" | "STATUS_CHECK" | "ESCALATE";
+  notes?: string;
+  timestamp?: string;
 }
 
 export type DomainEventType =
@@ -199,6 +228,10 @@ export type DomainEventType =
   | "FOLLOWUP_COMPLETED"
   | "FOLLOWUP_OVERDUE"
   | "FOLLOWUP_RESCHEDULED"
+  | "FOLLOWUP_CANCELLED"
+  | "REMINDER_SENT"
+  | "AUTOMATION_TRIGGERED"
+  | "AUTOMATION_FAILED"
   | "CASE_SCHEME_INITIATED"
   | "CASE_RESOLVED";
 

@@ -1,208 +1,152 @@
-# SWASTHYASETU — PHASE 10 ARCHITECTURE SPECIFICATION
-## Actions, Follow-ups & n8n Automation Architecture
+# SwasthyaSetu — Phase 10: Actions, Follow-ups & n8n Automation Engine
+
+This document provides the authoritative reference for Phase 10 of the SwasthyaSetu healthcare assistance platform: Actions, Follow-ups, and n8n Workflow Automation Architecture.
 
 ---
 
-## 1. Executive Summary & Architectural Overview
+## 1. Core Architectural Principle: Single Source of Truth & Safe Automation
 
-Phase 10 elevates SwasthyaSetu from a proactive intelligence and case management system into a complete **closed-loop operational execution and follow-up engine**.
+In SwasthyaSetu, **business logic, state machines, deterministic scheme eligibility, role-based access control, and persistence live strictly within the core application backend** (Node.js/Fastify + Cloud Firestore).
 
-```
-+---------------------------------------------------------------------------------------------------+
-|                                      SWASTHYASETU PHASE 10                                       |
-|                                                                                                   |
-|  [Household & Eligibility Gaps]                                                                   |
-|              │                                                                                    |
-|              ▼                                                                                    |
-|  [Proactive ASHA Action]                                                                          |
-|              │                                                                                    |
-|              ▼                                                                                    |
-|  [Field Task Execution] ──► (Generates Deterministic Next Follow-up)                              |
-|              │                          │                                                         |
-|              │                          ▼                                                         |
-|              │                  [Due Date Engine] (Today, Overdue, Upcoming)                     |
-|              │                          │                                                         |
-|              │                          ▼                                                         |
-|              │                  [ASHA Field Visit & Outcome Recorded]                            |
-|              │                          │                                                         |
-|              ▼                          ▼                                                         |
-|  [Case Journey Resolution] ◄────────────┴─► [Optional n8n Automation / Domain Event Dispatcher]   |
-+---------------------------------------------------------------------------------------------------+
-```
+### What n8n Is vs What It Is Not
 
-### Core Architecture Principles:
-1. **Authoritative Source of Truth**: SwasthyaSetu's PostgreSQL/Firestore database and domain services are strictly authoritative.
-2. **Zero External Hard Dependency**: n8n automation is an **optional, non-blocking notification layer**. The platform executes at 100% capacity when `N8N_WEBHOOK_URL` is empty, unreachable, times out (3-second limit), or returns 500 errors.
-3. **No Fake Automation**: Internal state changes are explicitly labeled (e.g. `Follow-up scheduled`, `Workflow Auto-Triggered`). No misleading labels like "SMS delivered" appear unless backed by an actual integrated provider.
-4. **Deterministic Counting Model**: Adheres strictly to the audited counting model (PM-JAY: 5 tasks / 7 milestones; JSY: 6 tasks / 8 milestones) without infinite loops or state desynchronization.
+| Aspect | Core SwasthyaSetu Backend | n8n Automation Orchestrator |
+|---|---|---|
+| **Authoritative State** | **YES** (Source of Truth) | **NO** (Stateless runner) |
+| **Eligibility Decisions** | **YES** (Deterministic Rule Engine) | **NO** (Cannot decide eligibility) |
+| **RBAC & Authorization** | **YES** (Token & Role Verification) | **NO** (Cannot authorize users) |
+| **Case Lifecycle Transitions** | **YES** ($5/5$ PM-JAY, $6/6$ JSY) | **NO** (Cannot mark cases resolved) |
+| **Task / Milestone Logic** | **YES** (Immutable Audit Trail) | **NO** (Dispatches reminders only) |
+| **Failure Mode** | Self-contained, resilient | **Non-blocking fallback** (Graceful degradation) |
+
+> [!IMPORTANT]
+> A reminder dispatched by n8n or an external channel is **NOT** a task or case completion. Case resolution depends exclusively on verified task milestones executed by authorized actors (e.g. ASHA workers or Citizens) on the SwasthyaSetu platform.
 
 ---
 
-## 2. ASHA Action & Follow-Up Domain Models
+## 2. Follow-Up Data Model & Lifecycle State Machine
 
-### A. CaseFollowUp Model
-Follow-ups are first-class, persistent domain entities linked to a Case, Household, Beneficiary Member, and Scheme.
+Follow-up tasks are stored as first-class persisted entities under `cases/{caseId}/followups/{followUpId}`.
+
+```
+                    ┌──────────────────────────────────────────────┐
+                    │                   PENDING                    │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                        ┌──────────────────┼──────────────────┐
+                        ▼                  ▼                  ▼
+                 [dueAt == today]   [dueAt < today]   [dueAt > today]
+                   (DUE TODAY)        (OVERDUE)         (UPCOMING)
+                        │                  │                  │
+                        └──────────────────┼──────────────────┘
+                                           │
+                         ┌─────────────────┴─────────────────┐
+                         │                                   │
+                         ▼                                   ▼
+                   ┌───────────┐                       ┌───────────┐
+                   │ COMPLETED │                       │ CANCELLED │
+                   └───────────┘                       └───────────┘
+```
+
+### Complete Field Schema (`CaseFollowUp`)
 
 ```typescript
 export interface CaseFollowUp {
-  id: string;
-  caseId: string;
-  householdId: string;
-  headOfHouseholdName?: string;
-  assignedAshaUid?: string;
-  schemeId?: string | null;
-  schemeName?: string | null;
-  beneficiaryMemberId?: string | null;
-  beneficiaryName?: string | null;
-  title?: string;
-  reason: string;
-  dueAt: string;                       // ISO 8601 server timestamp
-  scheduledAt: string;                 // ISO 8601 server timestamp
+  id: string;                          // Unique ID: fu_<timestamp>_<rand>
+  caseId: string;                      // Linked parent case ID
+  householdId?: string;                // Denormalized household ID
+  headOfHouseholdName?: string;        // Head of household name
+  assignedAshaUid?: string;            // Assigned ASHA worker UID
+  schemeId?: string | null;            // Linked scheme (e.g. "ab-pmjay", "jsy")
+  schemeName?: string | null;          // Human-readable scheme name
+  beneficiaryMemberId?: string | null; // Specific family member ID
+  beneficiaryName?: string | null;     // Beneficiary full name
+  title?: string;                      // Actionable title
+  reason: string;                      // Detailed reason / objective
+  dueAt: string;                       // ISO 8601 target completion date
+  scheduledAt: string;                 // Backward compatibility alias
   status: "PENDING" | "COMPLETED" | "CANCELLED";
-  outcome?: string | null;             // Mandatory on completion
-  notes?: string | null;
-  completedAt?: string | null;
-  completedBy?: string | null;
-  rescheduledAt?: string | null;
-  rescheduleReason?: string | null;
-  sourceTaskId?: string | null;        // Task that triggered this follow-up (Idempotency key)
-  isOverdue?: boolean;                 // Computed dynamically server-side
-  createdAt: string;
-  updatedAt: string;
+  isOverdue?: boolean;                 // Server-computed dynamically
+  completedAt?: string | null;         // ISO 8601 timestamp
+  completedBy?: string | null;         // Actor display name
+  outcome?: string | null;             // Mandatory resolution outcome
+  notes?: string | null;               // Field observations
+  rescheduledAt?: string | null;       // Timestamp of reschedule
+  rescheduleReason?: string | null;    // Mandatory reschedule reason
+  cancelledAt?: string | null;         // Timestamp of cancellation
+  cancelledBy?: string | null;         // Actor display name
+  cancelReason?: string | null;        // Mandatory cancellation reason
+  sourceTaskId?: string | null;        // Auto-triggering source task ID
+  createdAt: string;                   // ISO 8601 timestamp
+  updatedAt: string;                   // ISO 8601 timestamp
 }
 ```
 
-### B. Dynamic Due Date & Overdue Computation
-Due dates are stored as unambiguous UTC ISO timestamps. Overdue status is evaluated server-side on demand:
+---
 
-$$\text{isOverdue} = (\text{status} = \text{"PENDING"}) \land (\text{dueAt} < \text{now}) \land \neg \text{isSameDay}(\text{dueAt}, \text{now})$$
+## 3. Scheme-Specific Deterministic Follow-Up Policy
 
-Summary KPIs (`dueToday`, `upcoming`, `overdue`, `completed`) are computed dynamically across the ASHA worker's entire caseload without stale cached values.
+When an ASHA worker completes a scheme task, the system automatically schedules the next logical doorstep visit:
+
+### PM-JAY Assistance Journey (5 Tasks / 7 Milestones)
+
+| Step | Task Completed | Automatic Follow-Up Generated | Due Horizon |
+|---|---|---|---|
+| **1** | Confirm Senior/Family Eligibility & Consent | `PM-JAY e-KYC & Registration Assistance` | +2 days |
+| **2** | Assist with Aadhaar e-KYC on Portal | `Verify PM-JAY Application Submission` | +3 days |
+| **3** | Submit / Track BIS Application | `Check Ayushman Card Generation Status` | +5 days |
+| **4** | Download & Verify Ayushman Card | `Deliver Ayushman Card & Hospital Network Guidance` | +2 days |
+| **5** | Handover Card & Empanelled Hospital List | **RESOLVES CASE ($5/5$)** — Marks intermediate follow-ups complete and halts all reminders | N/A |
+
+### JSY Maternal Health Journey (6 Tasks / 8 Milestones)
+
+| Step | Task Completed | Automatic Follow-Up Generated | Due Horizon |
+|---|---|---|---|
+| **1** | Confirm Pregnancy & Issue MCP Card | `Antenatal Care (ANC) & MCP Card Follow-up` | +7 days |
+| **2** | Coordinate ANC & Checkup Schedule | `Map Institutional Delivery Hospital & Ambulance` | +14 days |
+| **3** | Verify Facility Mapping & Transport (108) | `Birth Preparedness & Delivery Readiness Check` | +14 days |
+| **4** | Delivery Support & 48h Stay Monitoring | `48-Hour Postnatal Visit & Newborn Vaccines` | +2 days |
+| **5** | Conduct Postnatal Visit & Newborn Care | `Track JSY Cash Incentive DBT Transfer` | +10 days |
+| **6** | Verify ₹1,400 DBT Bank Transfer | **RESOLVES CASE ($6/6$)** — Marks intermediate follow-ups complete and halts all reminders | N/A |
 
 ---
 
-## 3. Deterministic Automatic Follow-up Matrix
+## 4. Inbound & Outbound Automation Integration
 
-When an ASHA worker completes a scheme field task via `PATCH /api/v1/asha/cases/:caseId/tasks/:taskId/complete`, the system automatically schedules the next deterministic follow-up:
+### Outbound Webhook Dispatcher (`AutomationService.emitDomainEvent`)
 
-### A. Ayushman Bharat PM-JAY (Senior Citizen 70+)
-| Completed Task | Auto-Generated Next Follow-up Title | Due Interval | Purpose & Guidance |
-| :--- | :--- | :--- | :--- |
-| **Task 1**: `CONFIRM_BENEFICIARY` | **PM-JAY e-KYC & Registration Assistance** | +3 Days | Assist senior citizen with official Aadhaar e-KYC and PM-JAY registration at CSC/portal. |
-| **Task 2**: `ENROLLMENT_GUIDANCE` | **Verify PM-JAY Application Submission** | +7 Days | Verify PM-JAY application submission and record reference acknowledgment number. |
-| **Task 3**: `VERIFY_ENROLLMENT` | **Check Ayushman Card Generation Status** | +5 Days | Check Ayushman Card generation and digital/physical receipt for beneficiary. |
-| **Task 4**: `CONFIRM_CARD` | **Deliver Ayushman Card & Hospital Network Guidance** | +3 Days | Deliver Ayushman Card to beneficiary and inform family of nearest empaneled hospitals for ₹5 Lakh cover. |
-| **Task 5**: `BENEFIT_GUIDANCE` | *(Resolves Case & Scheme Journey)* | 0 Days | Completes scheme journey, resolves case to `RESOLVED`, clears `nextFollowUpAt`, and marks intermediate follow-ups `COMPLETED`. |
+- **Trigger**: Any major domain transition (`TASK_COMPLETED`, `FOLLOWUP_CREATED`, `FOLLOWUP_CANCELLED`, `CASE_RESOLVED`).
+- **Security**: HMAC-SHA256 signature in `X-SwasthyaSetu-Signature` header using `N8N_WEBHOOK_SECRET`.
+- **Payload Redaction**: Recursively redacts passwords, tokens, API keys, and sensitive auth credentials.
+- **Resilience**: 3,000ms AbortSignal timeout. Non-blocking; failures do not impact core domain transactions.
+- **Fallback**: Gracefully falls back to `N8N_UNCONFIGURED` when no webhook URL is configured.
 
-### B. Janani Suraksha Yojana (JSY Maternal Care)
-| Completed Task | Auto-Generated Next Follow-up Title | Due Interval | Purpose & Guidance |
-| :--- | :--- | :--- | :--- |
-| **Task 1**: `CONFIRM_PREGNANCY` | **Antenatal Care (ANC) & MCP Card Follow-up** | +7 Days | Ensure Mother and Child Protection (MCP) card issuance and schedule Antenatal Care checkups. |
-| **Task 2**: `ANC_COORDINATION` | **Map Institutional Delivery Hospital & Ambulance** | +14 Days | Map accredited public hospital and confirm 108/102 emergency ambulance contact. |
-| **Task 3**: `FACILITY_MAPPING` | **Birth Preparedness & Delivery Readiness Check** | +14 Days | Review birth preparedness plan and hospital admission readiness before Expected Date of Delivery. |
-| **Task 4**: `DELIVERY_SUPPORT` | **48-Hour Postnatal Visit & Newborn Vaccines** | +2 Days | Conduct 48-hour postpartum home visit to check maternal recovery, newborn breastfeeding, and zero-dose vaccines. |
-| **Task 5**: `POSTNATAL_VISIT` | **Track JSY Cash Incentive DBT Transfer** | +10 Days | Verify beneficiary bank account linkage and receipt of official JSY institutional delivery cash assistance. |
-| **Task 6**: `DBT_TRACKING` | *(Resolves Case & Maternal Care Journey)* | 0 Days | Completes maternal care journey, resolves case to `RESOLVED`, clears `nextFollowUpAt`, and marks intermediate follow-ups `COMPLETED`. |
+### Inbound Webhook Receiver (`POST /api/v1/automation/webhook`)
 
-### C. Idempotency & Duplicate Protection
-Every automatic follow-up is tagged with its originating `sourceTaskId`. Re-executing a task or retrying completions will never produce duplicate pending follow-ups for the same source task.
+- **Authentication**: Requires `X-N8N-Webhook-Secret` or `Authorization: Bearer <secret>`.
+- **Idempotency**: Circular deduplication buffer caches `eventId` to ignore retry duplicates.
+- **Audit Logging**: Dispatches `AUTOMATION_DISPATCHED` activity entry onto parent case.
+
+### Status Query Endpoint (`GET /api/v1/automation/cases/:caseId/follow-ups/:followUpId/status`)
+
+- **Returns**: `{ followUp, caseStatus, shouldHalt: boolean }`.
+- **Halt Contract**: If `caseStatus === "RESOLVED"` or `followUp.status !== "PENDING"`, returns `shouldHalt: true` so external automation workflows safely terminate without sending stale reminders.
 
 ---
 
-## 4. Optional n8n Automation & Domain Event Architecture
+## 5. Production n8n Workflow Artifacts
 
-The `AutomationService` publishes structured domain events:
+Located in `docs/n8n-workflows/`:
 
-### A. Supported Domain Events
-- `CASE_CREATED`: When a household case is assigned or registered in the field.
-- `TASK_COMPLETED`: When an ASHA worker completes a field task milestone.
-- `FOLLOWUP_CREATED`: When a follow-up visit is manually or automatically scheduled.
-- `FOLLOWUP_COMPLETED`: When a follow-up visit outcome is recorded.
-- `FOLLOWUP_RESCHEDULED`: When a follow-up visit is moved to a new target date.
-- `CASE_SCHEME_INITIATED`: When proactive or citizen-requested doorstep scheme facilitation starts.
-- `CASE_RESOLVED`: When all required scheme tasks reach complete milestone resolution.
-
-### B. Payload Structure & Data Sanitization
-```json
-{
-  "eventId": "evt_1788107995160_3w44w",
-  "eventType": "TASK_COMPLETED",
-  "timestamp": "2026-08-30T16:39:55.160Z",
-  "caseId": "case_101",
-  "householdId": "hh_101",
-  "assignedAshaUid": "asha101",
-  "schemeId": "ab-pmjay",
-  "beneficiaryMemberId": "mem_202",
-  "beneficiaryName": "Gopal Sharma",
-  "payload": {
-    "taskId": "task_1",
-    "taskTitle": "Confirm senior citizen identity & age documentation",
-    "completedTasksCount": 1,
-    "totalTasksCount": 5
-  }
-}
-```
-
-### C. Fail-Safe Non-Blocking Dispatch Guarantee
-```typescript
-try {
-  const response = await fetch(this.webhookUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-SwasthyaSetu-Event": eventType,
-      "X-SwasthyaSetu-Event-ID": eventId,
-    },
-    body: JSON.stringify(event),
-    signal: AbortSignal.timeout(3000), // 3-second hard timeout
-  });
-} catch (err) {
-  // Safe degradation: core database transaction continues without interruption
-}
-```
-All sensitive credentials, API keys, session tokens, and passwords matching `/pass|token|secret|credential|auth|key/i` are automatically sanitized to `"[REDACTED]"`.
+1. **`SwasthyaSetu_FollowUp_Dispatcher.json`**: Listens for outbound domain events, checks pre-flight status, and confirms dispatch.
+2. **`SwasthyaSetu_Due_FollowUp_Poller.json`**: Hourly cron job querying `/api/v1/automation/due-follow-ups` to trigger timely field notifications.
+3. **`SwasthyaSetu_Overdue_Escalator.json`**: Daily 9:00 AM cron escalating follow-ups overdue by >48 hours to the ASHA supervisor queue.
+4. **`SwasthyaSetu_Case_Lifecycle_Orchestrator.json`**: Listens for `CASE_RESOLVED` events and terminates all active reminders and queues for that case.
 
 ---
 
-## 5. REST API Endpoints Reference
+## 6. RBAC & Security Isolation
 
-| Method | Endpoint | Access Guard | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/asha/follow-ups` | ASHA, ADMIN | Lists all assigned follow-ups with on-demand KPI counters (`dueToday`, `overdue`, `upcoming`, `completed`). |
-| `GET` | `/api/v1/asha/cases/:caseId/follow-ups` | ASHA (assigned), ADMIN | Lists follow-up history and pending visits for a specific case. |
-| `POST` | `/api/v1/asha/cases/:caseId/follow-ups` | ASHA (assigned), ADMIN | Creates a new manual follow-up for a case. |
-| `PATCH` | `/api/v1/asha/cases/:caseId/follow-ups/:followUpId/complete` | ASHA (assigned), ADMIN | Records outcome, completion timestamp, actor name, and recalculates `nextFollowUpAt`. |
-| `PATCH` | `/api/v1/asha/cases/:caseId/follow-ups/:followUpId/reschedule` | ASHA (assigned), ADMIN | Reschedules follow-up with new target date and mandatory audit reason. |
-| `PATCH` | `/api/v1/asha/cases/:caseId/tasks/:taskId/complete` | ASHA (assigned), ADMIN | Marks task completed, advances journey step, and generates next follow-up. |
-
----
-
-## 6. Citizen Privacy & Separation
-
-- **High-Level Assistance Visibility**: Citizens can view high-level progress (e.g. `ACCEPTED`, `IN_PROGRESS`, `RESOLVED`, public ASHA response notes) through `/api/v1/citizen/assistance`.
-- **Zero Confidential Leakage**: Internal ASHA field notes, triage assessments, and raw operational follow-up rosters are strictly protected and never exposed to citizens.
-
----
-
-## 7. Verification & Test Suite Summary
-
-### Automated Test Matrix
-- **Total Backend Test Files**: 35 Files
-- **Total Backend Tests**: 282 Passed (100% Pass Rate)
-- **Phase 10 Dedicated Tests (`tests/phase10-followups-automation.test.ts`)**: 14 Tests
-  - Action & Task authorization and IDOR protection
-  - Citizen access restrictions (403 Forbidden)
-  - Deterministic automatic follow-up generation for PM-JAY (Tasks 1–4)
-  - Deterministic automatic follow-up generation for JSY (Tasks 1–5)
-  - Idempotency & duplicate follow-up prevention
-  - Outcome recording & `nextFollowUpAt` recalculation
-  - Reschedule audit reason recording
-  - Dynamic KPI counter computation (Due Today, Overdue, Upcoming, Completed)
-  - n8n unconfigured safe degradation
-  - n8n 500 error safe degradation
-  - n8n timeout non-blocking handling
-  - Deep payload credential sanitization
-  - Citizen progress tracking without confidential note leakage
-- **Backend Typecheck (`npx tsc --noEmit`)**: 0 Errors
-- **Frontend Typecheck (`npx tsc --noEmit`)**: 0 Errors
-- **Frontend Production Build (`npm run build`)**: 11 Static routes built cleanly in Turbopack
+- **CITIZEN**: Can view own household status, track connected ASHA assistance, and view action plan. Cannot modify case tasks, complete follow-ups, or access automation telemetry.
+- **ASHA**: Can create, complete, reschedule, and cancel follow-ups for assigned caseload. Cannot view other ASHA rosters or platform-wide telemetry.
+- **ADMIN**: Can view platform-wide caseload, follow-up telemetry, and orchestrator status (`/api/v1/admin/automation/health`).

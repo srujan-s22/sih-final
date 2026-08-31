@@ -11,6 +11,8 @@ import {
   UpdateCaseFollowUpInputSchema,
   CompleteCaseFollowUpInputSchema,
   RescheduleCaseFollowUpInputSchema,
+  CancelCaseFollowUpInputSchema,
+  InboundAutomationWebhookInputSchema,
   AssignCaseInputSchema,
   InitiateSchemeAssistanceInputSchema,
 } from "../../../shared/schemas/case.schema.js";
@@ -459,6 +461,43 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   /**
+   * PATCH /api/v1/asha/cases/:caseId/follow-ups/:followUpId/cancel
+   * Cancels a follow-up task with mandatory reason
+   */
+  fastify.patch(
+    "/v1/asha/cases/:caseId/follow-ups/:followUpId/cancel",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, followUpId } = request.params as { caseId: string; followUpId: string };
+        const parseResult = CancelCaseFollowUpInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid follow-up cancellation payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const followUp = await fastify.caseService.cancelFollowUp(
+          caseId,
+          followUpId,
+          parseResult.data,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { followUp },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
    * PATCH /api/v1/asha/cases/:caseId/follow-ups/:followUpId
    * General update for a follow-up task
    */
@@ -757,6 +796,177 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(HTTP_STATUS.OK).send({
           success: true,
           data: { case: assignedCase },
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/admin/follow-ups
+   * Retrieves all platform follow-ups across all cases (Admin only)
+   */
+  fastify.get(
+    "/v1/admin/follow-ups",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const userProfile = request.userProfile;
+        if (!userProfile || userProfile.role !== "ADMIN") {
+          return reply.status(HTTP_STATUS.FORBIDDEN).send({
+            success: false,
+            code: "FORBIDDEN_ROLE",
+            message: "Only Administrators can view all platform follow-ups.",
+          });
+        }
+
+        const summary = await fastify.caseService.listAllFollowUpsForAdmin(userProfile);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: summary,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/admin/automation/health
+   * Retrieves automation orchestration health & telemetry (Admin only)
+   */
+  fastify.get(
+    "/v1/admin/automation/health",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const userProfile = request.userProfile;
+        if (!userProfile || userProfile.role !== "ADMIN") {
+          return reply.status(HTTP_STATUS.FORBIDDEN).send({
+            success: false,
+            code: "FORBIDDEN_ROLE",
+            message: "Only Administrators can view automation health telemetry.",
+          });
+        }
+
+        const health = await fastify.caseService.getAutomationHealth(userProfile);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: health,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  // ============================================================================
+  // n8n AUTOMATION INBOUND WEBHOOK ENDPOINTS (/api/v1/automation/*)
+  // ============================================================================
+
+  /**
+   * POST /api/v1/automation/webhook
+   * Inbound authenticated webhook handler for n8n orchestrator
+   */
+  fastify.post(
+    "/v1/automation/webhook",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const parseResult = InboundAutomationWebhookInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid automation webhook payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const providedSecret =
+          (request.headers["x-n8n-webhook-secret"] as string) ||
+          (request.headers["x-swasthyasetu-secret"] as string) ||
+          (request.headers["authorization"]?.replace(/^Bearer\s+/i, ""));
+
+        const result = await fastify.caseService.handleInboundAutomationWebhook(
+          parseResult.data,
+          providedSecret
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/automation/due-follow-ups
+   * Retrieves due follow-ups across active cases for n8n polling workflow
+   */
+  fastify.get(
+    "/v1/automation/due-follow-ups",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const providedSecret =
+          (request.headers["x-n8n-webhook-secret"] as string) ||
+          (request.headers["x-swasthyasetu-secret"] as string) ||
+          (request.headers["authorization"]?.replace(/^Bearer\s+/i, ""));
+
+        const isAuthentic = fastify.caseService["automationService"]?.verifyInboundWebhook(providedSecret);
+        if (!isAuthentic) {
+          return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
+            success: false,
+            code: "UNAUTHORIZED_WEBHOOK",
+            message: "Invalid or missing automation authorization secret.",
+          });
+        }
+
+        const data = await fastify.caseService.getDueFollowUpsForAutomation();
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/automation/cases/:caseId/follow-ups/:followUpId/status
+   * Inspects follow-up and case status before executing reminder in n8n
+   */
+  fastify.get(
+    "/v1/automation/cases/:caseId/follow-ups/:followUpId/status",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId, followUpId } = request.params as { caseId: string; followUpId: string };
+        const providedSecret =
+          (request.headers["x-n8n-webhook-secret"] as string) ||
+          (request.headers["x-swasthyasetu-secret"] as string) ||
+          (request.headers["authorization"]?.replace(/^Bearer\s+/i, ""));
+
+        const isAuthentic = fastify.caseService["automationService"]?.verifyInboundWebhook(providedSecret);
+        if (!isAuthentic) {
+          return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
+            success: false,
+            code: "UNAUTHORIZED_WEBHOOK",
+            message: "Invalid or missing automation authorization secret.",
+          });
+        }
+
+        const statusInfo = await fastify.caseService.getFollowUpStatusForAutomation(caseId, followUpId);
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: statusInfo,
         });
       } catch (err) {
         return handleCaseError(err, reply);

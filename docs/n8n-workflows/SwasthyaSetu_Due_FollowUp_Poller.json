@@ -1,0 +1,107 @@
+{
+  "name": "SwasthyaSetu - Due Follow-up Batch Poller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (Hourly)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/due-follow-ups",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Due Follow-ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.dueFollowUps",
+        "options": {}
+      },
+      "name": "Split Follow-up List",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"poll_\" + $json.id + \"_\" + $now.toMillis(),\n  \"eventType\": \"REMINDER_SENT\",\n  \"caseId\": $json.caseId,\n  \"followUpId\": $json.id,\n  \"action\": \"REMINDER_SENT\",\n  \"notes\": \"Hourly scheduled polling reminder dispatched for \" + ($json.title || $json.reason),\n  \"timestamp\": $now.toISO()\n}"
+      },
+      "name": "Send Follow-up Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Hourly)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Due Follow-ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Due Follow-ups": {
+      "main": [
+        [
+          {
+            "node": "Split Follow-up List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Follow-up List": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

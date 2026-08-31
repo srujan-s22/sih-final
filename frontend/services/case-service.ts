@@ -14,6 +14,7 @@ import {
   AshaAttentionSignalsResponse,
   InitiateSchemeAssistanceInput,
   InitiateSchemeAssistanceResponse,
+  AutomationHealthResponse,
 } from "@shared/types/case";
 import { Household } from "@shared/types/household";
 import {
@@ -169,6 +170,34 @@ export class CaseServiceClient {
       `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}/reschedule`,
       { dueAt, reason }
     );
+  }
+
+  /**
+   * Cancels a scheduled follow-up task with reason
+   */
+  public async cancelFollowUp(
+    caseId: string,
+    followUpId: string,
+    reason: string
+  ): Promise<ApiResult<{ followUp: CaseFollowUp }>> {
+    return apiClient.patch<{ followUp: CaseFollowUp }>(
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/follow-ups/${encodeURIComponent(followUpId)}/cancel`,
+      { reason }
+    );
+  }
+
+  /**
+   * Retrieves all platform follow-ups (Admin only)
+   */
+  public async listAllFollowUpsForAdmin(): Promise<ApiResult<FollowUpSummaryResponse>> {
+    return apiClient.get<FollowUpSummaryResponse>("/api/v1/admin/follow-ups");
+  }
+
+  /**
+   * Retrieves automation orchestration health & telemetry (Admin only)
+   */
+  public async getAutomationHealth(): Promise<ApiResult<AutomationHealthResponse>> {
+    return apiClient.get<AutomationHealthResponse>("/api/v1/admin/automation/health");
   }
 
   /**

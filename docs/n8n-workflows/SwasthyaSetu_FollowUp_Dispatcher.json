@@ -1,0 +1,132 @@
+{
+  "name": "SwasthyaSetu - Follow-up Reminder Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "swasthyasetu-followup-events",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook Inbound Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "swasthyasetu-events-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.eventType }}",
+              "operation": "equal",
+              "value2": "FOLLOWUP_CREATED"
+            }
+          ]
+        }
+      },
+      "name": "Filter Event Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/cases/{{ $json.body.caseId }}/follow-ups/{{ $json.body.payload.followUpId }}/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Pre-flight Status Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [640, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.data.shouldHalt }}",
+              "operation": "equal",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "name": "Is Follow-up Active?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [860, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SWASTHYASETU_API_BASE || 'http://localhost:4000' }}/api/v1/automation/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-SwasthyaSetu-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || 'swasthyasetu-prod-automation-key-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"rem_\" + $now.toMillis() + \"_\" + Math.random().toString(36).substring(2,7),\n  \"eventType\": \"REMINDER_SENT\",\n  \"caseId\": \"{{ $('Webhook Inbound Trigger').item.json.body.caseId }}\",\n  \"followUpId\": \"{{ $('Webhook Inbound Trigger').item.json.body.payload.followUpId }}\",\n  \"action\": \"REMINDER_SENT\",\n  \"notes\": \"Automated field reminder dispatched to ASHA worker for household visit.\",\n  \"timestamp\": $now.toISO()\n}"
+      },
+      "name": "Report Reminder Dispatched",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1080, 220]
+    }
+  ],
+  "connections": {
+    "Webhook Inbound Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Event Type": {
+      "main": [
+        [
+          {
+            "node": "Pre-flight Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-flight Status Check": {
+      "main": [
+        [
+          {
+            "node": "Is Follow-up Active?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Follow-up Active?": {
+      "main": [
+        [
+          {
+            "node": "Report Reminder Dispatched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
