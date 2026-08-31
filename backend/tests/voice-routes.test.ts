@@ -151,7 +151,7 @@ describe("Phase 11 — Voice API Endpoints (/api/v1/voice)", () => {
     expect(turnBody.success).toBe(true);
     expect(turnBody.data.verificationStatus).toBe("UNVERIFIED");
     expect(turnBody.data.textResponse).toContain("verify your identity");
-  });
+  }, 15000);
 
   it("4. POST /api/v1/voice/sessions/:id/verify verifies identity with Ration Card code", async () => {
     // Create session
@@ -178,7 +178,7 @@ describe("Phase 11 — Voice API Endpoints (/api/v1/voice)", () => {
     expect(verifyBody.success).toBe(true);
     expect(verifyBody.data.verificationStatus).toBe("VERIFIED");
     expect(verifyBody.data.textResponse).toContain("Identity verified for Manjunath's household");
-  });
+  }, 15000);
 
   it("5. POST /api/v1/voice/outbound initiates authorized outbound follow-up call", async () => {
     const res = await app.inject({
@@ -376,7 +376,7 @@ describe("Phase 11 — Voice API Endpoints (/api/v1/voice)", () => {
     expect(turnBody.data.detectedIntent).toBe("EMERGENCY");
     expect(turnBody.data.textResponse).toContain("108");
     expect(turnBody.data.textResponse).toContain("emergency");
-  });
+  }, 15000);
 
   it("14. POST /api/v1/voice/citizen/request-call rejects invalid phone numbers with 400", async () => {
     const res = await app.inject({

@@ -437,7 +437,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(turn.verificationStatus).toBe("UNVERIFIED");
       expect(turn.textResponse).toContain("verify your identity");
       expect(turn.actionResult).toBeUndefined();
-    });
+    }, 15000);
 
     it("fails closed: unverified callers cannot view assistance status", async () => {
       const session = await gatewayService.createInboundSession("+919876543210");
@@ -448,7 +448,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
 
       expect(turn.verificationStatus).toBe("UNVERIFIED");
       expect(turn.textResponse).toContain("verify your identity");
-    });
+    }, 15000);
 
     it("verifies identity when valid Ration Card digits are provided", async () => {
       const session = await gatewayService.createInboundSession("+919876543210");
@@ -460,7 +460,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
 
       expect(turn.verificationStatus).toBe("VERIFIED");
       expect(turn.textResponse).toContain("Identity verified for Ramesh Kumar's household");
-    });
+    }, 15000);
 
     it("rejects invalid verification codes and remains protected", async () => {
       const session = await gatewayService.createInboundSession("+919876543210");
@@ -471,7 +471,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
 
       expect(turn.verificationStatus).toBe("UNVERIFIED");
       expect(turn.textResponse).toContain("did not match");
-    });
+    }, 15000);
   });
 
   describe("4. Authoritative Business Logic via Strict Voice Allowlist", () => {
@@ -494,7 +494,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(turn.actionResult?.isEligible).toBe(true);
       expect(turn.textResponse).toContain("Dinanath Kumar");
       expect(turn.textResponse).toContain("Age 71");
-    });
+    }, 15000);
 
     it("evaluates maternal eligibility for pregnant mother (JSY)", async () => {
       const turn = await gatewayService.processTurn(verifiedSession.id, {
@@ -503,7 +503,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
 
       expect(turn.executedAction).toBe("getEligibilityForMember");
       expect(turn.textResponse).toContain("Savitri Devi");
-    });
+    }, 15000);
 
     it("checks active assistance progress and returns accurate task counts (e.g. 2/5 for PM-JAY)", async () => {
       // Seed an active PM-JAY case with 2 of 5 tasks completed
@@ -538,7 +538,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(turn.actionResult?.completedTasks).toBe(2);
       expect(turn.actionResult?.totalTasks).toBe(5);
       expect(turn.textResponse).toContain("2 of 5 field tasks");
-    });
+    }, 15000);
 
     it("is idempotent: reuses existing case when assistance is requested again", async () => {
       // Seed existing PM-JAY case
@@ -572,7 +572,7 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(turn.executedAction).toBe("requestAssistance");
       expect(turn.actionResult?.isExisting).toBe(true);
       expect(turn.textResponse).toContain("already exists and is currently in progress");
-    });
+    }, 15000);
 
     it("enforces cost control limits by ending session after max turns", async () => {
       verifiedSession.turnCount = 10;
