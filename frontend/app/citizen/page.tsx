@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +104,7 @@ const ASSISTANCE_CATEGORIES: Array<{ value: AssistanceCategory; label: string }>
 
 export default function CitizenPage() {
   const { userProfile } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("overview");
 
   // Data states
@@ -530,12 +532,12 @@ export default function CitizenPage() {
   };
 
   const navTabs = [
-    { id: "overview", label: "Overview", icon: Users },
-    { id: "household", label: "My Household", icon: MapPin },
-    { id: "family", label: "Family Members", icon: Users },
-    { id: "asha-connection", label: "My ASHA Worker", icon: UserCheck },
-    { id: "support", label: "Healthcare Support", icon: ShieldCheck },
-    { id: "actions", label: "Next Steps", icon: FileCheck },
+    { id: "overview", label: t("navigation.overview"), icon: Users },
+    { id: "household", label: t("navigation.household"), icon: MapPin },
+    { id: "family", label: t("navigation.family"), icon: Users },
+    { id: "asha-connection", label: t("navigation.ashaConnect"), icon: UserCheck },
+    { id: "support", label: t("navigation.schemes"), icon: ShieldCheck },
+    { id: "actions", label: t("common.next"), icon: FileCheck },
   ];
 
   const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
@@ -548,29 +550,29 @@ export default function CitizenPage() {
         role="CITIZEN"
         title={
           activeTab === "household"
-            ? "My Household"
+            ? t("navigation.household")
             : activeTab === "family"
-            ? "Family Members"
+            ? t("navigation.family")
             : activeTab === "asha-connection"
-            ? "My ASHA Worker"
+            ? t("navigation.ashaConnect")
             : activeTab === "support"
-            ? "Healthcare Support & Schemes"
+            ? t("navigation.schemes")
             : activeTab === "actions"
-            ? "Next Steps"
-            : `Welcome, ${userProfile?.displayName || "Citizen"} 👋`
+            ? t("common.next")
+            : t("citizen.welcome", { name: userProfile?.displayName || "Citizen" })
         }
         description={
           activeTab === "household"
-            ? "Your household address, location, and ration details used for government healthcare support."
+            ? t("citizen.healthBenefitsDesc")
             : activeTab === "family"
-            ? "Household members evaluated for healthcare schemes and entitlements."
+            ? t("citizen.familyMembersDesc")
             : activeTab === "asha-connection"
-            ? "Direct connection and doorstep assistance requests with your local ASHA worker."
+            ? t("citizen.ashaSectionDesc")
             : activeTab === "support"
-            ? "Discovered government health schemes and verified entitlements."
+            ? t("citizen.healthBenefitsDesc")
             : activeTab === "actions"
-            ? "Personalized step-by-step guide to complete requirements and claim benefits."
-            : "Your government healthcare benefits, family support, and ASHA assistance in one place."
+            ? t("citizen.portalSubtitle")
+            : t("citizen.portalSubtitle")
         }
         navTabs={navTabs}
         activeTab={activeTab}

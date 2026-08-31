@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTranslation } from "@/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
 import {
   Users,
@@ -68,6 +69,7 @@ import { AshaCallModal } from "@/components/voice/asha-call-modal";
 
 export default function AshaWorkspacePage() {
   const { userProfile } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("overview");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -800,13 +802,13 @@ export default function AshaWorkspacePage() {
   const actionableFollowUpBadge = overdueFollowUpsCount + dueTodayFollowUpsCount;
 
   const navTabs = [
-    { id: "overview", label: "Dashboard", icon: Activity },
-    { id: "cases", label: `My Households (${totalAssignedHouseholds})`, icon: Users },
-    { id: "requests", label: `Requests (${totalActiveRequestsCount})`, icon: Inbox },
-    { id: "attention", label: `Needs Attention (${totalAttentionSignalsCount})`, icon: AlertCircle },
+    { id: "overview", label: t("navigation.dashboard"), icon: Activity },
+    { id: "cases", label: `${t("navigation.caseload")} (${totalAssignedHouseholds})`, icon: Users },
+    { id: "requests", label: `${t("navigation.assistance")} (${totalActiveRequestsCount})`, icon: Inbox },
+    { id: "attention", label: `${t("navigation.attentionSignals")} (${totalAttentionSignalsCount})`, icon: AlertCircle },
     {
       id: "followups",
-      label: `Follow-ups${actionableFollowUpBadge > 0 ? ` (${actionableFollowUpBadge})` : ""}`,
+      label: `${t("navigation.followUps")}${actionableFollowUpBadge > 0 ? ` (${actionableFollowUpBadge})` : ""}`,
       icon: Clock,
     },
   ];
@@ -836,25 +838,25 @@ export default function AshaWorkspacePage() {
         role="ASHA"
         title={
           activeTab === "cases"
-            ? "My Assigned Households"
+            ? t("navigation.caseload")
             : activeTab === "requests"
-            ? "Incoming Citizen Requests"
+            ? t("navigation.assistance")
             : activeTab === "attention"
-            ? "Needs Attention Queue"
+            ? t("navigation.attentionSignals")
             : activeTab === "followups"
-            ? "Follow-up & Visit Tasks"
-            : `Welcome, ${userProfile?.displayName || "ASHA Worker"} 👋`
+            ? t("navigation.followUps")
+            : t("citizen.welcome", { name: userProfile?.displayName || "ASHA Worker" })
         }
         description={
           activeTab === "cases"
-            ? "View assigned family profiles, monitor verified entitlements, and initiate doorstep assistance."
+            ? t("asha.workspaceDesc")
             : activeTab === "requests"
-            ? "Respond to scheme enrollment, document verification, and household connection requests."
+            ? t("asha.fieldPrioritiesTitle")
             : activeTab === "attention"
-            ? "Proactive intelligence signals highlighting senior citizens, maternal care, and blocked tasks."
+            ? t("asha.attentionRequired")
             : activeTab === "followups"
-            ? "Scheduled home visits, documentation verification checks, and health outreach tasks."
-            : "Here's what needs your attention today across your assigned households."
+            ? t("asha.dueFollowUps")
+            : t("asha.workspaceDesc")
         }
         navTabs={navTabs}
         activeTab={activeTab}

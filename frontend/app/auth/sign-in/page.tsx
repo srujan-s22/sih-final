@@ -11,9 +11,12 @@ import { UserRole } from "@shared/types/auth";
 import { env } from "@/config/env";
 import { ShieldCheck, Lock, ArrowRight, User, KeyRound, Building2, Users } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { useTranslation } from "@/i18n/i18n-context";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 
 export default function SignInPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const {
     isAuthenticated,
     isLoading,
@@ -182,6 +185,13 @@ export default function SignInPage() {
 
         {/* Auth Card */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xl shadow-slate-100 space-y-5">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              Language / ಭಾಷೆ / भाषा
+            </span>
+            <LanguageSelector size="sm" />
+          </div>
+
           {/* Sign In / Sign Up Mode Switcher */}
           <div className="flex rounded-lg bg-slate-100 p-1">
             <button
@@ -196,7 +206,7 @@ export default function SignInPage() {
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Sign In
+              {t("navigation.signIn")}
             </button>
             <button
               type="button"
@@ -210,7 +220,7 @@ export default function SignInPage() {
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Create Account
+              {t("auth.createAccount")}
             </button>
           </div>
 

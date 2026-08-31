@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,7 @@ interface AshaWorkerSummary {
 
 export default function AdminPage() {
   const { userProfile } = useAuth();
+  const { t } = useTranslation();
 
   // --- Core Telemetry & Data State ---
   const [schemes, setSchemes] = useState<Scheme[]>([]);
@@ -400,12 +402,12 @@ export default function AdminPage() {
 
   // --- Navigation Tabs ---
   const navTabs = [
-    { id: "overview", label: "Dashboard", icon: Building2 },
-    { id: "households", label: `Households (${totalHouseholdsCount})`, icon: Users },
-    { id: "ashas", label: `ASHA Workforce (${totalAshasCount})`, icon: ShieldCheck },
-    { id: "cases", label: `Case Oversight (${activeCasesCount})`, icon: Inbox },
-    { id: "schemes", label: `Schemes (${schemes.length})`, icon: Layers },
-    { id: "monitoring", label: "System Monitoring", icon: Activity },
+    { id: "overview", label: t("navigation.dashboard"), icon: Building2 },
+    { id: "households", label: `${t("navigation.directory")} (${totalHouseholdsCount})`, icon: Users },
+    { id: "ashas", label: `${t("navigation.workforce")} (${totalAshasCount})`, icon: ShieldCheck },
+    { id: "cases", label: `${t("navigation.oversight")} (${activeCasesCount})`, icon: Inbox },
+    { id: "schemes", label: `${t("navigation.registry")} (${schemes.length})`, icon: Layers },
+    { id: "monitoring", label: t("navigation.monitoring"), icon: Activity },
   ];
 
   // ============================================================================
@@ -533,8 +535,8 @@ export default function AdminPage() {
     <ProtectedRoute allowedRoles={["ADMIN"]}>
       <AuthenticatedShell
         role="ADMIN"
-        title="Healthcare Administration Console"
-        description="Unified operational oversight across registered households, ASHA field workers, entitlement cases, and platform telemetry."
+        title={t("admin.consoleTitle")}
+        description={t("admin.consoleDesc")}
         navTabs={navTabs}
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId)}

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useTranslation } from "@/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
 import {
   Users,
@@ -12,9 +13,9 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 
 export interface NavTabItem {
   id: string;
@@ -47,6 +48,7 @@ export function AuthenticatedShell({
   const router = useRouter();
   const pathname = usePathname();
   const { userProfile, signOut } = useAuth();
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -72,22 +74,22 @@ export function AuthenticatedShell({
     switch (role) {
       case "ADMIN":
         return {
-          portalName: "Admin Console",
+          portalName: t("navigation.adminConsole"),
           portalBadge: (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300 shadow-2xs">
               <Building2 className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
-              <span>Admin Area</span>
+              <span>{t("navigation.adminConsole")}</span>
             </span>
           ),
           homeHref: "/admin",
         };
       case "ASHA":
         return {
-          portalName: "ASHA Workspace",
+          portalName: t("navigation.ashaWorkspace"),
           portalBadge: (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
-              <span>ASHA Field Access</span>
+              <span>{t("navigation.ashaWorkspace")}</span>
             </span>
           ),
           homeHref: "/asha",
@@ -95,11 +97,11 @@ export function AuthenticatedShell({
       case "CITIZEN":
       default:
         return {
-          portalName: "Citizen Portal",
+          portalName: t("navigation.citizenPortal"),
           portalBadge: (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 shadow-2xs">
               <Users className="w-3.5 h-3.5 text-teal-700" aria-hidden="true" />
-              <span>Citizen Workspace</span>
+              <span>{t("navigation.citizenPortal")}</span>
             </span>
           ),
           homeHref: "/citizen",
@@ -159,8 +161,10 @@ export function AuthenticatedShell({
             </nav>
           )}
 
-          {/* User Profile & Actions */}
+          {/* Language Selector, User Profile & Actions */}
           <div className="hidden md:flex items-center gap-3">
+            <LanguageSelector size="sm" />
+
             <div className="flex flex-col text-right">
               <span className="text-xs font-bold text-slate-800 max-w-[160px] truncate">
                 {userProfile?.displayName || userProfile?.email || "Authenticated User"}
@@ -177,26 +181,27 @@ export function AuthenticatedShell({
               className="text-xs flex items-center gap-1.5 border-slate-200 hover:border-slate-300 hover:bg-slate-100"
             >
               <LogOut className="w-3.5 h-3.5 text-slate-500" />
-              <span>Sign Out</span>
+              <span>{t("navigation.signOut")}</span>
             </Button>
           </div>
 
-          {/* Mobile Hamburger Trigger */}
+          {/* Mobile Controls (Language + Hamburger) */}
           <div className="flex md:hidden items-center gap-2">
+            <LanguageSelector size="sm" />
             <Button
               variant="outline"
               size="sm"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
-              className="p-2 min-h-[40px] min-w-[40px]"
+              className="p-2 min-h-[36px] min-w-[36px]"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer / Dropdown */}
+        {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-4 shadow-lg animate-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -245,7 +250,7 @@ export function AuthenticatedShell({
                 className="text-xs font-semibold text-slate-500 hover:text-slate-800"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Public Overview
+                {t("navigation.publicWebsite")}
               </Link>
               <Button
                 variant="outline"
@@ -254,7 +259,7 @@ export function AuthenticatedShell({
                 className="text-xs text-rose-700 border-rose-200 hover:bg-rose-50 font-semibold"
               >
                 <LogOut className="w-3.5 h-3.5 mr-1" />
-                Sign Out
+                {t("navigation.signOut")}
               </Button>
             </div>
           </div>
@@ -298,7 +303,7 @@ export function AuthenticatedShell({
               href="/"
               className="hover:text-teal-800 transition-colors font-medium text-slate-500"
             >
-              Public Website
+              {t("navigation.publicWebsite")}
             </Link>
           </div>
         </div>

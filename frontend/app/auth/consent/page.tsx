@@ -6,9 +6,12 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ShieldCheck, Lock, ChevronDown, ChevronUp, AlertCircle, Building2 } from "lucide-react";
+import { useTranslation } from "@/i18n/i18n-context";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 
 export default function ConsentPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { isAuthenticated, isConsentRequired, role, submitConsent, signOut, isLoading } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -63,19 +66,17 @@ export default function ConsentPage() {
             <ShieldCheck className="w-6 h-6 text-teal-700" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-            Before you continue
+            {t("auth.consentTitle")}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Please review how your household data is evaluated for healthcare support.
+            {t("auth.consentSubtitle")}
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xl shadow-slate-100 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <span className="text-xs font-bold text-slate-900">Healthcare Access Notice</span>
-            <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-medium">
-              Version 1.0
-            </span>
+            <LanguageSelector size="sm" />
           </div>
 
           {error && (
@@ -134,7 +135,7 @@ export default function ConsentPage() {
               disabled={submitting}
               className="w-full sm:w-auto text-xs"
             >
-              Decline & Sign Out
+              {t("auth.declineSignOut")}
             </Button>
 
             <Button
@@ -145,7 +146,7 @@ export default function ConsentPage() {
               disabled={submitting}
               className="w-full sm:w-auto font-semibold shadow-xs"
             >
-              {submitting ? "Recording..." : "Accept & Continue"}
+              {submitting ? "..." : t("auth.agreeContinue")}
             </Button>
           </div>
         </div>

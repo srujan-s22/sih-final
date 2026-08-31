@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { DevStatusBar } from "@/components/dev/dev-status-bar";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { I18nProvider } from "@/i18n/i18n-context";
 
 export const metadata: Metadata = {
   title: {
@@ -22,9 +23,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "SwasthyaSetu Public Service Initiative" }],
   icons: {
-    icon: [
-      { url: "/logo.png", type: "image/png" },
-    ],
+    icon: [{ url: "/logo.png", type: "image/png" }],
     shortcut: "/logo.png",
     apple: "/logo.png",
   },
@@ -45,12 +44,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900 antialiased selection:bg-teal-100 selection:text-teal-900">
-        <AuthProvider>
-          <Header />
-          <div className="flex-1 flex flex-col">{children}</div>
-          <Footer />
-          <DevStatusBar />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <Header />
+            <div className="flex-1 flex flex-col">{children}</div>
+            <Footer />
+            <DevStatusBar />
+          </AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );
