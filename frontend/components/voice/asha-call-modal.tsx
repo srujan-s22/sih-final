@@ -362,25 +362,33 @@ export function AshaCallModal({
 
             {/* Failed Call UI State */}
             {callState === "FAILED" && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-5 space-y-3">
+              <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 sm:p-5 space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-full bg-rose-100 text-rose-700 shrink-0">
+                  <div className="p-2 rounded-full bg-rose-100 text-rose-700 shrink-0 mt-0.5">
                     <AlertTriangle className="w-5 h-5" />
                   </div>
                   <div className="space-y-1 flex-1">
-                    <h4 className="text-sm font-bold text-rose-950">Call Not Answered / Failed</h4>
-                    <p className="text-xs text-rose-800">
-                      {errorMessage || "The beneficiary could not be reached via telephony."}
+                    <h4 className="text-sm font-bold text-rose-950">Call Could Not Be Connected</h4>
+                    <p className="text-xs text-rose-800 leading-relaxed">
+                      {errorMessage || "The beneficiary could not be reached via telephony. Please verify the contact number or schedule a doorstep visit."}
                     </p>
                   </div>
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
+                <div className="pt-1 flex justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    onClick={onClose}
+                    className="text-xs"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
                     onClick={resetState}
-                    className="text-xs font-semibold"
+                    className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold"
                   >
                     <RefreshCw className="w-3.5 h-3.5 mr-1" />
                     Try Again

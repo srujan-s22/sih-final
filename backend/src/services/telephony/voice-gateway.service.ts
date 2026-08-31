@@ -16,7 +16,7 @@ import {
 } from "../../../../shared/types/voice.js";
 import { VoiceSessionRepository } from "../../repositories/voice-session.repository.js";
 import { SarvamService } from "./sarvam.service.js";
-import { ExotelService } from "./exotel.service.js";
+import { ExotelService, ExotelTelephonyError } from "./exotel.service.js";
 import { VoiceActionService } from "./voice-action.service.js";
 import { CaseRepository } from "../../repositories/case.repository.js";
 import { HouseholdRepository } from "../../repositories/household.repository.js";
@@ -627,18 +627,17 @@ export class VoiceGatewayService {
       destinationPhone = household?.contactPhone || citizenProfile?.phoneNumber || undefined;
     }
 
-    if (!destinationPhone || destinationPhone.trim().length === 0) {
-      throw new Error("Please enter or confirm a valid 10-digit mobile number to receive the call.");
+    const rawTarget = destinationPhone || "";
+    const normalizedDigits = this.exotelService.normalizeIndianPhoneNumber(rawTarget);
+    if (!/^[6-9]\d{9}$/.test(normalizedDigits)) {
+      throw new ExotelTelephonyError(
+        "Please enter a valid 10-digit Indian mobile number.",
+        "VOICE_VALIDATION_ERROR",
+        400
+      );
     }
 
-    let cleanPhone = destinationPhone.replace(/[^\d+]/g, "");
-    if (!cleanPhone.startsWith("+")) {
-      if (cleanPhone.length === 10) {
-        cleanPhone = `+91${cleanPhone}`;
-      } else if (cleanPhone.startsWith("91") && cleanPhone.length === 12) {
-        cleanPhone = `+${cleanPhone}`;
-      }
-    }
+    const cleanPhone = `+91${normalizedDigits}`;
 
     const callResult = await this.exotelService.initiateOutboundCall({
       toPhoneNumber: cleanPhone,

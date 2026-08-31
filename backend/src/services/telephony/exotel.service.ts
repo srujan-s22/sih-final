@@ -18,6 +18,20 @@ export interface ExotelOutboundOptions {
   flowUrl?: string;
 }
 
+export class ExotelTelephonyError extends Error {
+  public code: string;
+  public httpStatus: number;
+  public providerCode?: number | string;
+
+  constructor(message: string, code = "VOICE_PROVIDER_ERROR", httpStatus = 502, providerCode?: number | string) {
+    super(message);
+    this.name = "ExotelTelephonyError";
+    this.code = code;
+    this.httpStatus = httpStatus;
+    this.providerCode = providerCode;
+  }
+}
+
 export class ExotelService {
   private accountSid: string;
   private apiKey: string;
@@ -66,9 +80,34 @@ export class ExotelService {
     }
     return {
       virtualNumber: null,
-      displayHelplineText: "Helpline number will be assigned upon provisioning",
+      displayHelplineText: "Virtual number provisioning pending",
       isTollFree: false,
     };
+  }
+
+  /**
+   * Normalizes Indian phone numbers into canonical 10-digit format for validation
+   */
+  public normalizeIndianPhoneNumber(raw: string): string {
+    if (!raw) return "";
+    let clean = raw.replace(/[^\d]/g, "");
+    if (clean.length === 12 && clean.startsWith("91")) {
+      clean = clean.slice(2);
+    } else if (clean.length === 11 && clean.startsWith("0")) {
+      clean = clean.slice(1);
+    }
+    return clean;
+  }
+
+  /**
+   * Masks phone numbers for secure privacy logs
+   */
+  public maskPhoneNumber(phone: string): string {
+    const clean = this.normalizeIndianPhoneNumber(phone);
+    if (clean.length === 10) {
+      return `+91 ${clean.slice(0, 2)}*** ***${clean.slice(-2)}`;
+    }
+    return "+91 *** *** **";
   }
 
   /**
@@ -76,8 +115,19 @@ export class ExotelService {
    * POST /v1/Accounts/{AccountSid}/Calls/connect.json
    */
   public async initiateOutboundCall(options: ExotelOutboundOptions): Promise<ExotelCallResult> {
+    const normalizedTo = this.normalizeIndianPhoneNumber(options.toPhoneNumber);
+    const maskedTo = this.maskPhoneNumber(options.toPhoneNumber);
+
+    if (!/^[6-9]\d{9}$/.test(normalizedTo)) {
+      throw new ExotelTelephonyError(
+        "Please enter a valid 10-digit Indian mobile number.",
+        "VOICE_VALIDATION_ERROR",
+        400
+      );
+    }
+
     const isMockMode =
-      process.env.NODE_ENV === "test" ||
+      (process.env.NODE_ENV === "test" && !this.accountSid.startsWith("real_")) ||
       env.VOICE_PROVIDER_MODE === "test" ||
       env.VOICE_PROVIDER_MODE === "mock" ||
       !this.isConfigured() ||
@@ -96,7 +146,11 @@ export class ExotelService {
     }
 
     if (!this.isConfigured()) {
-      throw new Error("Exotel Telephony credentials are not configured on the server.");
+      throw new ExotelTelephonyError(
+        "Voice calling is temporarily unavailable. Telephony provider is not configured.",
+        "VOICE_CONFIGURATION_ERROR",
+        503
+      );
     }
 
     const authHeader = "Basic " + Buffer.from(`${this.apiKey}:${this.apiToken}`).toString("base64");
@@ -104,48 +158,141 @@ export class ExotelService {
       ? JSON.stringify(options.customField)
       : options.customField || "";
 
+    const activeCallerId = options.callerId || this.callerId;
+    if (!activeCallerId) {
+      throw new ExotelTelephonyError(
+        "Telephony Caller ID is not configured.",
+        "VOICE_CONFIGURATION_ERROR",
+        503
+      );
+    }
+
     const formData = new URLSearchParams();
-    formData.append("From", options.callerId || this.callerId);
-    formData.append("To", options.toPhoneNumber);
-    formData.append("CallerId", options.callerId || this.callerId);
+    // Exotel connect.json API Contract:
+    // From: First leg to dial (the citizen/recipient's mobile number, formatted as 0... or 10-digits)
+    // CallerId: The ExoPhone virtual number displayed to callee
+    // CallType: "trans" for transactional assistance
+    formData.append("From", `0${normalizedTo}`);
+    formData.append("CallerId", activeCallerId);
+    formData.append("CallType", "trans");
+    formData.append("TimeLimit", String(env.VOICE_MAX_CALL_DURATION_SEC || 300));
 
     if (options.flowUrl) {
       formData.append("Url", options.flowUrl);
+    } else {
+      formData.append("To", activeCallerId);
     }
-    if (options.statusCallbackUrl) {
+
+    // Only attach status callback if it is a public HTTPS URL (avoid localhost connection errors on Exotel)
+    if (options.statusCallbackUrl && options.statusCallbackUrl.startsWith("https://")) {
       formData.append("StatusCallback", options.statusCallbackUrl);
     }
+
     if (customFieldStr) {
       formData.append("CustomField", customFieldStr);
     }
 
     const url = `${this.baseUrl}/v1/Accounts/${this.accountSid}/Calls/connect.json`;
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData.toString(),
-    });
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      throw new Error(`Exotel outbound call failed with HTTP ${response.status}: ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        let exotelCode: number | string | undefined;
+        let exotelMsg: string | undefined;
+
+        try {
+          const parsed = JSON.parse(errorText);
+          const restException = parsed.RestException || (Array.isArray(parsed.RestException) ? parsed.RestException[0] : null);
+          if (restException) {
+            exotelCode = restException.Code || restException.StatusCode;
+            exotelMsg = restException.Message || restException.Description;
+          }
+        } catch {
+          // ignore JSON parse error
+        }
+
+        // Server-side structured log for diagnostics
+        console.error("❌ [Exotel Telephony] Outbound call rejected by provider:", {
+          status: response.status,
+          code: exotelCode,
+          message: exotelMsg || errorText,
+          destination: maskedTo,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Translate to user-safe, classified error
+        if (response.status === 401 || exotelCode === 34010) {
+          throw new ExotelTelephonyError(
+            "Telephony provider authentication failed. Please verify provider credentials or use the direct helpline.",
+            "VOICE_AUTHENTICATION_ERROR",
+            502,
+            exotelCode
+          );
+        } else if (response.status === 400 || exotelCode === 34004) {
+          throw new ExotelTelephonyError(
+            "The provided phone number could not be dialed. Please verify your 10-digit mobile number.",
+            "VOICE_VALIDATION_ERROR",
+            400,
+            exotelCode
+          );
+        } else if (response.status === 403 || exotelCode === 34003) {
+          throw new ExotelTelephonyError(
+            "Outbound voice calling is restricted on the current telephony account. Please call our direct helpline.",
+            "VOICE_PROVIDER_ERROR",
+            502,
+            exotelCode
+          );
+        } else if (response.status === 429 || exotelCode === 34005) {
+          throw new ExotelTelephonyError(
+            "Voice calling capacity reached. Please try again in a few minutes.",
+            "VOICE_RATE_LIMITED",
+            429,
+            exotelCode
+          );
+        }
+
+        throw new ExotelTelephonyError(
+          "We couldn't connect the call right now through the telephony provider. Please try again shortly or call our direct helpline.",
+          "VOICE_PROVIDER_ERROR",
+          502,
+          exotelCode
+        );
+      }
+
+      const data = await response.json() as { Call?: Record<string, string> };
+      const call = data.Call || {};
+
+      return {
+        callSid: call.Sid || `exo_${Date.now()}`,
+        status: call.Status || "in-progress",
+        accountSid: call.AccountSid || this.accountSid,
+        to: call.To || `+91${normalizedTo}`,
+        from: call.From || activeCallerId,
+        startTime: call.StartTime || new Date().toISOString(),
+      };
+    } catch (err: any) {
+      if (err instanceof ExotelTelephonyError) {
+        throw err;
+      }
+      console.error("❌ [Exotel Telephony] Network/Fetch error during outbound call:", {
+        error: err.message,
+        destination: maskedTo,
+      });
+      throw new ExotelTelephonyError(
+        "Unable to reach telephony gateway. Please check server network connection.",
+        "VOICE_NETWORK_ERROR",
+        503
+      );
     }
-
-    const data = await response.json() as { Call?: Record<string, string> };
-    const call = data.Call || {};
-
-    return {
-      callSid: call.Sid || `exo_${Date.now()}`,
-      status: call.Status || "in-progress",
-      accountSid: call.AccountSid || this.accountSid,
-      to: call.To || options.toPhoneNumber,
-      from: call.From || this.callerId,
-      startTime: call.StartTime || new Date().toISOString(),
-    };
   }
 
   /**
@@ -162,7 +309,6 @@ export class ExotelService {
    * Build Passthru IVR response
    */
   public buildPassthruResponse(spokenMessage: string): string {
-    // Exotel Passthru applet format
     return spokenMessage;
   }
 

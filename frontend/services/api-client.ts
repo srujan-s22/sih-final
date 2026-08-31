@@ -80,15 +80,25 @@ class ApiClient {
         let errorData: ApiErrorResponse;
         try {
           const body = await response.json();
+          const extractedMessage =
+            (body && typeof body.error === "object" && body.error !== null && body.error.message)
+              ? body.error.message
+              : body?.message || (typeof body?.error === "string" ? body.error : undefined);
+
+          const extractedCode =
+            (body && typeof body.error === "object" && body.error !== null && body.error.code)
+              ? body.error.code
+              : body?.code || `HTTP_${response.status}`;
+
           errorData = {
             success: false,
-            error: body.error || `HTTP_${response.status}`,
+            error: typeof body?.error === "string" ? body.error : extractedCode,
             message:
-              body.message || "An unexpected error occurred while communicating with the server.",
-            code: body.code || `HTTP_${response.status}`,
-            correlation_id: body.correlation_id || responseCorrelationId,
-            timestamp: body.timestamp || new Date().toISOString(),
-            details: body.details,
+              extractedMessage || "An unexpected error occurred while communicating with the server.",
+            code: extractedCode,
+            correlation_id: body?.correlation_id || responseCorrelationId,
+            timestamp: body?.timestamp || new Date().toISOString(),
+            details: body?.details || (body && typeof body.error === "object" ? body.error.details : undefined),
           };
         } catch {
           errorData = {

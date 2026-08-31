@@ -395,25 +395,50 @@ export function CitizenCallModal({
 
             {/* Failed Call UI State */}
             {callState === "FAILED" && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-5 space-y-3">
+              <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 sm:p-5 space-y-3.5">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-full bg-rose-100 text-rose-700 shrink-0">
+                  <div className="p-2 rounded-full bg-rose-100 text-rose-700 shrink-0 mt-0.5">
                     <AlertTriangle className="w-5 h-5" />
                   </div>
                   <div className="space-y-1 flex-1">
                     <h4 className="text-sm font-bold text-rose-950">Call Could Not Be Connected</h4>
-                    <p className="text-xs text-rose-800">
-                      {errorMessage || "We were unable to reach your phone. Please verify your phone number and network connectivity."}
+                    <p className="text-xs text-rose-800 leading-relaxed">
+                      {errorMessage || "We were unable to connect the call. Please verify your mobile number or try calling our helpline directly."}
                     </p>
                   </div>
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
+
+                {config?.virtualNumber && (
+                  <div className="rounded-lg bg-white/90 border border-rose-200 p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-800 block">Alternative Option:</span>
+                      <span className="text-slate-600 text-[11px]">Dial our direct automated helpline from your phone:</span>
+                    </div>
+                    <a
+                      href={`tel:${config.virtualNumber.replace(/\D/g, "")}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-mono font-bold text-xs shrink-0 transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>{config.virtualNumber}</span>
+                    </a>
+                  </div>
+                )}
+
+                <div className="pt-1 flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    onClick={onClose}
+                    className="text-xs"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
                     onClick={resetState}
-                    className="text-xs font-semibold"
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold"
                   >
                     <RefreshCw className="w-3.5 h-3.5 mr-1" />
                     Try Again

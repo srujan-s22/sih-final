@@ -171,9 +171,10 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
       const citizenUid = request.user!.uid;
       const parseResult = CitizenCallRequestSchema.safeParse(request.body || {});
       if (!parseResult.success) {
+        const errorMsg = parseResult.error.errors[0]?.message || "Invalid call request payload.";
         return reply.status(400).send({
           success: false,
-          error: { code: "VALIDATION_ERROR", message: "Invalid call request payload.", details: parseResult.error.format() },
+          error: { code: "VOICE_VALIDATION_ERROR", message: errorMsg, details: parseResult.error.format() },
         });
       }
 
@@ -181,7 +182,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const result = await gatewayService.requestCitizenCall(citizenUid, parseResult.data);
         return reply.send({ success: true, data: result });
       } catch (err: any) {
-        return reply.status(500).send({ success: false, error: { code: "CITIZEN_CALL_FAILED", message: err.message } });
+        const status = err.httpStatus || 500;
+        const code = err.code || "CITIZEN_CALL_FAILED";
+        return reply.status(status).send({ success: false, error: { code, message: err.message } });
       }
     }
   );
@@ -195,7 +198,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const history = await gatewayService.listCitizenCalls(request.user!.uid);
         return reply.send({ success: true, data: history });
       } catch (err: any) {
-        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+        const status = err.httpStatus || 500;
+        const code = err.code || "HISTORY_ERROR";
+        return reply.status(status).send({ success: false, error: { code, message: err.message } });
       }
     }
   );
@@ -218,7 +223,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const result = await gatewayService.initiateAshaCall(ashaUid, parseResult.data);
         return reply.send({ success: true, data: result });
       } catch (err: any) {
-        return reply.status(500).send({ success: false, error: { code: "ASHA_CALL_FAILED", message: err.message } });
+        const status = err.httpStatus || 500;
+        const code = err.code || "ASHA_CALL_FAILED";
+        return reply.status(status).send({ success: false, error: { code, message: err.message } });
       }
     }
   );
@@ -232,7 +239,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const history = await gatewayService.listAshaCalls(request.user!.uid);
         return reply.send({ success: true, data: history });
       } catch (err: any) {
-        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+        const status = err.httpStatus || 500;
+        const code = err.code || "HISTORY_ERROR";
+        return reply.status(status).send({ success: false, error: { code, message: err.message } });
       }
     }
   );
@@ -246,7 +255,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
         const history = await gatewayService.listCaseCalls(request.params.caseId);
         return reply.send({ success: true, data: history });
       } catch (err: any) {
-        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+        const status = err.httpStatus || 500;
+        const code = err.code || "HISTORY_ERROR";
+        return reply.status(status).send({ success: false, error: { code, message: err.message } });
       }
     }
   );
@@ -280,7 +291,9 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await gatewayService.initiateOutboundFollowUpCall(followUpId, caseId, reason);
       return reply.send({ success: true, data: result });
     } catch (err: any) {
-      return reply.status(500).send({ success: false, error: { code: "OUTBOUND_CALL_FAILED", message: err.message } });
+      const status = err.httpStatus || 500;
+      const code = err.code || "OUTBOUND_CALL_FAILED";
+      return reply.status(status).send({ success: false, error: { code, message: err.message } });
     }
   });
 

@@ -377,4 +377,39 @@ describe("Phase 11 — Voice API Endpoints (/api/v1/voice)", () => {
     expect(turnBody.data.textResponse).toContain("108");
     expect(turnBody.data.textResponse).toContain("emergency");
   });
+
+  it("14. POST /api/v1/voice/citizen/request-call rejects invalid phone numbers with 400", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/citizen/request-call",
+      headers: { authorization: `Bearer ${citizenToken}` },
+      payload: { phoneNumber: "12345", language: "hi-IN" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("VOICE_VALIDATION_ERROR");
+    expect(body.error.message).toContain("valid 10-digit Indian mobile number");
+  });
+
+  it("15. Security verification: credentials never appear in API responses or public config", async () => {
+    const configRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/voice/config",
+    });
+
+    expect(configRes.statusCode).toBe(200);
+    const rawBody = configRes.body;
+    expect(rawBody).not.toContain("EXOTEL_API_KEY");
+    expect(rawBody).not.toContain("EXOTEL_API_TOKEN");
+    expect(rawBody).not.toContain("EXOTEL_ACCOUNT_SID");
+    expect(rawBody).not.toContain("Basic ");
+    expect(rawBody).not.toContain("Authorization");
+
+    const parsed = JSON.parse(rawBody);
+    expect(parsed.data.accountSid).toBeUndefined();
+    expect(parsed.data.apiKey).toBeUndefined();
+    expect(parsed.data.apiToken).toBeUndefined();
+  });
 });

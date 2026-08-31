@@ -299,6 +299,33 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(exotelService.mapTelephonyStatus("canceled")).toBe("CALL_DECLINED");
     });
 
+    it("normalizes Indian phone number formats cleanly", () => {
+      expect(exotelService.normalizeIndianPhoneNumber("9876543210")).toBe("9876543210");
+      expect(exotelService.normalizeIndianPhoneNumber("+919876543210")).toBe("9876543210");
+      expect(exotelService.normalizeIndianPhoneNumber("919876543210")).toBe("9876543210");
+      expect(exotelService.normalizeIndianPhoneNumber("09876543210")).toBe("9876543210");
+      expect(exotelService.normalizeIndianPhoneNumber("+91 98765-43210")).toBe("9876543210");
+    });
+
+    it("masks phone numbers for privacy-preserving server logs", () => {
+      expect(exotelService.maskPhoneNumber("+919876543210")).toBe("+91 98*** ***10");
+      expect(exotelService.maskPhoneNumber("9876543210")).toBe("+91 98*** ***10");
+    });
+
+    it("rejects clearly invalid phone numbers before provider invocation", async () => {
+      await expect(
+        exotelService.initiateOutboundCall({ toPhoneNumber: "12345" })
+      ).rejects.toThrow("Please enter a valid 10-digit Indian mobile number.");
+
+      await expect(
+        exotelService.initiateOutboundCall({ toPhoneNumber: "invalid-phone" })
+      ).rejects.toThrow("Please enter a valid 10-digit Indian mobile number.");
+
+      await expect(
+        exotelService.initiateOutboundCall({ toPhoneNumber: "2345678901" }) // Invalid leading digit
+      ).rejects.toThrow("Please enter a valid 10-digit Indian mobile number.");
+    });
+
     it("initiates outbound call in test mode with correct metadata", async () => {
       const result = await exotelService.initiateOutboundCall({
         toPhoneNumber: "+919876543210",
@@ -306,6 +333,59 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       });
       expect(result.callSid).toBeDefined();
       expect(result.to).toBe("+919876543210");
+    });
+
+    it("maps provider 401 response to VOICE_AUTHENTICATION_ERROR when real mode is simulated", async () => {
+      const originalFetch = global.fetch;
+      (exotelService as any).accountSid = "real_sid";
+      (exotelService as any).apiKey = "real_key";
+      (exotelService as any).apiToken = "real_token";
+
+      // Mock fetch returning Exotel 401
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({
+          RestException: { Status: 401, Message: "Unauthorized", Code: 34010 }
+        }),
+      } as any);
+
+      try {
+        await expect(
+          exotelService.initiateOutboundCall({ toPhoneNumber: "9876543210" })
+        ).rejects.toThrow("Telephony provider authentication failed");
+      } finally {
+        global.fetch = originalFetch;
+        (exotelService as any).accountSid = "";
+        (exotelService as any).apiKey = "";
+        (exotelService as any).apiToken = "";
+      }
+    });
+
+    it("maps provider 400 response to VOICE_VALIDATION_ERROR when real mode is simulated", async () => {
+      const originalFetch = global.fetch;
+      (exotelService as any).accountSid = "real_sid";
+      (exotelService as any).apiKey = "real_key";
+      (exotelService as any).apiToken = "real_token";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({
+          RestException: { Status: 400, Message: "Invalid From number", Code: 34004 }
+        }),
+      } as any);
+
+      try {
+        await expect(
+          exotelService.initiateOutboundCall({ toPhoneNumber: "9876543210" })
+        ).rejects.toThrow("The provided phone number could not be dialed");
+      } finally {
+        global.fetch = originalFetch;
+        (exotelService as any).accountSid = "";
+        (exotelService as any).apiKey = "";
+        (exotelService as any).apiToken = "";
+      }
     });
   });
 
