@@ -26,6 +26,17 @@ export class VoiceActionService {
   ) {}
 
   /**
+   * 0. Emergency Escalation (Medical Safety Boundary)
+   */
+  public handleEmergencyRedirection(): VoiceActionResult {
+    return {
+      success: true,
+      message: "SwasthyaSetu provides administrative health scheme guidance and cannot provide emergency medical triage. If you or someone around you is experiencing a medical emergency, please call 108 or 102 immediately, or visit your nearest hospital emergency ward.",
+      data: { isEmergency: true, emergencyNumber: "108" },
+    };
+  }
+
+  /**
    * 1. Public Scheme Information (Unauthenticated safe)
    */
   public async getPublicSchemeInfo(schemeId?: string): Promise<VoiceActionResult> {

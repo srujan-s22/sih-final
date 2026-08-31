@@ -60,7 +60,7 @@ const envSchema = z.object({
   EXOTEL_VIRTUAL_NUMBER: z.string().optional(),
   EXOTEL_CALLER_ID: z.string().optional(),
   VOICE_ENABLED: z.coerce.boolean().default(true),
-  VOICE_PROVIDER_MODE: z.enum(["real", "test"]).default("real"),
+  VOICE_PROVIDER_MODE: z.enum(["real", "test", "mock"]).default("real"),
   VOICE_MAX_TURNS: z.coerce.number().default(10),
   VOICE_MAX_CALL_DURATION_SEC: z.coerce.number().default(300),
 });

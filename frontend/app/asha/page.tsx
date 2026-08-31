@@ -65,6 +65,7 @@ import {
 } from "@shared/types/assistance";
 import { IncomeCategory } from "@shared/types/household";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
+import { AshaCallModal } from "@/components/voice/asha-call-modal";
 
 export default function AshaWorkspacePage() {
   const { userProfile } = useAuth();
@@ -143,6 +144,16 @@ export default function AshaWorkspacePage() {
 
   // Voice Reminder Call State (Phase 11)
   const [isVoiceCallingId, setIsVoiceCallingId] = useState<string | null>(null);
+  const [isAshaCallModalOpen, setIsAshaCallModalOpen] = useState(false);
+  const [callModalTarget, setCallModalTarget] = useState<{
+    caseId: string;
+    citizenName?: string;
+    headOfHousehold?: string;
+    schemeName?: string;
+    contactPhoneMasked?: string;
+    followUpId?: string;
+    defaultReason?: string;
+  } | null>(null);
 
   // Field Registration Modal
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -579,25 +590,30 @@ export default function AshaWorkspacePage() {
     }
   };
 
-  // Trigger Outbound Voice Reminder Call (Phase 11)
+  // Trigger Outbound Voice Reminder / Assistance Call (Phase 11)
+  const handleOpenVoiceCallModal = (followUp?: CaseFollowUp, targetCase?: AshaCase) => {
+    const targetCaseId = followUp?.caseId || targetCase?.id || selectedCaseId || "";
+    const name = targetCase?.headOfHouseholdName || caseDetail?.household?.headOfHouseholdName || "Beneficiary";
+    const phone = caseDetail?.household?.contactPhone
+      ? `+91 ${caseDetail.household.contactPhone.replace(/\D/g, "").slice(-10).replace(/(\d{3})\d{4}(\d{3})/, "$1****$2")}`
+      : "+91 98*** **210";
+
+    setCallModalTarget({
+      caseId: targetCaseId,
+      citizenName: name,
+      headOfHousehold: targetCase?.headOfHouseholdName || caseDetail?.household?.headOfHouseholdName,
+      schemeName: targetCase?.schemeName || caseDetail?.case?.schemeName || "Government Health Scheme",
+      contactPhoneMasked: phone,
+      followUpId: followUp?.id,
+      defaultReason: followUp
+        ? `Doorstep visit reminder: ${followUp.title || followUp.reason}`
+        : `Outreach for ${targetCase?.schemeName || caseDetail?.case?.schemeName || "health scheme"} follow-up`,
+    });
+    setIsAshaCallModalOpen(true);
+  };
+
   const handleTriggerVoiceCall = async (followUp: CaseFollowUp) => {
-    try {
-      setIsVoiceCallingId(followUp.id);
-      const res = await voiceService.initiateOutboundCall({
-        followUpId: followUp.id,
-        caseId: followUp.caseId,
-        reason: `Doorstep visit reminder: ${followUp.title || followUp.reason}`,
-      });
-      if (res.success) {
-        setSuccessBanner(`Automated voice reminder call queued with Exotel telephony for "${followUp.title || followUp.reason}"`);
-      } else {
-        setErrorMessage(res.error?.message || "Failed to trigger voice reminder call.");
-      }
-    } catch {
-      setErrorMessage("Failed to initiate voice reminder call.");
-    } finally {
-      setIsVoiceCallingId(null);
-    }
+    handleOpenVoiceCallModal(followUp);
   };
 
   // Quick Complete from Case Drawer
@@ -2437,25 +2453,36 @@ export default function AshaWorkspacePage() {
                                         : caseDetail.case.schemeId)}
                                   </h3>
                                 </div>
-                                <span
-                                  className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 ${
-                                    ["RESOLVED", "CLOSED"].includes(caseDetail.case.status)
-                                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                                      : "bg-blue-100 text-blue-900 border-blue-300"
-                                  }`}
-                                >
-                                  {["RESOLVED", "CLOSED"].includes(caseDetail.case.status) ? (
-                                    <>
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                                      <span>✓ Case Resolved & Assistance Completed</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                                      <span>Case Status: {caseDetail.case.status}</span>
-                                    </>
-                                  )}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleOpenVoiceCallModal(undefined, caseDetail.case)}
+                                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer py-1 px-3"
+                                  >
+                                    <PhoneCall className="w-3.5 h-3.5" />
+                                    <span>Call Beneficiary</span>
+                                  </Button>
+                                  <span
+                                    className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 ${
+                                      ["RESOLVED", "CLOSED"].includes(caseDetail.case.status)
+                                        ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                        : "bg-blue-100 text-blue-900 border-blue-300"
+                                    }`}
+                                  >
+                                    {["RESOLVED", "CLOSED"].includes(caseDetail.case.status) ? (
+                                      <>
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                        <span>✓ Case Resolved & Assistance Completed</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                                        <span>Case Status: {caseDetail.case.status}</span>
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -3757,6 +3784,33 @@ export default function AshaWorkspacePage() {
           onClose={() => setIsAssistantOpen(false)}
           userRole="ASHA"
         />
+
+        {/* Phase 11 Real ASHA Telephony Call Modal */}
+        {callModalTarget && (
+          <AshaCallModal
+            isOpen={isAshaCallModalOpen}
+            onClose={() => {
+              setIsAshaCallModalOpen(false);
+              setCallModalTarget(null);
+            }}
+            caseId={callModalTarget.caseId}
+            citizenName={callModalTarget.citizenName}
+            headOfHousehold={callModalTarget.headOfHousehold}
+            schemeName={callModalTarget.schemeName}
+            contactPhoneMasked={callModalTarget.contactPhoneMasked}
+            followUpId={callModalTarget.followUpId}
+            defaultReason={callModalTarget.defaultReason}
+            onCallComplete={() => {
+              if (selectedCaseId) {
+                caseService.getCaseDetail(selectedCaseId).then((res) => {
+                  if (res.success && res.data) setCaseDetail(res.data);
+                });
+              }
+              loadFollowUps();
+              loadCaseload();
+            }}
+          />
+        )}
       </AuthenticatedShell>
     </ProtectedRoute>
   );

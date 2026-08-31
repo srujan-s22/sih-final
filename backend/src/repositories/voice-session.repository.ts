@@ -126,6 +126,81 @@ export class VoiceSessionRepository extends BaseFirestoreRepository<VoiceSession
     }
   }
 
+  public async listSessionsByCitizenId(citizenUid: string, limitCount: number = 10): Promise<VoiceSession[]> {
+    if (this.isUnitTestMode()) {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.citizenId === citizenUid)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+
+    try {
+      const snapshot = await this.getCollection()
+        .where("citizenId", "==", citizenUid)
+        .limit(limitCount)
+        .get();
+
+      return snapshot.docs
+        .map((d) => d.data() as VoiceSession)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.citizenId === citizenUid)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+  }
+
+  public async listSessionsByAshaUid(ashaUid: string, limitCount: number = 10): Promise<VoiceSession[]> {
+    if (this.isUnitTestMode()) {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.assignedAshaUid === ashaUid)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+
+    try {
+      const snapshot = await this.getCollection()
+        .where("assignedAshaUid", "==", ashaUid)
+        .limit(limitCount)
+        .get();
+
+      return snapshot.docs
+        .map((d) => d.data() as VoiceSession)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.assignedAshaUid === ashaUid)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+  }
+
+  public async listSessionsByCaseId(caseId: string, limitCount: number = 10): Promise<VoiceSession[]> {
+    if (this.isUnitTestMode()) {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.relatedCaseId === caseId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+
+    try {
+      const snapshot = await this.getCollection()
+        .where("relatedCaseId", "==", caseId)
+        .limit(limitCount)
+        .get();
+
+      return snapshot.docs
+        .map((d) => d.data() as VoiceSession)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return Array.from(this.memoryStore.values())
+        .filter((s) => s.relatedCaseId === caseId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limitCount);
+    }
+  }
+
   public async countSessionsToday(): Promise<{
     total: number;
     active: number;

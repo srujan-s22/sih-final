@@ -36,6 +36,32 @@ export const InitiateOutboundCallInputSchema = z.object({
 export type InitiateOutboundCallInput = z.infer<typeof InitiateOutboundCallInputSchema>;
 
 /**
+ * Citizen Inbound/Assistant Request Schema
+ */
+export const CitizenCallRequestSchema = z.object({
+  phoneNumber: z
+    .string()
+    .regex(/^(\+91|91)?[6-9]\d{9}$/, "Please enter a valid 10-digit Indian mobile number")
+    .optional(),
+  language: z.string().optional(),
+  reason: z.string().max(200).optional(),
+});
+
+export type CitizenCallRequestInput = z.infer<typeof CitizenCallRequestSchema>;
+
+/**
+ * ASHA Direct Call Citizen Request Schema
+ */
+export const AshaCallRequestSchema = z.object({
+  caseId: z.string().min(1, "caseId is required"),
+  followUpId: z.string().optional(),
+  reason: z.string().max(200).optional(),
+  language: z.string().optional(),
+});
+
+export type AshaCallRequestInput = z.infer<typeof AshaCallRequestSchema>;
+
+/**
  * Exotel Inbound Webhook Payload Schema
  */
 export const ExotelInboundWebhookSchema = z.object({

@@ -3,6 +3,10 @@ import {
   VoiceSession,
   VoiceTurnResponse,
   VoiceHealthResponse,
+  VoicePublicConfig,
+  CitizenCallRequest,
+  AshaCallRequest,
+  CallHistoryItem,
 } from "@shared/types/voice";
 import {
   VoiceTurnInput,
@@ -13,7 +17,59 @@ import { ApiResult } from "@shared/types/api";
 
 export class VoiceServiceClient {
   /**
-   * Initialize a voice helpline session
+   * Get public configuration (dynamic virtual number, supported languages)
+   */
+  public async getVoiceConfig(): Promise<ApiResult<VoicePublicConfig>> {
+    return apiClient.get<VoicePublicConfig>("/api/v1/voice/config");
+  }
+
+  /**
+   * Citizen requests an outbound call from SwasthyaSetu Healthcare Assistant
+   */
+  public async requestCitizenCall(
+    input: CitizenCallRequest
+  ): Promise<ApiResult<{ session: VoiceSession; callResult: any }>> {
+    return apiClient.post<{ session: VoiceSession; callResult: any }>(
+      "/api/v1/voice/citizen/request-call",
+      input
+    );
+  }
+
+  /**
+   * Retrieve recent call history for current authenticated citizen
+   */
+  public async getCitizenCallHistory(): Promise<ApiResult<CallHistoryItem[]>> {
+    return apiClient.get<CallHistoryItem[]>("/api/v1/voice/citizen/calls");
+  }
+
+  /**
+   * ASHA initiates direct call to assigned beneficiary
+   */
+  public async ashaCallCitizen(
+    input: AshaCallRequest
+  ): Promise<ApiResult<{ session: VoiceSession; callResult: any }>> {
+    return apiClient.post<{ session: VoiceSession; callResult: any }>(
+      "/api/v1/voice/asha/call-citizen",
+      input
+    );
+  }
+
+  /**
+   * Retrieve call history for current authenticated ASHA worker
+   */
+  public async getAshaCallHistory(): Promise<ApiResult<CallHistoryItem[]>> {
+    return apiClient.get<CallHistoryItem[]>("/api/v1/voice/asha/calls");
+  }
+
+  /**
+   * Retrieve call history for a specific case
+   */
+  public async getCaseCallHistory(caseId: string): Promise<ApiResult<CallHistoryItem[]>> {
+    return apiClient.get<CallHistoryItem[]>(`/api/v1/voice/cases/${caseId}/calls`);
+  }
+
+  /**
+   * Initialize a voice helpline session (development / simulator)
    */
   public async createSession(
     callerPhone?: string,

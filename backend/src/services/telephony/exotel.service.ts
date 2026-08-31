@@ -46,8 +46,29 @@ export class ExotelService {
     );
   }
 
-  public getVirtualNumber(): string {
-    return this.virtualNumber || "+91-1800-SWASTHYA";
+  public getVirtualNumber(): string | null {
+    return this.virtualNumber && this.virtualNumber.trim().length > 0 ? this.virtualNumber.trim() : null;
+  }
+
+  public getDisplayHelplineInfo(): {
+    virtualNumber: string | null;
+    displayHelplineText: string;
+    isTollFree: boolean;
+  } {
+    const vn = this.getVirtualNumber();
+    if (vn) {
+      const isTollFree = vn.replace(/[^\d]/g, "").startsWith("1800");
+      return {
+        virtualNumber: vn,
+        displayHelplineText: vn,
+        isTollFree,
+      };
+    }
+    return {
+      virtualNumber: null,
+      displayHelplineText: "Helpline number will be assigned upon provisioning",
+      isTollFree: false,
+    };
   }
 
   /**
@@ -55,18 +76,26 @@ export class ExotelService {
    * POST /v1/Accounts/{AccountSid}/Calls/connect.json
    */
   public async initiateOutboundCall(options: ExotelOutboundOptions): Promise<ExotelCallResult> {
+    const isMockMode =
+      process.env.NODE_ENV === "test" ||
+      env.VOICE_PROVIDER_MODE === "test" ||
+      env.VOICE_PROVIDER_MODE === "mock" ||
+      !this.isConfigured() ||
+      this.accountSid.startsWith("test_");
+
+    if (isMockMode) {
+      const testCallSid = `test_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      return {
+        callSid: testCallSid,
+        status: "in-progress",
+        accountSid: this.accountSid || "test_exotel_account",
+        to: options.toPhoneNumber,
+        from: options.callerId || this.callerId || "080-TEST-EXOTEL",
+        startTime: new Date().toISOString(),
+      };
+    }
+
     if (!this.isConfigured()) {
-      if (process.env.NODE_ENV === "test" || env.VOICE_PROVIDER_MODE === "test") {
-        const testCallSid = `test_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        return {
-          callSid: testCallSid,
-          status: "in-progress",
-          accountSid: "test_exotel_account",
-          to: options.toPhoneNumber,
-          from: options.callerId || this.callerId || "080-TEST-EXOTEL",
-          startTime: new Date().toISOString(),
-        };
-      }
       throw new Error("Exotel Telephony credentials are not configured on the server.");
     }
 

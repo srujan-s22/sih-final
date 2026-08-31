@@ -18,6 +18,8 @@ import {
   VoiceTurnInputSchema,
   VerifyCallerIdentityInputSchema,
   InitiateOutboundCallInputSchema,
+  CitizenCallRequestSchema,
+  AshaCallRequestSchema,
   ExotelInboundWebhookSchema,
   ExotelStatusCallbackSchema,
 } from "../../../shared/schemas/voice.schema.js";
@@ -64,6 +66,16 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     userRepo,
     automationService
   );
+
+  // 0. Public Voice Configuration (No secrets exposed)
+  fastify.get("/v1/voice/config", async (_request, reply) => {
+    try {
+      const config = gatewayService.getPublicConfig();
+      return reply.send({ success: true, data: config });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: { code: "CONFIG_ERROR", message: err.message } });
+    }
+  });
 
   // 1. Exotel Inbound Call Webhook
   fastify.post("/v1/voice/webhooks/exotel/inbound", async (request, reply) => {
@@ -151,16 +163,102 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // 7. Initiate Authorized Outbound Call (RBAC: ASHA / ADMIN or internal secret)
+  // 7. Citizen Requests Voice Assistant Call (Auth: CITIZEN)
+  fastify.post(
+    "/v1/voice/citizen/request-call",
+    { preHandler: [requireAuth, requireRole(["CITIZEN"])] },
+    async (request, reply) => {
+      const citizenUid = request.user!.uid;
+      const parseResult = CitizenCallRequestSchema.safeParse(request.body || {});
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Invalid call request payload.", details: parseResult.error.format() },
+        });
+      }
+
+      try {
+        const result = await gatewayService.requestCitizenCall(citizenUid, parseResult.data);
+        return reply.send({ success: true, data: result });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "CITIZEN_CALL_FAILED", message: err.message } });
+      }
+    }
+  );
+
+  // 8. Citizen Call History (Auth: CITIZEN)
+  fastify.get(
+    "/v1/voice/citizen/calls",
+    { preHandler: [requireAuth, requireRole(["CITIZEN"])] },
+    async (request, reply) => {
+      try {
+        const history = await gatewayService.listCitizenCalls(request.user!.uid);
+        return reply.send({ success: true, data: history });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+      }
+    }
+  );
+
+  // 9. ASHA Direct Call Citizen (Auth: ASHA / ADMIN)
+  fastify.post(
+    "/v1/voice/asha/call-citizen",
+    { preHandler: [requireAuth, requireRole(["ASHA", "ADMIN"])] },
+    async (request, reply) => {
+      const ashaUid = request.user!.uid;
+      const parseResult = AshaCallRequestSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Invalid ASHA call request.", details: parseResult.error.format() },
+        });
+      }
+
+      try {
+        const result = await gatewayService.initiateAshaCall(ashaUid, parseResult.data);
+        return reply.send({ success: true, data: result });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "ASHA_CALL_FAILED", message: err.message } });
+      }
+    }
+  );
+
+  // 10. ASHA Call History (Auth: ASHA / ADMIN)
+  fastify.get(
+    "/v1/voice/asha/calls",
+    { preHandler: [requireAuth, requireRole(["ASHA", "ADMIN"])] },
+    async (request, reply) => {
+      try {
+        const history = await gatewayService.listAshaCalls(request.user!.uid);
+        return reply.send({ success: true, data: history });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+      }
+    }
+  );
+
+  // 11. Case Call History (Auth: ASHA / ADMIN)
+  fastify.get<{ Params: { caseId: string } }>(
+    "/v1/voice/cases/:caseId/calls",
+    { preHandler: [requireAuth, requireRole(["ASHA", "ADMIN"])] },
+    async (request, reply) => {
+      try {
+        const history = await gatewayService.listCaseCalls(request.params.caseId);
+        return reply.send({ success: true, data: history });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: { code: "HISTORY_ERROR", message: err.message } });
+      }
+    }
+  );
+
+  // 12. Initiate Authorized Outbound Follow-up Call (ASHA / ADMIN / internal secret)
   fastify.post("/v1/voice/outbound", async (request, reply) => {
-    // Check either internal secret or authenticated user role
     const secretHeader = request.headers["x-swasthya-secret"] || request.headers["x-n8n-webhook-secret"];
     const isSecretAuthorized = Boolean(
       secretHeader && secretHeader === (env.N8N_WEBHOOK_SECRET || "swasthyasetu-prod-automation-key-2026")
     );
 
     if (!isSecretAuthorized) {
-      // Must be authenticated ASHA or ADMIN
       if (!request.user || (request.user.role !== "ASHA" && request.user.role !== "ADMIN")) {
         return reply.status(403).send({
           success: false,
@@ -186,7 +284,7 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // 8. Admin Voice Telemetry & Telephony Health
+  // 13. Admin Voice Telemetry & Telephony Health
   fastify.get(
     "/v1/admin/voice/telemetry",
     { preHandler: [requireAuth, requireRole(["ADMIN"])] },

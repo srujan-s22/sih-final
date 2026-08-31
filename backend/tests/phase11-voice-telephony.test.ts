@@ -535,6 +535,69 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       expect(updated?.durationSeconds).toBe(45);
       expect(updated?.status).toBe("COMPLETED");
     });
+
+    it("citizen web-initiated outbound call creates pre-verified session and links household", async () => {
+      const { session, callResult } = await gatewayService.requestCitizenCall(
+        "citizen_user_01",
+        {
+          phoneNumber: "+919876543210",
+          language: "kn-IN",
+          reason: "Checking Ayushman Bharat PM-JAY status",
+        }
+      );
+
+      expect(session.direction).toBe("OUTBOUND");
+      expect(session.citizenId).toBe("citizen_user_01");
+      expect(session.householdId).toBe("hh_voice_test_01");
+      expect(session.verificationStatus).toBe("VERIFIED");
+      expect(session.language).toBe("kn-IN");
+      expect(callResult.callSid).toBeDefined();
+
+      const citizenHistory = await gatewayService.listCitizenCalls("citizen_user_01");
+      expect(citizenHistory.length).toBeGreaterThan(0);
+      expect(citizenHistory[0].direction).toBe("OUTBOUND");
+    });
+
+    it("ASHA direct beneficiary call resolves phone server-side from household", async () => {
+      await caseRepo.createCase({
+        id: "case_asha_direct_01",
+        householdId: "hh_voice_test_01",
+        assignedAshaUid: "asha_worker_01",
+        headOfHouseholdName: "Ramesh Kumar",
+        district: "Bengaluru Rural",
+        state: "Karnataka",
+        incomeCategory: "BPL",
+        memberCount: 2,
+        schemeId: "ab-pmjay",
+        schemeName: "Ayushman Bharat PM-JAY",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        detectedGapsCount: 0,
+        eligibleSchemesCount: 1,
+        lastContactAt: null,
+        nextFollowUpAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const { session } = await gatewayService.initiateAshaCall("asha_worker_01", {
+        caseId: "case_asha_direct_01",
+        reason: "Direct outreach for scheme documents",
+        language: "hi-IN",
+      });
+
+      expect(session.direction).toBe("OUTBOUND");
+      expect(session.assignedAshaUid).toBe("asha_worker_01");
+      expect(session.relatedCaseId).toBe("case_asha_direct_01");
+      expect(session.maskedCallerNumber).toBe("+91***210");
+
+      const ashaHistory = await gatewayService.listAshaCalls("asha_worker_01");
+      expect(ashaHistory.length).toBeGreaterThan(0);
+      expect(ashaHistory[0].relatedCaseId).toBe("case_asha_direct_01");
+
+      const caseHistory = await gatewayService.listCaseCalls("case_asha_direct_01");
+      expect(caseHistory.length).toBeGreaterThan(0);
+    });
   });
 
   describe("6. Admin Telemetry & Health Monitoring", () => {
@@ -545,9 +608,15 @@ describe("Phase 11 — Sarvam AI + Exotel Voice & Telephony Architecture", () =>
       const telemetry = await gatewayService.getHealthAndTelemetry();
 
       expect(telemetry.totalCallsToday).toBe(2);
-      expect(telemetry.virtualNumber).toBeDefined();
       expect(telemetry.recentSessions.length).toBe(2);
       expect(telemetry.recentSessions[0].maskedNumber).toContain("***");
+    });
+
+    it("public voice config provides sanitized details without fake toll-free invention", () => {
+      const config = gatewayService.getPublicConfig();
+      expect(config.voiceEnabled).toBe(true);
+      expect(config.supportedLanguages.length).toBeGreaterThan(0);
+      expect(config.displayHelplineText).not.toContain("1800-SWASTHYA");
     });
   });
 });

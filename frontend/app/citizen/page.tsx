@@ -32,6 +32,9 @@ import {
   AshaAssistanceRequest,
   AssistanceCategory,
 } from "@shared/types/assistance";
+import { CitizenCallModal } from "@/components/voice/citizen-call-modal";
+import { voiceService } from "@/services/voice-service";
+import { VoicePublicConfig } from "@shared/types/voice";
 import {
   Users,
   ShieldCheck,
@@ -183,6 +186,10 @@ export default function CitizenPage() {
   // Phase 8 Assistant Integration
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
+  // Phase 11 Voice / Telephony Modal State
+  const [isVoiceCallModalOpen, setIsVoiceCallModalOpen] = useState(false);
+  const [voiceConfig, setVoiceConfig] = useState<VoicePublicConfig | null>(null);
+
   // Load Eligibility Evaluation & Guidance Plan
   const loadEligibility = useCallback(async () => {
     setIsEvaluating(true);
@@ -271,6 +278,11 @@ export default function CitizenPage() {
     loadHouseholdData();
     loadConnectionStatus();
     loadAssistanceRequests();
+    voiceService.getVoiceConfig().then((res) => {
+      if (res.success && res.data) {
+        setVoiceConfig(res.data);
+      }
+    });
   }, [loadHouseholdData, loadConnectionStatus, loadAssistanceRequests]);
 
   // Handle Household Form Submit
@@ -823,7 +835,7 @@ export default function CitizenPage() {
                   </div>
                 </div>
 
-                {/* 3. SwasthyaSetu Voice Helpline & IVR Guide (Phase 11) */}
+                {/* 3. SwasthyaSetu Voice Helpline & Call Assist */}
                 <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 p-5 shadow-2xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -836,17 +848,31 @@ export default function CitizenPage() {
                             SwasthyaSetu Voice Helpline & Call Assist
                           </h3>
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            PSTN / IVR
+                            Telephony / IVR
                           </span>
                         </div>
                         <p className="text-xs text-slate-600">
-                          Dial our toll-free multilingual helpline from any phone for instant scheme eligibility, application tracking, and ASHA assistance.
+                          Connect directly with our AI Voice Assistant on your phone or dial our helpline for instant scheme eligibility, application tracking, and ASHA assistance.
                         </p>
                       </div>
                     </div>
-                    <div className="shrink-0 bg-white px-3.5 py-2 rounded-lg border border-emerald-300 text-center shadow-2xs">
-                      <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">Toll-Free Helpline</span>
-                      <span className="font-mono text-sm sm:text-base font-bold text-emerald-800 tracking-wider">1800-SWASTHYA</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="shrink-0 bg-white px-3 py-1.5 rounded-lg border border-emerald-300 text-left shadow-2xs">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">
+                          {voiceConfig?.isTollFree ? "Toll-Free Helpline" : "Helpline"}
+                        </span>
+                        <span className="font-mono text-xs sm:text-sm font-bold text-emerald-800 tracking-wider">
+                          {voiceConfig?.displayHelplineText || "Virtual number provisioning pending"}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setIsVoiceCallModalOpen(true)}
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm flex items-center gap-1.5 py-2 px-3.5"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call Assistant</span>
+                      </Button>
                     </div>
                   </div>
 
@@ -867,7 +893,7 @@ export default function CitizenPage() {
                         Ration Card Verification
                       </p>
                       <p className="text-slate-600 text-[11px]">
-                        For privacy, the voice system will request the last 4 digits of your Ration Card before discussing family records.
+                        For privacy, the voice system verifies Ration Card digits before disclosing household records.
                       </p>
                     </div>
 
@@ -877,7 +903,7 @@ export default function CitizenPage() {
                         Automated ASHA Reminders
                       </p>
                       <p className="text-slate-600 text-[11px]">
-                        Your ASHA worker can dispatch automated reminder calls to your registered phone for upcoming doorstep visits.
+                        Your ASHA worker can dispatch automated reminder calls to your registered phone for upcoming visits.
                       </p>
                     </div>
                   </div>
@@ -2458,6 +2484,14 @@ export default function CitizenPage() {
           isOpen={isAssistantOpen}
           onClose={() => setIsAssistantOpen(false)}
           userRole="CITIZEN"
+        />
+
+        {/* Phase 11 Real Voice / Calling Modal */}
+        <CitizenCallModal
+          isOpen={isVoiceCallModalOpen}
+          onClose={() => setIsVoiceCallModalOpen(false)}
+          defaultPhone={household?.contactPhone || userProfile?.phoneNumber || ""}
+          householdHeadName={household?.headOfHouseholdName}
         />
       </AuthenticatedShell>
     </ProtectedRoute>

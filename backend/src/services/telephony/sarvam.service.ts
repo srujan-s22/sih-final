@@ -191,6 +191,30 @@ export class SarvamService {
     const raw = transcript.trim();
     const normalized = raw.toLowerCase();
 
+    // 0. Check for Medical Emergency (Instant safety redirection)
+    if (
+      normalized.includes("emergency") ||
+      normalized.includes("ambulance") ||
+      normalized.includes("108") ||
+      normalized.includes("102") ||
+      normalized.includes("chest pain") ||
+      normalized.includes("heart attack") ||
+      normalized.includes("dil ka daura") ||
+      normalized.includes("bleeding") ||
+      normalized.includes("khoon nikal") ||
+      normalized.includes("unconscious") ||
+      normalized.includes("behosh") ||
+      normalized.includes("accident") ||
+      normalized.includes("saans nahi aa rahi")
+    ) {
+      return {
+        intent: "EMERGENCY",
+        confidence: 0.99,
+        rawTranscript: raw,
+        language: sessionLanguage,
+      };
+    }
+
     // 1. Check for Termination / End Call
     if (
       normalized.includes("bye") ||

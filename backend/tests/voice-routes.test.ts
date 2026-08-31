@@ -248,4 +248,133 @@ describe("Phase 11 — Voice API Endpoints (/api/v1/voice)", () => {
     expect(body.data.virtualNumber).toBeDefined();
     expect(body.data.totalCallsToday).toBeGreaterThanOrEqual(0);
   });
+
+  it("8. GET /api/v1/voice/config returns public configuration without exposing secrets", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/voice/config",
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(body.data.voiceEnabled).toBe(true);
+    expect(body.data.supportedLanguages).toBeDefined();
+    expect(body.data.supportedLanguages.length).toBeGreaterThan(0);
+    expect(body.data.displayHelplineText).toBeDefined();
+    expect(body.data.displayHelplineText).not.toContain("1800-SWASTHYA"); // No fake toll-free invention
+  });
+
+  it("9. POST /api/v1/voice/citizen/request-call allows authenticated citizen to request voice assistant call", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/citizen/request-call",
+      headers: {
+        authorization: `Bearer ${citizenToken}`,
+      },
+      payload: {
+        phoneNumber: "+919988776655",
+        language: "hi-IN",
+        reason: "PM-JAY senior citizen assistance",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(body.data.session.direction).toBe("OUTBOUND");
+    expect(body.data.session.citizenId).toBe("citizenvoice01");
+    expect(body.data.session.verificationStatus).toBe("VERIFIED");
+  });
+
+  it("10. GET /api/v1/voice/citizen/calls retrieves authenticated citizen call history", async () => {
+    // Make a call first
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/citizen/request-call",
+      headers: { authorization: `Bearer ${citizenToken}` },
+      payload: { phoneNumber: "+919988776655", language: "kn-IN" },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/voice/citizen/calls",
+      headers: { authorization: `Bearer ${citizenToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data[0].direction).toBe("OUTBOUND");
+  });
+
+  it("11. POST /api/v1/voice/asha/call-citizen allows ASHA to initiate call to beneficiary", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/asha/call-citizen",
+      headers: { authorization: `Bearer ${ashaToken}` },
+      payload: {
+        caseId: "case_route_voice_01",
+        reason: "Document verification visit reminder",
+        language: "kn-IN",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(body.data.session.direction).toBe("OUTBOUND");
+    expect(body.data.session.assignedAshaUid).toBe("ashavoice01");
+    expect(body.data.session.relatedCaseId).toBe("case_route_voice_01");
+  });
+
+  it("12. GET /api/v1/voice/cases/:caseId/calls retrieves call logs for specific case", async () => {
+    // Initiate an ASHA call for the case
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/asha/call-citizen",
+      headers: { authorization: `Bearer ${ashaToken}` },
+      payload: {
+        caseId: "case_route_voice_01",
+        reason: "Scheduled follow-up outreach",
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/voice/cases/case_route_voice_01/calls",
+      headers: { authorization: `Bearer ${ashaToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data[0].relatedCaseId).toBe("case_route_voice_01");
+  });
+
+  it("13. Medical Emergency keywords trigger instant 108 / 102 redirection boundary", async () => {
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/voice/sessions",
+      payload: { callerPhone: "+919988776655" },
+    });
+    const sessionId = JSON.parse(createRes.body).data.id;
+
+    const turnRes = await app.inject({
+      method: "POST",
+      url: `/api/v1/voice/sessions/${sessionId}/turn`,
+      payload: { transcript: "Emergency ambulance chahiye patient ko heart attack aaya hai" },
+    });
+
+    expect(turnRes.statusCode).toBe(200);
+    const turnBody = JSON.parse(turnRes.body);
+    expect(turnBody.success).toBe(true);
+    expect(turnBody.data.detectedIntent).toBe("EMERGENCY");
+    expect(turnBody.data.textResponse).toContain("108");
+    expect(turnBody.data.textResponse).toContain("emergency");
+  });
 });

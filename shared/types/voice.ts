@@ -28,6 +28,7 @@ export type CallOutcome =
 
 export type VoiceIntentType =
   | "GREETING"
+  | "EMERGENCY"
   | "CHECK_SCHEMES"
   | "CHECK_ELIGIBILITY"
   | "REQUEST_ASSISTANCE"
@@ -40,6 +41,7 @@ export type VoiceIntentType =
   | "UNKNOWN";
 
 export type VoiceActionName =
+  | "handleEmergencyRedirection"
   | "getPublicSchemeInfo"
   | "verifyCallerIdentity"
   | "getEligibleSchemes"
@@ -155,6 +157,63 @@ export interface OutboundCallRequest {
   followUpId: string;                       // Required: target follow-up reference
   caseId?: string;                          // Optional: related case reference
   reason?: string;                          // Telephony dispatch reason
+}
+
+/**
+ * Citizen Request for Inbound/Assistant Call
+ */
+export interface CitizenCallRequest {
+  phoneNumber?: string;                     // Optional: confirmation of phone number (E.164)
+  language?: SupportedVoiceLanguage | string;
+  reason?: string;                          // e.g. "Healthcare Assistant Call"
+}
+
+/**
+ * ASHA Direct Call Citizen Request
+ */
+export interface AshaCallRequest {
+  caseId: string;
+  followUpId?: string;
+  reason?: string;
+  language?: SupportedVoiceLanguage | string;
+}
+
+/**
+ * Public Configuration for Client Presentation
+ */
+export interface VoicePublicConfig {
+  voiceEnabled: boolean;
+  providerMode: "real" | "test";
+  virtualNumber: string | null;             // Real configured number or null
+  displayHelplineText: string;              // Clean formatted text
+  isTollFree: boolean;                      // true only if proven toll-free (e.g. 1800)
+  supportedLanguages: Array<{
+    code: SupportedVoiceLanguage | string;
+    name: string;
+    nativeName: string;
+  }>;
+  maxCallDurationSec: number;
+  sarvamConfigured: boolean;
+  exotelConfigured: boolean;
+}
+
+/**
+ * Item in Call History list
+ */
+export interface CallHistoryItem {
+  id: string;
+  callSid: string;
+  direction: CallDirection;
+  maskedNumber: string;
+  status: VoiceSessionStatus;
+  outcome?: CallOutcome;
+  intent?: VoiceIntentType;
+  durationSeconds?: number;
+  outboundReason?: string | null;
+  relatedCaseId?: string | null;
+  relatedFollowUpId?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
 }
 
 /**

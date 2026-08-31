@@ -4,6 +4,10 @@ import {
   VoiceTurnRequest,
   VoiceTurnResponse,
   VoiceHealthResponse,
+  VoicePublicConfig,
+  CitizenCallRequest,
+  AshaCallRequest,
+  CallHistoryItem,
   ExotelInboundWebhookPayload,
   ExotelStatusCallbackPayload,
   CallOutcome,
@@ -213,6 +217,14 @@ export class VoiceGatewayService {
 
     // Step 3: Dispatch to Strict Allowlisted VoiceActionService
     switch (nluResult.intent) {
+      case "EMERGENCY": {
+        executedAction = "handleEmergencyRedirection";
+        const res = this.voiceActionService.handleEmergencyRedirection();
+        textResponse = res.message;
+        actionResultData = res.data;
+        break;
+      }
+
       case "GREETING": {
         textResponse =
           "Namaste! Welcome to SwasthyaSetu. I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker visits. What would you like to know?";
@@ -538,7 +550,7 @@ export class VoiceGatewayService {
     let status: "OPERATIONAL" | "UNCONFIGURED" | "DEGRADED" = "UNCONFIGURED";
     if (sarvamOk && exotelOk) {
       status = "OPERATIONAL";
-    } else if (sarvamOk || exotelOk || env.VOICE_PROVIDER_MODE === "test") {
+    } else if (sarvamOk || exotelOk || env.VOICE_PROVIDER_MODE === "test" || env.VOICE_PROVIDER_MODE === "mock") {
       status = "DEGRADED";
     }
 
@@ -566,5 +578,250 @@ export class VoiceGatewayService {
         startedAt: s.startedAt,
       })),
     };
+  }
+
+  /**
+   * 8. Public Voice Configuration for Client Presentation
+   */
+  public getPublicConfig(): VoicePublicConfig {
+    const helplineInfo = this.exotelService.getDisplayHelplineInfo();
+    return {
+      voiceEnabled: env.VOICE_ENABLED !== false,
+      providerMode: (env.VOICE_PROVIDER_MODE as "real" | "test") || "real",
+      virtualNumber: helplineInfo.virtualNumber,
+      displayHelplineText: helplineInfo.displayHelplineText,
+      isTollFree: helplineInfo.isTollFree,
+      supportedLanguages: [
+        { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
+        { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
+        { code: "te-IN", name: "Telugu", nativeName: "తెలుగు" },
+        { code: "ta-IN", name: "Tamil", nativeName: "தமிழ்" },
+        { code: "mr-IN", name: "Marathi", nativeName: "मराठी" },
+        { code: "bn-IN", name: "Bengali", nativeName: "বাংলা" },
+        { code: "gu-IN", name: "Gujarati", nativeName: "ગુજરાતી" },
+        { code: "en-IN", name: "English", nativeName: "English" },
+      ],
+      maxCallDurationSec: env.VOICE_MAX_CALL_DURATION_SEC || 300,
+      sarvamConfigured: this.sarvamService.isConfigured(),
+      exotelConfigured: this.exotelService.isConfigured(),
+    };
+  }
+
+  /**
+   * 9. Citizen Web-Initiated Outbound Call
+   */
+  public async requestCitizenCall(
+    citizenUid: string,
+    input: CitizenCallRequest
+  ): Promise<{ session: VoiceSession; callResult: any }> {
+    if (env.VOICE_ENABLED === false) {
+      throw new Error("Voice assistance is currently unavailable.");
+    }
+
+    const citizenProfile = await this.userRepository.getUserById(citizenUid);
+    const household = await this.householdRepository.getHouseholdByOwnerUid(citizenUid);
+
+    // Resolve destination phone
+    let destinationPhone: string | undefined = input.phoneNumber;
+    if (!destinationPhone || destinationPhone.trim().length === 0) {
+      destinationPhone = household?.contactPhone || citizenProfile?.phoneNumber || undefined;
+    }
+
+    if (!destinationPhone || destinationPhone.trim().length === 0) {
+      throw new Error("Please enter or confirm a valid 10-digit mobile number to receive the call.");
+    }
+
+    let cleanPhone = destinationPhone.replace(/[^\d+]/g, "");
+    if (!cleanPhone.startsWith("+")) {
+      if (cleanPhone.length === 10) {
+        cleanPhone = `+91${cleanPhone}`;
+      } else if (cleanPhone.startsWith("91") && cleanPhone.length === 12) {
+        cleanPhone = `+${cleanPhone}`;
+      }
+    }
+
+    const callResult = await this.exotelService.initiateOutboundCall({
+      toPhoneNumber: cleanPhone,
+      customField: {
+        citizenUid,
+        householdId: household?.id || null,
+        type: "CITIZEN_REQUEST",
+      },
+      statusCallbackUrl: `${env.HOST}:${env.PORT}/api/v1/voice/callbacks/exotel/status`,
+    });
+
+    const sessionId = `vses_cit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const session: VoiceSession = {
+      id: sessionId,
+      callSid: callResult.callSid,
+      direction: "OUTBOUND",
+      provider: this.exotelService.isConfigured() ? "EXOTEL" : "TEST_MOCK",
+      callerNumberHash: this.hashPhoneNumber(cleanPhone),
+      maskedCallerNumber: this.maskPhoneNumber(cleanPhone),
+      status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+      citizenId: citizenUid,
+      householdId: household?.id || null,
+      language: input.language || "hi-IN",
+      turnCount: 0,
+      maxTurns: env.VOICE_MAX_TURNS || 10,
+      outboundReason: input.reason || "Citizen Web Assistant Request",
+      startedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.sessionRepository.createSession(session);
+
+    await this.automationService.emitDomainEvent("OUTBOUND_CALL_INITIATED", {
+      caseId: "unbound",
+      householdId: household?.id || "unknown",
+      assignedAshaUid: "system",
+      payload: {
+        sessionId,
+        callSid: callResult.callSid,
+        citizenUid,
+        destinationMasked: this.maskPhoneNumber(cleanPhone),
+      },
+    });
+
+    return { session, callResult };
+  }
+
+  /**
+   * 10. ASHA Direct Beneficiary Call
+   */
+  public async initiateAshaCall(
+    ashaUid: string,
+    input: AshaCallRequest
+  ): Promise<{ session: VoiceSession; callResult: any }> {
+    if (env.VOICE_ENABLED === false) {
+      throw new Error("Voice assistance is currently unavailable.");
+    }
+
+    const targetCase = await this.caseRepository.getCaseById(input.caseId);
+    if (!targetCase) {
+      throw new Error(`Target case "${input.caseId}" not found.`);
+    }
+
+    const household = await this.householdRepository.getHouseholdById(targetCase.householdId);
+    if (!household || !household.contactPhone) {
+      throw new Error(`Household contact phone not found for case "${input.caseId}".`);
+    }
+
+    const destinationPhone = household.contactPhone;
+
+    const callResult = await this.exotelService.initiateOutboundCall({
+      toPhoneNumber: destinationPhone,
+      customField: {
+        caseId: targetCase.id,
+        followUpId: input.followUpId || null,
+        ashaUid,
+        householdId: household.id,
+        type: "ASHA_ASSISTANCE_CALL",
+      },
+      statusCallbackUrl: `${env.HOST}:${env.PORT}/api/v1/voice/callbacks/exotel/status`,
+    });
+
+    const sessionId = `vses_asha_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const session: VoiceSession = {
+      id: sessionId,
+      callSid: callResult.callSid,
+      direction: "OUTBOUND",
+      provider: this.exotelService.isConfigured() ? "EXOTEL" : "TEST_MOCK",
+      callerNumberHash: this.hashPhoneNumber(destinationPhone),
+      maskedCallerNumber: this.maskPhoneNumber(destinationPhone),
+      status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+      citizenId: household.ownerUid,
+      householdId: household.id,
+      assignedAshaUid: ashaUid,
+      relatedCaseId: targetCase.id,
+      relatedFollowUpId: input.followUpId || null,
+      language: input.language || "hi-IN",
+      turnCount: 0,
+      maxTurns: env.VOICE_MAX_TURNS || 10,
+      outboundReason: input.reason || `ASHA Outreach: ${targetCase.schemeName || "Healthcare Case"}`,
+      startedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.sessionRepository.createSession(session);
+
+    await this.automationService.emitDomainEvent("OUTBOUND_CALL_INITIATED", {
+      caseId: targetCase.id,
+      householdId: household.id,
+      assignedAshaUid: ashaUid,
+      payload: {
+        sessionId,
+        callSid: callResult.callSid,
+        caseId: targetCase.id,
+        followUpId: input.followUpId,
+        destinationMasked: this.maskPhoneNumber(destinationPhone),
+      },
+    });
+
+    return { session, callResult };
+  }
+
+  /**
+   * 11. Call History Queries
+   */
+  public async listCitizenCalls(citizenUid: string): Promise<CallHistoryItem[]> {
+    const sessions = await this.sessionRepository.listSessionsByCitizenId(citizenUid);
+    return sessions.map((s) => ({
+      id: s.id,
+      callSid: s.callSid,
+      direction: s.direction,
+      maskedNumber: s.maskedCallerNumber,
+      status: s.status,
+      outcome: s.callOutcome,
+      intent: s.currentIntent,
+      durationSeconds: s.durationSeconds,
+      outboundReason: s.outboundReason,
+      relatedCaseId: s.relatedCaseId,
+      relatedFollowUpId: s.relatedFollowUpId,
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+    }));
+  }
+
+  public async listAshaCalls(ashaUid: string): Promise<CallHistoryItem[]> {
+    const sessions = await this.sessionRepository.listSessionsByAshaUid(ashaUid);
+    return sessions.map((s) => ({
+      id: s.id,
+      callSid: s.callSid,
+      direction: s.direction,
+      maskedNumber: s.maskedCallerNumber,
+      status: s.status,
+      outcome: s.callOutcome,
+      intent: s.currentIntent,
+      durationSeconds: s.durationSeconds,
+      outboundReason: s.outboundReason,
+      relatedCaseId: s.relatedCaseId,
+      relatedFollowUpId: s.relatedFollowUpId,
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+    }));
+  }
+
+  public async listCaseCalls(caseId: string): Promise<CallHistoryItem[]> {
+    const sessions = await this.sessionRepository.listSessionsByCaseId(caseId);
+    return sessions.map((s) => ({
+      id: s.id,
+      callSid: s.callSid,
+      direction: s.direction,
+      maskedNumber: s.maskedCallerNumber,
+      status: s.status,
+      outcome: s.callOutcome,
+      intent: s.currentIntent,
+      durationSeconds: s.durationSeconds,
+      outboundReason: s.outboundReason,
+      relatedCaseId: s.relatedCaseId,
+      relatedFollowUpId: s.relatedFollowUpId,
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+    }));
   }
 }
