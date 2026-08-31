@@ -19,15 +19,21 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center p-8 md:p-12 text-center rounded-lg border border-dashed border-slate-300 bg-slate-50/50",
+        "flex flex-col items-center justify-center p-8 sm:p-10 md:p-12 text-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70",
         className
       )}
     >
       {icon ? (
-        <div className="mb-4 text-slate-400">{icon}</div>
+        <div className="mb-3.5 text-slate-400">{icon}</div>
       ) : (
-        <div className="mb-4 p-3 rounded-full bg-slate-100 text-slate-500">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="mb-3.5 p-3 rounded-full bg-slate-100 text-slate-500">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -37,9 +43,13 @@ export function EmptyState({
           </svg>
         </div>
       )}
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500 max-w-sm">{description}</p>
-      {action && <div className="mt-6">{action}</div>}
+      <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
+        {title}
+      </h3>
+      <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed">
+        {description}
+      </p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

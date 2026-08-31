@@ -11,7 +11,6 @@ import { UserRole } from "@shared/types/auth";
 import {
   X,
   Send,
-  Sparkles,
   Bot,
   User,
   ShieldCheck,

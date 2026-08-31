@@ -23,7 +23,6 @@ import {
   History,
   Info,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 
 export interface CitizenCallModalProps {
@@ -336,7 +335,7 @@ export function CitizenCallModal({
 
                 <div className="p-3 bg-white rounded-lg border border-slate-200 text-left space-y-1 text-xs">
                   <p className="font-semibold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                    <Info className="w-3.5 h-3.5 text-teal-700" />
                     What to expect when you answer:
                   </p>
                   <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-0.5">

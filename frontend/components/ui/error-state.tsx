@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 export interface ErrorStateProps {
   title?: string;
@@ -10,7 +11,7 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = "Something went wrong",
+  title = "Unable to load information",
   message = "An error occurred while loading this section. Please try again.",
   onRetry,
   className,
@@ -18,33 +19,30 @@ export function ErrorState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center p-8 md:p-12 text-center rounded-lg border border-red-200 bg-red-50/50",
+        "flex flex-col items-center justify-center p-8 sm:p-10 text-center rounded-xl border border-rose-200 bg-rose-50/40",
         className
       )}
       role="alert"
     >
-      <div className="mb-4 p-3 rounded-full bg-red-100 text-red-700">
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth="1.5"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-          />
-        </svg>
+      <div className="mb-3.5 p-3 rounded-full bg-rose-100 text-rose-700">
+        <AlertCircle className="w-6 h-6" aria-hidden="true" />
       </div>
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-sm text-slate-600 max-w-md">{message}</p>
+      <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
+        {title}
+      </h3>
+      <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
+        {message}
+      </p>
       {onRetry && (
         <div className="mt-5">
-          <Button variant="secondary" size="sm" onClick={onRetry}>
-            Try Again
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="text-xs font-semibold text-slate-800 bg-white border-slate-300 hover:bg-slate-50 flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+            <span>Try Again</span>
           </Button>
         </div>
       )}

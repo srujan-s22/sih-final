@@ -37,7 +37,6 @@ import {
   AlertTriangle,
   CalendarDays,
   FileCheck,
-  Sparkles,
   PhoneCall,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
@@ -2557,7 +2556,7 @@ export default function AshaWorkspacePage() {
                             {/* Actionable Healthcare Opportunities */}
                             <div className="space-y-3">
                               <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-teal-700" />
+                                <ShieldCheck className="w-4 h-4 text-teal-700" />
                                 <span>Identified Entitlement Opportunities</span>
                               </h4>
 

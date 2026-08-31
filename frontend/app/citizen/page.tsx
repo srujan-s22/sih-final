@@ -54,7 +54,6 @@ import {
   ArrowRight,
   Info,
   Layers,
-  Sparkles,
   Bot,
   QrCode,
   Link2,

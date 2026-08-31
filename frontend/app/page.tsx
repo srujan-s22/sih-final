@@ -15,7 +15,6 @@ import {
   Lock,
   Building2,
   ArrowRight,
-  Sparkles,
   CheckCircle2,
   HeartHandshake,
   ChevronRight,
@@ -163,8 +162,8 @@ export default function HomePage() {
                         </h4>
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       Verified
                     </span>
                   </div>
