@@ -74,10 +74,43 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     (fastify as any).exotelStreamGatewayService ||
     new ExotelStreamGatewayService(gatewayService, sessionRepo, sarvamService);
 
-  // Real-Time Exotel Audio WebSocket Stream (Phase 11)
-  // Route mounted at /api/v1/voice/stream
-  fastify.get("/v1/voice/stream", { websocket: true } as any, (socket: any, req: any) => {
-    streamGatewayService.handleConnection(socket, req);
+  // Real-Time Exotel Audio WebSocket Stream (Phase 11 & Multilingual Hardening)
+  // Route mounted under API prefix at /api/v1/voice/stream
+  (fastify.route as any)({
+    method: "GET",
+    url: "/v1/voice/stream",
+    handler: async (_request: any, reply: any) => {
+      return reply.send({
+        success: true,
+        service: "SwasthyaSetu Voice Telephony Stream Gateway",
+        protocol: "websocket",
+        status: "ready",
+        endpoint: "/api/v1/voice/stream",
+      });
+    },
+    wsHandler: (socket: any, req: any) => {
+      streamGatewayService.handleConnection(socket, req);
+    },
+  });
+
+  // Support /api/v1/voice/stream/:language path parameter routing to identical handler
+  (fastify.route as any)({
+    method: "GET",
+    url: "/v1/voice/stream/:language",
+    handler: async (request: any, reply: any) => {
+      const { language } = (request.params as any) || {};
+      return reply.send({
+        success: true,
+        service: "SwasthyaSetu Voice Telephony Stream Gateway",
+        protocol: "websocket",
+        status: "ready",
+        language: toVoiceLanguage(language),
+        endpoint: "/api/v1/voice/stream",
+      });
+    },
+    wsHandler: (socket: any, req: any) => {
+      streamGatewayService.handleConnection(socket, req);
+    },
   });
 
   // 0. Public Voice Configuration (No secrets exposed)

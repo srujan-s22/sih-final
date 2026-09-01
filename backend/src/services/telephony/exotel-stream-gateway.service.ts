@@ -45,7 +45,9 @@ export interface StreamSessionContext {
   sessionId: string | null;
   session: VoiceSession | null;
   mediaFormat: ExotelStreamMediaFormat;
-  language: string;
+  language: SupportedVoiceLanguage;
+  streamUrlLanguage?: SupportedVoiceLanguage | null;
+  languageSource?: string;
   turnCount: number;
   maxTurns: number;
   startTime: number;
@@ -73,14 +75,48 @@ export class ExotelStreamGatewayService {
     const remoteAddress = req.ip || req.socket?.remoteAddress || "unknown";
     const hostHeader = req.headers?.host || "unknown";
 
+    // Safely parse URL, searchParams, query and params to extract requested stream language (e.g. ?language=kn-IN)
+    let streamUrlLanguage: SupportedVoiceLanguage | null = null;
+    try {
+      if (req.params && typeof req.params === "object") {
+        const pLang = (req.params as any).language || (req.params as any).lang;
+        if (pLang) streamUrlLanguage = toVoiceLanguage(pLang);
+      }
+      if (!streamUrlLanguage && req.query && typeof req.query === "object") {
+        const qLang = (req.query as any).language || (req.query as any).lang;
+        if (qLang) streamUrlLanguage = toVoiceLanguage(qLang);
+      }
+      if (!streamUrlLanguage && typeof req.url === "string") {
+        const parsedUrl = new URL(req.url, "http://localhost");
+        const urlLang = parsedUrl.searchParams.get("language") || parsedUrl.searchParams.get("lang");
+        if (urlLang) {
+          streamUrlLanguage = toVoiceLanguage(urlLang);
+        } else {
+          // Check if path ends in a language code (e.g. /stream/kn-IN)
+          const segments = parsedUrl.pathname.split("/").filter(Boolean);
+          const last = segments[segments.length - 1];
+          if (last && last !== "stream") {
+            streamUrlLanguage = toVoiceLanguage(last);
+          }
+        }
+      }
+    } catch {
+      // Safe non-blocking parse
+    }
+
+    const defaultLang = streamUrlLanguage || toVoiceLanguage(env.VOICE_LANGUAGE || "en-IN");
+    const languageSource = streamUrlLanguage ? "STREAM_URL_QUERY" : "ENVIRONMENT_DEFAULT";
+
     console.log("🔗 [ExotelStreamGateway] WebSocket Client Connection Established", {
       remoteAddress,
       host: hostHeader,
       url: req.url,
+      streamUrlLanguage,
+      resolvedLanguage: defaultLang,
+      languageSource,
       timestamp: new Date().toISOString(),
     });
 
-    const defaultLang = env.VOICE_LANGUAGE || "en-IN";
     const context: StreamSessionContext = {
       streamSid: null,
       callSid: null,
@@ -92,6 +128,8 @@ export class ExotelStreamGatewayService {
         channels: 1,
       },
       language: defaultLang,
+      streamUrlLanguage,
+      languageSource,
       turnCount: 0,
       maxTurns: env.VOICE_MAX_TURNS || 10,
       startTime: Date.now(),
@@ -142,6 +180,9 @@ export class ExotelStreamGatewayService {
       console.log("🔌 [ExotelStreamGateway] WebSocket Client Disconnected", {
         streamSid: context.streamSid,
         callSid: context.callSid,
+        sessionId: context.sessionId,
+        resolvedLanguage: context.language,
+        languageSource: context.languageSource,
         code,
         reason: reason?.toString("utf-8") || "normal",
       });
@@ -149,7 +190,13 @@ export class ExotelStreamGatewayService {
     });
 
     socket.on("error", (err) => {
-      console.error("⚠️ [ExotelStreamGateway] WebSocket client error:", err.message);
+      console.error("⚠️ [ExotelStreamGateway] WebSocket client error:", {
+        streamSid: context.streamSid,
+        callSid: context.callSid,
+        sessionId: context.sessionId,
+        resolvedLanguage: context.language,
+        error: err.message,
+      });
       this.cleanupStreamContext(context);
     });
   }
@@ -238,30 +285,52 @@ export class ExotelStreamGatewayService {
       event.customParameters ||
       {};
 
-    // Authoritative Precedence (Sections 7 & 9):
-    // 1. If an existing VoiceSession exists for callSid (e.g. initiated from website), KEEP session.language
-    // 2. If inbound PSTN call with no session, resolve language via resolveInboundVoiceLanguage(callerPhone, metadataLang)
-    // 3. Fallback safely to "en-IN"
-    let session = callSid ? await this.sessionRepository.getSessionByCallSid(callSid) : null;
-    let resolvedLanguage: string = "en-IN";
+    const metadataLang =
+      customParams?.language ||
+      startData?.language ||
+      event?.language ||
+      null;
 
-    if (session && session.language) {
+    const callerPhone =
+      customParams?.callerPhone ||
+      customParams?.From ||
+      startData?.from ||
+      event?.from ||
+      "";
+
+    // Authoritative Precedence (Sections 7 & 9 of docs/backend_exotel_fix.md):
+    // 1. Existing explicit VoiceSession.language from outbound website call request (must be preserved)
+    // 2. Explicit language supplied by the current stream/query URL (?language=kn-IN from IVR selection)
+    // 3. Pre-existing session with explicit valid language (if no URL override)
+    // 4. Exotel start-event metadata (customParameters.language)
+    // 5. Inbound caller profile / recent session lookup or default en-IN
+    let session = callSid ? await this.sessionRepository.getSessionByCallSid(callSid) : null;
+    let resolvedLanguage: SupportedVoiceLanguage = "en-IN";
+    let languageSource = "SAFE_FALLBACK";
+
+    if (session && session.direction === "OUTBOUND" && session.language) {
       resolvedLanguage = toVoiceLanguage(session.language);
+      languageSource = "EXISTING_OUTBOUND_SESSION";
+    } else if (context.streamUrlLanguage) {
+      resolvedLanguage = context.streamUrlLanguage;
+      languageSource = "STREAM_URL_QUERY";
+      if (session && session.language !== resolvedLanguage) {
+        session.language = resolvedLanguage;
+        await this.sessionRepository.updateSession(session.id, { language: resolvedLanguage });
+      }
+    } else if (session && session.language && ["en-IN", "kn-IN", "hi-IN"].includes(session.language)) {
+      resolvedLanguage = toVoiceLanguage(session.language);
+      languageSource = "EXISTING_SESSION";
+    } else if (metadataLang) {
+      resolvedLanguage = toVoiceLanguage(metadataLang);
+      languageSource = "EXOTEL_START_METADATA";
     } else {
-      const callerPhone =
-        customParams?.callerPhone ||
-        customParams?.From ||
-        startData?.from ||
-        event?.from ||
-        "";
-      const rawExotelLang =
-        customParams?.language ||
-        startData?.language ||
-        event?.language;
-      resolvedLanguage = await this.gatewayService.resolveInboundVoiceLanguage(callerPhone, rawExotelLang);
+      resolvedLanguage = await this.gatewayService.resolveInboundVoiceLanguage(callerPhone);
+      languageSource = "CALLER_RESOLUTION_OR_DEFAULT";
     }
 
     context.language = resolvedLanguage;
+    context.languageSource = languageSource;
 
     if (streamSid) {
       this.activeStreams.set(streamSid, context);
@@ -271,13 +340,8 @@ export class ExotelStreamGatewayService {
     if (callSid) {
       if (!session) {
         // Inbound call direct into stream applet
-        const callerPhone =
-          customParams?.callerPhone ||
-          customParams?.From ||
-          startData?.from ||
-          event?.from ||
-          "+919876543210";
-        session = await this.gatewayService.createInboundSession(callerPhone, callSid, resolvedLanguage);
+        const callerPhoneNormalized = callerPhone || "+919876543210";
+        session = await this.gatewayService.createInboundSession(callerPhoneNormalized, callSid, resolvedLanguage);
       }
       context.session = session;
       context.sessionId = session.id;
@@ -289,6 +353,7 @@ export class ExotelStreamGatewayService {
       callSid: context.callSid,
       sessionId: context.sessionId,
       language: context.language,
+      languageSource: context.languageSource,
       encoding: context.mediaFormat.encoding,
       sampleRate: context.mediaFormat.sampleRate,
     });
@@ -441,6 +506,25 @@ export class ExotelStreamGatewayService {
       });
 
       // 4. Process Turn via VoiceGatewayService & deterministic VoiceActionService
+      if (!context.sessionId || context.sessionId === "unbound") {
+        try {
+          let recSession = context.callSid
+            ? await this.sessionRepository.getSessionByCallSid(context.callSid)
+            : null;
+          if (!recSession) {
+            recSession = await this.gatewayService.createInboundSession(
+              "+919876543210",
+              context.callSid || `exo_rec_${Date.now()}`,
+              context.language
+            );
+          }
+          context.session = recSession;
+          context.sessionId = recSession.id;
+        } catch (recErr: any) {
+          console.warn("⚠️ [ExotelStreamGateway] Safe session recovery warning:", recErr.message);
+        }
+      }
+
       const sessionId = context.sessionId || "unbound";
       const turnResponse = await this.gatewayService.processTurn(sessionId, {
         transcript,

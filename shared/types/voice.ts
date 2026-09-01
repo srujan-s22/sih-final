@@ -131,10 +131,10 @@ export function toDisplayIndianPhoneNumber(raw?: string | null): string {
  */
 export function toVoiceLanguage(lang?: string | null): SupportedVoiceLanguage {
   if (!lang) return "en-IN";
-  const clean = lang.trim().toLowerCase();
-  if (clean === "kn" || clean === "kn-in") return "kn-IN";
-  if (clean === "hi" || clean === "hi-in") return "hi-IN";
-  if (clean === "en" || clean === "en-in") return "en-IN";
+  const clean = lang.trim().toLowerCase().replace(/_/g, "-");
+  if (clean === "kn" || clean === "kn-in" || clean === "kannada") return "kn-IN";
+  if (clean === "hi" || clean === "hi-in" || clean === "hindi") return "hi-IN";
+  if (clean === "en" || clean === "en-in" || clean === "english") return "en-IN";
   return "en-IN";
 }
 
