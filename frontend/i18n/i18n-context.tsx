@@ -75,6 +75,12 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, lang);
       document.documentElement.lang = lang;
+      // Non-blocking server-side profile persistence for authenticated users
+      import("@/services/auth-service")
+        .then(({ authService }) => {
+          authService.syncUser({ preferredLanguage: lang }).catch(() => {});
+        })
+        .catch(() => {});
     } catch {
       // Ignore storage errors
     }

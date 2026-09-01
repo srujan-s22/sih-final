@@ -13,7 +13,7 @@ export class UserService {
    */
   public async getOrCreateUser(
     token: DecodedIdToken,
-    metadata?: { displayName?: string | null; phoneNumber?: string | null },
+    metadata?: { displayName?: string | null; phoneNumber?: string | null; preferredLanguage?: "en" | "kn" | "hi" | null },
     assignedRole?: UserRole
   ): Promise<{ user: UserProfile; isNewUser: boolean; isConsentRequired: boolean }> {
     const existing = await this.userRepository.getUserById(token.uid);
@@ -25,6 +25,9 @@ export class UserService {
       }
       if (metadata?.phoneNumber && metadata.phoneNumber !== existing.phoneNumber) {
         updates.phoneNumber = metadata.phoneNumber;
+      }
+      if (metadata?.preferredLanguage && metadata.preferredLanguage !== existing.preferredLanguage) {
+        updates.preferredLanguage = metadata.preferredLanguage;
       }
       // If a verified privileged role was authorized, apply it
       if (assignedRole && (assignedRole === "ASHA" || assignedRole === "ADMIN") && existing.role !== assignedRole) {
@@ -60,6 +63,7 @@ export class UserService {
       consentedAt: null,
       ashaServiceCode: effectiveRole === "ASHA" ? this.generateAshaCode() : null,
       serviceArea: effectiveRole === "ASHA" ? "Field Jurisdiction" : null,
+      preferredLanguage: metadata?.preferredLanguage || "en",
       createdAt: now,
       updatedAt: now,
     };

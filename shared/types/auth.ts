@@ -23,6 +23,7 @@ export interface UserProfile {
   consentedAt: string | null;
   ashaServiceCode?: string | null;
   serviceArea?: string | null;
+  preferredLanguage?: "en" | "kn" | "hi" | null;
   createdAt: string;
   updatedAt: string;
 }

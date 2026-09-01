@@ -13,6 +13,10 @@ import {
   CallOutcome,
   VoiceIntentType,
   VoiceActionName,
+  SupportedVoiceLanguage,
+  VOICE_LANGUAGE_OPTIONS,
+  normalizeIndianPhoneNumber,
+  toE164IndianPhoneNumber,
   toVoiceLanguage,
 } from "../../../../shared/types/voice.js";
 import { VoiceSessionRepository } from "../../repositories/voice-session.repository.js";
@@ -58,6 +62,84 @@ export class VoiceGatewayService {
   }
 
   /**
+   * Resolves the authoritative language for a direct inbound PSTN call.
+   *
+   * Precedence Hierarchy (Section 9):
+   * Priority 1: Known caller phone number → registered user profile language preference (preferredLanguage)
+   * Priority 2: Existing active/recent voice session associated with the caller (last 24h) → session.language
+   * Priority 3: Caller-provided language parameter (from customParams / IVR if provided)
+   * Priority 4: Safe default → en-IN
+   */
+  public async resolveInboundVoiceLanguage(
+    callerPhone: string,
+    explicitParamLang?: string | null
+  ): Promise<SupportedVoiceLanguage> {
+    const clean10 = normalizeIndianPhoneNumber(callerPhone);
+
+    // Priority 1: Known caller phone number → registered user profile / household language preference
+    if (clean10 && clean10.length === 10) {
+      try {
+        let matchedOwnerUid: string | null = null;
+        const memoryHouseholds = (this.householdRepository as any).memoryHouseholds;
+        if (memoryHouseholds) {
+          for (const h of memoryHouseholds.values()) {
+            if (h.contactPhone && normalizeIndianPhoneNumber(h.contactPhone) === clean10) {
+              matchedOwnerUid = h.ownerUid;
+              break;
+            }
+          }
+        }
+
+        if (matchedOwnerUid) {
+          const user = await this.userRepository.getUserById(matchedOwnerUid);
+          if (user?.preferredLanguage) {
+            return toVoiceLanguage(user.preferredLanguage);
+          }
+        }
+
+        const memoryUsers = (this.userRepository as any).memoryStore || (this.userRepository as any).memoryUsers;
+        if (memoryUsers) {
+          for (const u of memoryUsers.values()) {
+            if (u.phoneNumber && normalizeIndianPhoneNumber(u.phoneNumber) === clean10) {
+              if (u.preferredLanguage) {
+                return toVoiceLanguage(u.preferredLanguage);
+              }
+              break;
+            }
+          }
+        }
+      } catch {
+        // Safe non-blocking fallback
+      }
+    }
+
+    // Priority 2: Existing active/recent voice session associated with the caller (within 24h)
+    if (clean10 && clean10.length === 10 && !explicitParamLang) {
+      try {
+        const hash = this.hashPhoneNumber(callerPhone);
+        const recentSession = await this.sessionRepository.getRecentSessionByCallerHash(hash);
+        if (
+          recentSession?.language &&
+          (recentSession.language === "en-IN" || recentSession.language === "kn-IN" || recentSession.language === "hi-IN")
+        ) {
+          return toVoiceLanguage(recentSession.language);
+        }
+      } catch {
+        // Safe non-blocking fallback
+      }
+    }
+
+    // Priority 3: Caller-provided language selection parameter (if provided)
+    if (explicitParamLang) {
+      const mapped = toVoiceLanguage(explicitParamLang);
+      if (mapped) return mapped;
+    }
+
+    // Priority 4: Safe default → en-IN
+    return "en-IN";
+  }
+
+  /**
    * 1. Create Inbound Voice Session
    */
   public async createInboundSession(
@@ -69,27 +151,37 @@ export class VoiceGatewayService {
     const sid = callSid || `exo_in_${Date.now()}`;
     const hash = this.hashPhoneNumber(callerPhone);
     const masked = this.maskPhoneNumber(callerPhone);
-    const resolvedLanguage = toVoiceLanguage(language || env.VOICE_LANGUAGE || "en-IN");
+    const cleanPhone = normalizeIndianPhoneNumber(callerPhone);
 
     // Attempt to lookup citizen/household by phone WITHOUT verifying yet
     let matchedCitizenId: string | null = null;
     let matchedHouseholdId: string | null = null;
+    let matchedUserLanguage: SupportedVoiceLanguage | null = null;
 
     try {
-      const cleanPhone = callerPhone.replace(/[^\d]/g, "");
       const memoryHouseholds = (this.householdRepository as any).memoryHouseholds;
       if (memoryHouseholds) {
         for (const h of memoryHouseholds.values()) {
-          if (h.contactPhone && h.contactPhone.replace(/[^\d]/g, "").endsWith(cleanPhone.slice(-10))) {
+          if (h.contactPhone && normalizeIndianPhoneNumber(h.contactPhone) === cleanPhone) {
             matchedHouseholdId = h.id;
             matchedCitizenId = h.ownerUid;
             break;
           }
         }
       }
+      if (matchedCitizenId) {
+        const user = await this.userRepository.getUserById(matchedCitizenId);
+        if (user?.preferredLanguage) {
+          matchedUserLanguage = toVoiceLanguage(user.preferredLanguage);
+        }
+      }
     } catch {
       // Non-blocking lookup
     }
+
+    const resolvedLanguage = language
+      ? toVoiceLanguage(language)
+      : matchedUserLanguage || (await this.resolveInboundVoiceLanguage(callerPhone));
 
     const session: VoiceSession = {
       id,
@@ -586,16 +678,7 @@ export class VoiceGatewayService {
       virtualNumber: helplineInfo.virtualNumber,
       displayHelplineText: helplineInfo.displayHelplineText,
       isTollFree: helplineInfo.isTollFree,
-      supportedLanguages: [
-        { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
-        { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
-        { code: "te-IN", name: "Telugu", nativeName: "తెలుగు" },
-        { code: "ta-IN", name: "Tamil", nativeName: "தமிழ்" },
-        { code: "mr-IN", name: "Marathi", nativeName: "मराठी" },
-        { code: "bn-IN", name: "Bengali", nativeName: "বাংলা" },
-        { code: "gu-IN", name: "Gujarati", nativeName: "ગુજરાતી" },
-        { code: "en-IN", name: "English", nativeName: "English" },
-      ],
+      supportedLanguages: [...VOICE_LANGUAGE_OPTIONS],
       maxCallDurationSec: env.VOICE_MAX_CALL_DURATION_SEC || 300,
       sarvamConfigured: this.sarvamService.isConfigured(),
       exotelConfigured: this.exotelService.isConfigured(),

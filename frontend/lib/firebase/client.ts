@@ -64,9 +64,24 @@ export function isClientFirebaseReady(): boolean {
  */
 export async function getCurrentUserToken(forceRefresh = false): Promise<string | null> {
   const currentAuth = getClientAuth();
-  if (!currentAuth || !currentAuth.currentUser) {
+  if (!currentAuth) {
     return null;
   }
+
+  // If currentUser is not yet settled, await native authStateReady promise so that
+  // in-flight session restoration from IndexedDB completes before determining token availability.
+  if (!currentAuth.currentUser && typeof currentAuth.authStateReady === "function") {
+    try {
+      await currentAuth.authStateReady();
+    } catch (err) {
+      console.warn("Firebase authStateReady resolution error:", err);
+    }
+  }
+
+  if (!currentAuth.currentUser) {
+    return null;
+  }
+
   try {
     return await currentAuth.currentUser.getIdToken(forceRefresh);
   } catch (err) {

@@ -47,6 +47,9 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
+    const rawHeaders = options.headers as Record<string, string> | undefined;
+    const hadExplicitAuth = Boolean(rawHeaders?.["Authorization"] || rawHeaders?.["authorization"]);
+
     // Attach Bearer token if not explicitly provided
     if (!headers["Authorization"] && !headers["authorization"]) {
       try {
@@ -63,11 +66,36 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         ...options,
         headers,
         cache: options.cache || "no-store",
       });
+
+      // If unauthorized and we used an Authorization header, attempt a force-refresh once
+      // to transparently recover from expired or stale Firebase ID tokens.
+      if (
+        response.status === 401 &&
+        headers["Authorization"] &&
+        !hadExplicitAuth
+      ) {
+        try {
+          const refreshedToken = this.customTokenProvider
+            ? await this.customTokenProvider()
+            : await getCurrentUserToken(true);
+
+          if (refreshedToken && `Bearer ${refreshedToken}` !== headers["Authorization"]) {
+            headers["Authorization"] = `Bearer ${refreshedToken}`;
+            response = await fetch(url, {
+              ...options,
+              headers,
+              cache: options.cache || "no-store",
+            });
+          }
+        } catch {
+          // Fall through to standard 401 handling
+        }
+      }
 
       const responseCorrelationId =
         response.headers.get("X-Correlation-ID") || correlationId;

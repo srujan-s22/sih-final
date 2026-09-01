@@ -61,6 +61,71 @@ export const SUPPORTED_VOICE_LANGUAGES: readonly SupportedVoiceLanguage[] = [
 ] as const;
 
 /**
+ * Authoritative supported voice languages for UI presentation and validation
+ */
+export const VOICE_LANGUAGE_OPTIONS = [
+  { code: "en-IN" as const, name: "English", nativeName: "English" },
+  { code: "kn-IN" as const, name: "Kannada", nativeName: "ಕನ್ನಡ" },
+  { code: "hi-IN" as const, name: "Hindi", nativeName: "हिन्दी" },
+] as const;
+
+/**
+ * Canonical SwasthyaSetu automated helpline phone numbers
+ */
+export const CANONICAL_HELPLINE_E164 = "+918047283240";
+export const CANONICAL_HELPLINE_DISPLAY = "08047283240";
+
+/**
+ * Normalizes Indian phone numbers into canonical 10-digit format (e.g. 8047283240 or 9876543210)
+ */
+export function normalizeIndianPhoneNumber(raw?: string | null): string {
+  if (!raw) return "";
+  let clean = raw.trim().replace(/[^\d]/g, "");
+  if (clean.length === 12 && clean.startsWith("91")) {
+    clean = clean.slice(2);
+  } else if (clean.length === 11 && clean.startsWith("0")) {
+    clean = clean.slice(1);
+  }
+  return clean;
+}
+
+/**
+ * Normalizes Indian phone numbers into canonical E.164 format (+91XXXXXXXXXX)
+ * Examples:
+ *   "08047283240"    -> "+918047283240"
+ *   "8047283240"     -> "+918047283240"
+ *   "+918047283240"  -> "+918047283240"
+ *   "+91 8047283240" -> "+918047283240"
+ */
+export function toE164IndianPhoneNumber(raw?: string | null): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("+") && !trimmed.startsWith("+91")) {
+    return `+${trimmed.replace(/[^\d]/g, "")}`;
+  }
+  const clean10 = normalizeIndianPhoneNumber(raw);
+  if (clean10.length === 10) {
+    return `+91${clean10}`;
+  }
+  if (clean10.length > 0) {
+    return `+91${clean10}`;
+  }
+  return "";
+}
+
+/**
+ * Formats Indian phone numbers for local display (e.g. 08047283240)
+ */
+export function toDisplayIndianPhoneNumber(raw?: string | null): string {
+  if (!raw) return "";
+  const clean10 = normalizeIndianPhoneNumber(raw);
+  if (clean10.length === 10) {
+    return `0${clean10}`;
+  }
+  return raw.trim();
+}
+
+/**
  * Maps arbitrary UI locales or telephony language codes into authoritative SupportedVoiceLanguage
  * Defaults safely to "en-IN" if unspecified or unsupported.
  */
@@ -207,7 +272,7 @@ export interface VoicePublicConfig {
   displayHelplineText: string;              // Clean formatted text
   isTollFree: boolean;                      // true only if proven toll-free (e.g. 1800)
   supportedLanguages: Array<{
-    code: SupportedVoiceLanguage | string;
+    code: SupportedVoiceLanguage;
     name: string;
     nativeName: string;
   }>;

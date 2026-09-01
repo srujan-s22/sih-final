@@ -93,9 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
           // Sync user profile idempotently on the backend
+          const activeLang = typeof window !== "undefined"
+            ? (localStorage.getItem("swasthyasetu_lang") as "en" | "kn" | "hi" | null)
+            : null;
           const syncRes = await authService.syncUser({
             displayName: currentUser.displayName,
             phoneNumber: currentUser.phoneNumber,
+            preferredLanguage: activeLang || undefined,
           });
 
           if (syncRes.success) {
@@ -110,18 +114,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        apiClient.clearTokenProvider();
-        setUserProfile(null);
-        setIsConsentRequired(false);
+        let restoredDev = false;
+        if (typeof window !== "undefined") {
+          try {
+            const savedDevRole = sessionStorage.getItem("swasthyasetu_dev_role") as UserRole | null;
+            if (savedDevRole && ["CITIZEN", "ASHA", "ADMIN"].includes(savedDevRole)) {
+              const devUid = `dev-${savedDevRole.toLowerCase()}-user`;
+              apiClient.setTokenProvider(async () => `test_token_${devUid}_${savedDevRole.toLowerCase()}`);
+              const activeLang = typeof window !== "undefined"
+                ? (localStorage.getItem("swasthyasetu_lang") as "en" | "kn" | "hi" | null)
+                : null;
+              const syncRes = await authService.syncUser({
+                displayName: `Test ${savedDevRole} User`,
+                preferredLanguage: activeLang || undefined,
+              });
+              if (syncRes.success) {
+                setUserProfile(syncRes.data.user);
+                setIsConsentRequired(syncRes.data.isConsentRequired);
+                restoredDev = true;
+              }
+            }
+          } catch {
+            // Ignore sessionStorage access error
+          }
+        }
+
+        if (!restoredDev) {
+          apiClient.clearTokenProvider();
+          setUserProfile(null);
+          setIsConsentRequired(false);
+        }
         setIsLoading(false);
       }
     });
 
     // Register 401 callback with api client
     apiClient.setUnauthorizedHandler(() => {
-      apiClient.clearTokenProvider();
-      setUserProfile(null);
-      setIsConsentRequired(false);
+      const currentAuth = getClientAuth();
+      if (!currentAuth?.currentUser) {
+        apiClient.clearTokenProvider();
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem("swasthyasetu_dev_role");
+          } catch {
+            // ignore
+          }
+        }
+        setUserProfile(null);
+        setIsConsentRequired(false);
+      }
     });
 
     return () => unsubscribe();
@@ -130,6 +171,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(async (email: string, pass: string) => {
     setIsLoading(true);
     setError(null);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("swasthyasetu_dev_role");
+      } catch {
+        // ignore
+      }
+    }
     apiClient.clearTokenProvider();
     try {
       const firebaseUser = await authSignInWithEmail(email, pass);
@@ -166,6 +214,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       setIsLoading(true);
       setError(null);
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem("swasthyasetu_dev_role");
+        } catch {
+          // ignore
+        }
+      }
       apiClient.clearTokenProvider();
       isExplicitRegistrationActiveRef.current = true;
       let createdFirebaseUser: User | null = null;
@@ -189,9 +244,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(createdFirebaseUser);
 
         // STEP 3: SYNCHRONIZE & ATTACH AUTHORITATIVE ROLE ON BACKEND
+        const activeLang = typeof window !== "undefined"
+          ? (localStorage.getItem("swasthyasetu_lang") as "en" | "kn" | "hi" | null)
+          : null;
         const syncRes = await authService.registerUser({
           displayName: displayName || null,
           requestedRole,
+          preferredLanguage: activeLang || undefined,
           registrationSecret: registrationSecret || null,
         });
 
@@ -229,6 +288,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("swasthyasetu_dev_role");
+      } catch {
+        // ignore
+      }
+    }
     apiClient.clearTokenProvider();
     try {
       await authSignInWithGoogle();
@@ -267,6 +333,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem("swasthyasetu_dev_role");
+        } catch {
+          // ignore
+        }
+      }
       apiClient.clearTokenProvider();
       await authSignOut();
       setUser(null);
@@ -282,6 +355,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchDevIdentity = useCallback(async (devRole: UserRole) => {
     setIsLoading(true);
     try {
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("swasthyasetu_dev_role", devRole);
+        } catch {
+          // ignore
+        }
+      }
       const devUid = `dev-${devRole.toLowerCase()}-user`;
       apiClient.setTokenProvider(async () => `test_token_${devUid}_${devRole.toLowerCase()}`);
       const syncRes = await authService.syncUser({

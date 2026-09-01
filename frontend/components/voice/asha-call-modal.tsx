@@ -7,6 +7,9 @@ import { voiceService } from "@/services/voice-service";
 import {
   VoiceSession,
   CallHistoryItem,
+  SupportedVoiceLanguage,
+  CANONICAL_HELPLINE_E164,
+  toE164IndianPhoneNumber,
   toVoiceLanguage,
 } from "@shared/types/voice";
 import {
@@ -38,10 +41,14 @@ export interface AshaCallModalProps {
   onCallComplete?: () => void;
 }
 
-const DEFAULT_LANGUAGES = [
+const DEFAULT_LANGUAGES: Array<{
+  code: SupportedVoiceLanguage;
+  name: string;
+  nativeName: string;
+}> = [
+  { code: "en-IN", name: "English", nativeName: "English" },
   { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
   { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
-  { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
 import { useTranslation } from "@/i18n/i18n-context";
@@ -413,19 +420,19 @@ export function AshaCallModal({
                     <Languages className="w-3.5 h-3.5 text-teal-700" />
                     Preferred Language for Beneficiary
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {DEFAULT_LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
                         type="button"
                         onClick={() => setLanguage(lang.code)}
-                        className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                        className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
                           language === lang.code
-                            ? "border-teal-700 bg-teal-50 font-bold text-teal-900 ring-1 ring-teal-700"
+                            ? "border-teal-700 bg-teal-50 font-bold text-teal-900 ring-1 ring-teal-700 shadow-2xs"
                             : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                         }`}
                       >
-                        <div className="text-xs font-semibold">{lang.name}</div>
+                        <div className="text-xs font-bold">{lang.name}</div>
                         <div className="text-[11px] text-slate-500">{lang.nativeName}</div>
                       </button>
                     ))}

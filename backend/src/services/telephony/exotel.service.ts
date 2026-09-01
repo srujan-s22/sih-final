@@ -1,5 +1,12 @@
 import { env } from "../../config/env.js";
-import { CallOutcome } from "../../../../shared/types/voice.js";
+import {
+  CallOutcome,
+  CANONICAL_HELPLINE_E164,
+  CANONICAL_HELPLINE_DISPLAY,
+  normalizeIndianPhoneNumber,
+  toE164IndianPhoneNumber,
+  toDisplayIndianPhoneNumber,
+} from "../../../../shared/types/voice.js";
 
 export interface ExotelCallResult {
   callSid: string;
@@ -70,18 +77,12 @@ export class ExotelService {
     isTollFree: boolean;
   } {
     const vn = this.getVirtualNumber();
-    if (vn) {
-      const isTollFree = vn.replace(/[^\d]/g, "").startsWith("1800");
-      return {
-        virtualNumber: vn,
-        displayHelplineText: vn,
-        isTollFree,
-      };
-    }
+    const rawNumber = vn || CANONICAL_HELPLINE_E164;
+    const isTollFree = rawNumber.replace(/[^\d]/g, "").startsWith("1800");
     return {
-      virtualNumber: null,
-      displayHelplineText: "Virtual number provisioning pending",
-      isTollFree: false,
+      virtualNumber: toE164IndianPhoneNumber(rawNumber) || CANONICAL_HELPLINE_E164,
+      displayHelplineText: toDisplayIndianPhoneNumber(rawNumber) || CANONICAL_HELPLINE_DISPLAY,
+      isTollFree,
     };
   }
 
@@ -89,14 +90,14 @@ export class ExotelService {
    * Normalizes Indian phone numbers into canonical 10-digit format for validation
    */
   public normalizeIndianPhoneNumber(raw: string): string {
-    if (!raw) return "";
-    let clean = raw.replace(/[^\d]/g, "");
-    if (clean.length === 12 && clean.startsWith("91")) {
-      clean = clean.slice(2);
-    } else if (clean.length === 11 && clean.startsWith("0")) {
-      clean = clean.slice(1);
-    }
-    return clean;
+    return normalizeIndianPhoneNumber(raw);
+  }
+
+  /**
+   * Normalizes Indian phone numbers into canonical E.164 format (+91XXXXXXXXXX)
+   */
+  public toE164IndianPhoneNumber(raw: string): string {
+    return toE164IndianPhoneNumber(raw);
   }
 
   /**
@@ -195,7 +196,7 @@ export class ExotelService {
     const url = `${this.baseUrl}/v1/Accounts/${this.accountSid}/Calls/connect.json`;
 
     try {
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: authHeader,
@@ -203,6 +204,26 @@ export class ExotelService {
         },
         body: formData.toString(),
       });
+
+      // If provider returns 401, attempt inverted key:token once as a fallback recovery
+      if (response.status === 401 && this.apiKey !== this.apiToken) {
+        const altAuthHeader = "Basic " + Buffer.from(`${this.apiToken}:${this.apiKey}`).toString("base64");
+        try {
+          const altResponse = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: altAuthHeader,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: formData.toString(),
+          });
+          if (altResponse.status !== 401) {
+            response = altResponse;
+          }
+        } catch {
+          // Fall through to normal error handling
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");

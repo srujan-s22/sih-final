@@ -77,6 +77,25 @@ export class VoiceSessionRepository extends BaseFirestoreRepository<VoiceSession
     }
   }
 
+  public async getRecentSessionByCallerHash(callerNumberHash: string): Promise<VoiceSession | null> {
+    for (const session of this.memoryStore.values()) {
+      if (session.callerNumberHash === callerNumberHash) {
+        return { ...session };
+      }
+    }
+    try {
+      const snapshot = await this.getCollection()
+        .where("callerNumberHash", "==", callerNumberHash)
+        .orderBy("createdAt", "desc")
+        .limit(1)
+        .get();
+      if (snapshot.empty) return null;
+      return snapshot.docs[0].data() as VoiceSession;
+    } catch {
+      return null;
+    }
+  }
+
   public async updateSession(
     sessionId: string,
     updates: Partial<VoiceSession>

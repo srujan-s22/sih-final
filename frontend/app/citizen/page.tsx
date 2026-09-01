@@ -104,7 +104,7 @@ const ASSISTANCE_CATEGORIES: Array<{ value: AssistanceCategory; label: string }>
 ];
 
 export default function CitizenPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, isLoading: authLoading, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("overview");
 
@@ -277,6 +277,9 @@ export default function CitizenPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || userProfile?.role !== "CITIZEN") {
+      return;
+    }
     loadHouseholdData();
     loadConnectionStatus();
     loadAssistanceRequests();
@@ -285,7 +288,7 @@ export default function CitizenPage() {
         setVoiceConfig(res.data);
       }
     });
-  }, [loadHouseholdData, loadConnectionStatus, loadAssistanceRequests]);
+  }, [authLoading, isAuthenticated, userProfile?.role, loadHouseholdData, loadConnectionStatus, loadAssistanceRequests]);
 
   // Handle Household Form Submit
   const handleHouseholdSubmit = async (e: React.FormEvent) => {
@@ -1172,9 +1175,12 @@ export default function CitizenPage() {
                             <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block">
                               {voiceConfig?.isTollFree ? "Toll-Free Helpline" : "Helpline Number"}
                             </span>
-                            <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 tracking-wider">
+                            <a
+                              href={`tel:${voiceConfig?.virtualNumber || "+918047283240"}`}
+                              className="font-mono text-xs sm:text-sm font-bold text-slate-900 tracking-wider hover:text-teal-800 transition-colors"
+                            >
                               {voiceConfig?.displayHelplineText || "08047283240"}
-                            </span>
+                            </a>
                           </div>
                         </div>
                       </div>

@@ -36,6 +36,7 @@ export const authService = {
   async syncUser(metadata?: {
     displayName?: string | null;
     phoneNumber?: string | null;
+    preferredLanguage?: "en" | "kn" | "hi" | null;
     requestedRole?: UserRole;
     registrationSecret?: string | null;
   }): Promise<ApiResult<AuthSyncResponse>> {
@@ -48,6 +49,7 @@ export const authService = {
   async registerUser(payload: {
     displayName?: string | null;
     phoneNumber?: string | null;
+    preferredLanguage?: "en" | "kn" | "hi" | null;
     requestedRole?: UserRole;
     registrationSecret?: string | null;
   }): Promise<ApiResult<AuthSyncResponse>> {

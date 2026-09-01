@@ -9,6 +9,11 @@ import {
   VoiceSession,
   VoicePublicConfig,
   CallHistoryItem,
+  SupportedVoiceLanguage,
+  CANONICAL_HELPLINE_E164,
+  CANONICAL_HELPLINE_DISPLAY,
+  toE164IndianPhoneNumber,
+  toDisplayIndianPhoneNumber,
   toVoiceLanguage,
 } from "@shared/types/voice";
 import {
@@ -41,10 +46,14 @@ const QUICK_REASONS = [
   "Coordinate Doorstep ASHA Worker Visit",
 ];
 
-const DEFAULT_LANGUAGES = [
+const DEFAULT_LANGUAGES: Array<{
+  code: SupportedVoiceLanguage;
+  name: string;
+  nativeName: string;
+}> = [
+  { code: "en-IN", name: "English", nativeName: "English" },
   { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
   { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
-  { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
 import { useTranslation } from "@/i18n/i18n-context";
@@ -220,7 +229,16 @@ export function CitizenCallModal({
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const supportedLangs = config?.supportedLanguages || DEFAULT_LANGUAGES;
+  const allowedCodes = new Set<SupportedVoiceLanguage>(["en-IN", "kn-IN", "hi-IN"]);
+  const supportedLangs = (config?.supportedLanguages && config.supportedLanguages.length > 0
+    ? config.supportedLanguages.filter((l): l is { code: SupportedVoiceLanguage; name: string; nativeName: string } =>
+        allowedCodes.has(l.code as SupportedVoiceLanguage)
+      )
+    : DEFAULT_LANGUAGES
+  ).sort((a, b) => {
+    const order = ["en-IN", "kn-IN", "hi-IN"];
+    return order.indexOf(a.code) - order.indexOf(b.code);
+  });
 
   return (
     <Modal
@@ -291,7 +309,12 @@ export function CitizenCallModal({
                   You can also dial our central helpline directly from any phone:
                 </p>
                 <p className="font-mono font-bold text-emerald-900 text-xs pt-0.5">
-                  {config?.displayHelplineText || "Helpline number will be assigned upon provisioning"}
+                  <a
+                    href={`tel:${toE164IndianPhoneNumber(config?.virtualNumber || CANONICAL_HELPLINE_E164)}`}
+                    className="hover:underline"
+                  >
+                    {config?.displayHelplineText || CANONICAL_HELPLINE_DISPLAY}
+                  </a>
                 </p>
               </div>
             </div>
@@ -407,21 +430,19 @@ export function CitizenCallModal({
                   </div>
                 </div>
 
-                {config?.virtualNumber && (
-                  <div className="rounded-lg bg-white/90 border border-rose-200 p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                    <div>
-                      <span className="font-semibold text-slate-800 block">Alternative Option:</span>
-                      <span className="text-slate-600 text-[11px]">Dial our direct automated helpline from your phone:</span>
-                    </div>
-                    <a
-                      href={`tel:${config.virtualNumber.replace(/\D/g, "")}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-mono font-bold text-xs shrink-0 transition-colors"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>{config.virtualNumber}</span>
-                    </a>
+                <div className="rounded-lg bg-white/90 border border-rose-200 p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-800 block">Direct Helpline Option:</span>
+                    <span className="text-slate-600 text-[11px]">Dial our direct automated helpline from your phone:</span>
                   </div>
-                )}
+                  <a
+                    href={`tel:${toE164IndianPhoneNumber(config?.virtualNumber || CANONICAL_HELPLINE_E164)}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-mono font-bold text-xs shrink-0 transition-colors"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>{config?.virtualNumber ? toE164IndianPhoneNumber(config.virtualNumber) : CANONICAL_HELPLINE_E164}</span>
+                  </a>
+                </div>
 
                 <div className="pt-1 flex flex-wrap justify-end gap-2">
                   <Button
@@ -488,19 +509,19 @@ export function CitizenCallModal({
                     <Languages className="w-3.5 h-3.5 text-teal-700" />
                     Spoken Language / भाषा
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {supportedLangs.map((lang) => (
                       <button
                         key={lang.code}
                         type="button"
                         onClick={() => setLanguage(lang.code)}
-                        className={`p-2 rounded-lg border text-left text-xs transition-all ${
+                        className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
                           language === lang.code
-                            ? "border-emerald-600 bg-emerald-50/80 font-bold text-emerald-900 ring-1 ring-emerald-600"
+                            ? "border-emerald-600 bg-emerald-50/80 font-bold text-emerald-900 ring-1 ring-emerald-600 shadow-2xs"
                             : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                         }`}
                       >
-                        <div className="text-xs font-semibold">{lang.name}</div>
+                        <div className="text-xs font-bold">{lang.name}</div>
                         <div className="text-[11px] text-slate-500">{lang.nativeName}</div>
                       </button>
                     ))}

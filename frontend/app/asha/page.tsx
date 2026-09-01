@@ -69,7 +69,7 @@ import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-ass
 import { AshaCallModal } from "@/components/voice/asha-call-modal";
 
 export default function AshaWorkspacePage() {
-  const { userProfile } = useAuth();
+  const { userProfile, isLoading: authLoading, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("overview");
   const [isLoading, setIsLoading] = useState(true);
@@ -260,12 +260,15 @@ export default function AshaWorkspacePage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || (userProfile?.role !== "ASHA" && userProfile?.role !== "ADMIN")) {
+      return;
+    }
     loadCaseload();
     loadFollowUps();
     loadAttentionSignals();
     loadPendingRequests();
     loadAssistanceRequests();
-  }, [loadCaseload, loadFollowUps, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
+  }, [authLoading, isAuthenticated, userProfile?.role, loadCaseload, loadFollowUps, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
 
   // Handle Proactive Scheme Initiation
   const handleInitiateScheme = async (

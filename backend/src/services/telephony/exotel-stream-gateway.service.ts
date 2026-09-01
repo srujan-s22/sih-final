@@ -12,6 +12,7 @@ import {
   ExotelStreamOutboundMarkMessage,
   ExotelStreamOutboundClearMessage,
   ExotelStreamMediaFormat,
+  SupportedVoiceLanguage,
   toVoiceLanguage,
 } from "../../../../shared/types/voice.js";
 import { ExotelStreamInboundMessageSchema } from "../../../../shared/schemas/voice.schema.js";
@@ -185,6 +186,10 @@ export class ExotelStreamGatewayService {
         await this.handleStopEvent(socket, context);
         break;
 
+      case "dtmf":
+        await this.handleDtmfEvent(socket, context, event);
+        break;
+
       case "mark":
         // Mark acknowledged
         break;
@@ -233,9 +238,9 @@ export class ExotelStreamGatewayService {
       event.customParameters ||
       {};
 
-    // Authoritative Precedence:
+    // Authoritative Precedence (Sections 7 & 9):
     // 1. If an existing VoiceSession exists for callSid (e.g. initiated from website), KEEP session.language
-    // 2. Otherwise, check Exotel start metadata (customParameters.language or startData.language)
+    // 2. If inbound PSTN call with no session, resolve language via resolveInboundVoiceLanguage(callerPhone, metadataLang)
     // 3. Fallback safely to "en-IN"
     let session = callSid ? await this.sessionRepository.getSessionByCallSid(callSid) : null;
     let resolvedLanguage: string = "en-IN";
@@ -243,11 +248,17 @@ export class ExotelStreamGatewayService {
     if (session && session.language) {
       resolvedLanguage = toVoiceLanguage(session.language);
     } else {
+      const callerPhone =
+        customParams?.callerPhone ||
+        customParams?.From ||
+        startData?.from ||
+        event?.from ||
+        "";
       const rawExotelLang =
         customParams?.language ||
         startData?.language ||
         event?.language;
-      resolvedLanguage = toVoiceLanguage(rawExotelLang || env.VOICE_LANGUAGE || "en-IN");
+      resolvedLanguage = await this.gatewayService.resolveInboundVoiceLanguage(callerPhone, rawExotelLang);
     }
 
     context.language = resolvedLanguage;
@@ -260,12 +271,17 @@ export class ExotelStreamGatewayService {
     if (callSid) {
       if (!session) {
         // Inbound call direct into stream applet
-        const callerPhone = customParams?.callerPhone || "+919876543210";
+        const callerPhone =
+          customParams?.callerPhone ||
+          customParams?.From ||
+          startData?.from ||
+          event?.from ||
+          "+919876543210";
         session = await this.gatewayService.createInboundSession(callerPhone, callSid, resolvedLanguage);
       }
       context.session = session;
       context.sessionId = session.id;
-      context.language = resolvedLanguage;
+      context.language = toVoiceLanguage(session.language);
     }
 
     console.log("▶️ [ExotelStreamGateway] Exotel 'start' event bound", {
@@ -276,6 +292,33 @@ export class ExotelStreamGatewayService {
       encoding: context.mediaFormat.encoding,
       sampleRate: context.mediaFormat.sampleRate,
     });
+  }
+
+  /**
+   * Handles Exotel 'dtmf' event: processes caller keypresses for IVR language selection
+   * 1 -> en-IN
+   * 2 -> kn-IN
+   * 3 -> hi-IN
+   */
+  public async handleDtmfEvent(
+    _socket: WebSocket,
+    context: StreamSessionContext,
+    event: any
+  ): Promise<void> {
+    const rawDigit = String(event.dtmf?.digit || event.digit || event.dtmf?.Digit || "").trim();
+    let newLang: SupportedVoiceLanguage | null = null;
+    if (rawDigit === "1") newLang = "en-IN";
+    else if (rawDigit === "2") newLang = "kn-IN";
+    else if (rawDigit === "3") newLang = "hi-IN";
+
+    if (newLang) {
+      context.language = newLang;
+      if (context.session) {
+        context.session.language = newLang;
+        await this.sessionRepository.updateSession(context.session.id, { language: newLang });
+      }
+      console.log(`🔤 [ExotelStreamGateway] Language switched via DTMF '${rawDigit}' to ${newLang}`);
+    }
   }
 
   /**

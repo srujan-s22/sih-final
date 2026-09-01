@@ -69,7 +69,7 @@ interface AshaWorkerSummary {
 }
 
 export default function AdminPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, isLoading: authLoading, isAuthenticated } = useAuth();
   const { t } = useTranslation();
 
   // --- Core Telemetry & Data State ---
@@ -227,14 +227,20 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || userProfile?.role !== "ADMIN") {
+      return;
+    }
     loadAdminData();
-  }, [loadAdminData]);
+  }, [authLoading, isAuthenticated, userProfile?.role, loadAdminData]);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || userProfile?.role !== "ADMIN") {
+      return;
+    }
     if (selectedSchemeId) {
       loadSchemeEvidence(selectedSchemeId);
     }
-  }, [selectedSchemeId, loadSchemeEvidence]);
+  }, [authLoading, isAuthenticated, userProfile?.role, selectedSchemeId, loadSchemeEvidence]);
 
   // ============================================================================
   // SINGLE SOURCE OF TRUTH: UNIFIED METRICS & STATE DERIVATIONS

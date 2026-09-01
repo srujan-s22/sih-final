@@ -23,6 +23,7 @@ export const RolePrevalidateSchema = z.object({
 export const UserSyncSchema = z.object({
   displayName: z.string().max(100).optional().nullable(),
   phoneNumber: z.string().max(20).optional().nullable(),
+  preferredLanguage: z.enum(["en", "kn", "hi"]).optional().nullable(),
   requestedRole: UserRoleSchema.optional().nullable(),
   registrationSecret: z.string().max(256).optional().nullable(),
 });
@@ -30,6 +31,7 @@ export const UserSyncSchema = z.object({
 export const UserRegisterSchema = z.object({
   displayName: z.string().max(100).optional().nullable(),
   phoneNumber: z.string().max(20).optional().nullable(),
+  preferredLanguage: z.enum(["en", "kn", "hi"]).optional().nullable(),
   requestedRole: UserRoleSchema.optional().nullable(),
   registrationSecret: z.string().max(256).optional().nullable(),
 });
