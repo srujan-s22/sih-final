@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n/i18n-context";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
+  closeText?: string;
 }
 
 export function Modal({
@@ -23,7 +25,9 @@ export function Modal({
   children,
   footer,
   className,
+  closeText,
 }: ModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -109,7 +113,7 @@ export function Modal({
         ) : (
           <div className="flex items-center justify-end border-t border-slate-100 p-3 sm:p-3.5 bg-slate-50/50 flex-shrink-0">
             <Button variant="secondary" size="sm" onClick={onClose} className="cursor-pointer">
-              Close
+              {closeText || t("common.close")}
             </Button>
           </div>
         )}

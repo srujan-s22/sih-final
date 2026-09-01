@@ -70,15 +70,15 @@ export default function SignInPage() {
     setErrorMessage(null);
 
     if (!email || !password) {
-      setErrorMessage("Please enter both email and password.");
+      setErrorMessage(t("auth.enterEmailAndPassword"));
       return;
     }
 
     if (mode === "signup" && requestedRole !== "CITIZEN" && !registrationSecret) {
       setErrorMessage(
         requestedRole === "ASHA"
-          ? "Please enter your ASHA registration code."
-          : "Please enter your Admin registration code."
+          ? t("auth.enterAshaCode")
+          : t("auth.enterAdminCode")
       );
       return;
     }

@@ -888,7 +888,7 @@ export default function AdminPage() {
                     <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-0.5">
                       <span className="text-[10px] text-slate-500 font-semibold block uppercase">{t("citizen.voiceCallBtn")}</span>
                       <span className={`text-xs font-bold flex items-center gap-1 ${voiceTelemetry?.sarvamConfigured ? "text-emerald-800" : "text-amber-800"}`}>
-                        <CheckCircle2 className="w-3 h-3" /> {voiceTelemetry?.sarvamConfigured ? "Sarvam saaras:v2" : "Local Engine"}
+                        <CheckCircle2 className="w-3 h-3" /> {voiceTelemetry?.sarvamConfigured ? "Sarvam saaras:v3" : "Local Engine"}
                       </span>
                     </div>
 
@@ -1703,7 +1703,7 @@ export default function AdminPage() {
                         Sarvam STT / TTS
                       </span>
                       <p className={`text-base font-bold ${voiceTelemetry?.sarvamConfigured ? "text-emerald-700" : "text-amber-700"}`}>
-                        {voiceTelemetry?.sarvamConfigured ? "Active (saaras:v2)" : "Local Engine"}
+                        {voiceTelemetry?.sarvamConfigured ? "Active (saaras:v3)" : "Local Engine"}
                       </p>
                       <p className="text-[11px] text-slate-400">{t("citizen.voiceCallBtn")}</p>
                     </div>

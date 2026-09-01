@@ -1369,7 +1369,7 @@ export default function AshaWorkspacePage() {
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                     <input
                       type="text"
-                      placeholder="Search households by head name, district, village, or case ID..."
+                      placeholder={t("asha.searchPlaceholder")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
@@ -1382,7 +1382,7 @@ export default function AshaWorkspacePage() {
                       className="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white font-medium text-slate-700"
                     >
                       <option value="ALL">{t("common.all")}</option>
-                      <option value="NEW">New</option>
+                      <option value="NEW">{t("status.new")}</option>
                       <option value="ACTIVE">{t("common.active")}</option>
                       <option value="NEEDS_ATTENTION">{t("status.action_required")}</option>
                       <option value="FOLLOW_UP">{t("navigation.followUps")}</option>
@@ -1408,9 +1408,9 @@ export default function AshaWorkspacePage() {
                 {filteredCases.length === 0 ? (
                   <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-2">
                     <Users className="w-9 h-9 text-slate-300 mx-auto mb-1" />
-                    <h3 className="text-sm font-bold text-slate-800">{t("citizen.noSchemesMessage")}</h3>
+                    <h3 className="text-sm font-bold text-slate-800">{t("asha.noCasesFound")}</h3>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      {t("citizen.noSchemesMessage")}
+                      {t("asha.myCaseloadDesc")}
                     </p>
                   </div>
                 ) : (
@@ -1893,9 +1893,9 @@ export default function AshaWorkspacePage() {
                 ) : attentionSignals.length === 0 ? (
                   <div className="py-16 text-center bg-white rounded-xl border border-slate-200 shadow-2xs p-6 space-y-1">
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-1 opacity-80" />
-                    <p className="text-sm font-bold text-slate-800">{t("status.completed")}</p>
+                    <p className="text-sm font-bold text-slate-800">{t("asha.noAttentionSignals")}</p>
                     <p className="text-xs text-slate-500">
-                      {t("citizen.portalSubtitle")}
+                      {t("asha.noAttentionSignalsDesc")}
                     </p>
                   </div>
                 ) : (
@@ -2009,11 +2009,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">{t("status.pending")}</span>
+                      <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">{t("status.due_today")}</span>
                       <Calendar className="w-4 h-4 text-amber-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-amber-950 mt-1">{dueTodayFollowUpsCount}</p>
-                    <p className="text-[11px] text-amber-700 mt-0.5">{t("status.pending")}</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">{t("status.due_today")}</p>
                   </div>
 
                   <div
@@ -2025,11 +2025,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">{t("status.urgent")}</span>
+                      <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">{t("status.overdue")}</span>
                       <AlertTriangle className="w-4 h-4 text-rose-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-rose-950 mt-1">{overdueFollowUpsCount}</p>
-                    <p className="text-[11px] text-rose-700 mt-0.5">{t("status.urgent")}</p>
+                    <p className="text-[11px] text-rose-700 mt-0.5">{t("status.overdue")}</p>
                   </div>
 
                   <div
@@ -2041,11 +2041,11 @@ export default function AshaWorkspacePage() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">{t("common.pending")}</span>
+                      <span className="text-xs font-bold text-sky-800 uppercase tracking-wider">{t("common.upcoming")}</span>
                       <Clock className="w-4 h-4 text-sky-600" />
                     </div>
                     <p className="text-2xl font-extrabold text-sky-950 mt-1">{upcomingFollowUpsCount}</p>
-                    <p className="text-[11px] text-sky-700 mt-0.5">{t("common.pending")}</p>
+                    <p className="text-[11px] text-sky-700 mt-0.5">{t("common.upcoming")}</p>
                   </div>
 
                   <div

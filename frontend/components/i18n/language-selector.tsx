@@ -16,7 +16,7 @@ export function LanguageSelector({
   size = "sm",
   className = "",
 }: LanguageSelectorProps) {
-  const { language, setLanguage, languages } = useTranslation();
+  const { language, setLanguage, languages, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +102,7 @@ export function LanguageSelector({
           className="absolute right-0 mt-1.5 w-40 rounded-xl bg-white shadow-lg border border-slate-200 py-1.5 z-50 animate-in fade-in-50 zoom-in-95 duration-100"
         >
           <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-100 mb-1">
-            Select Language
+            {t("common.selectLanguageTitle")}
           </div>
           {SUPPORTED_LANGUAGES.map((l) => {
             const isSelected = language === l.code;

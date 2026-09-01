@@ -1726,32 +1726,50 @@ export default function CitizenPage() {
                         const isPmjay = req.schemeId === "ab-pmjay";
                         const isJsy = req.schemeId === "jsy";
 
+                        const getCategoryLabel = (category: string) => {
+                          switch (category) {
+                            case "SCHEME_ENROLLMENT":
+                              return t("citizen.categorySchemeEnrollment");
+                            case "DOCUMENT_HELP":
+                              return t("citizen.categoryDocHelp");
+                            case "FACILITY_ACCESS":
+                              return t("citizen.categoryFacilityAccess");
+                            case "ELIGIBILITY_CLARIFICATION":
+                              return t("citizen.categoryEligibilityClarification");
+                            case "FOLLOW_UP":
+                              return t("citizen.categoryFollowUp");
+                            case "OTHER":
+                            default:
+                              return t("citizen.categoryOther");
+                          }
+                        };
+
                         const steps = isPmjay
                           ? [
-                              "Eligibility Identified",
-                              "Identity Confirmed",
-                              "e-KYC & Enrollment",
-                              "Application Submitted",
-                              "Card Issued",
-                              "Hospital Access",
-                              "Resolved",
+                              t("citizen.stepEligibilityIdentified"),
+                              t("citizen.stepIdentityConfirmed"),
+                              t("citizen.stepEkycEnrollment"),
+                              t("citizen.stepAppSubmitted"),
+                              t("citizen.stepCardIssued"),
+                              t("citizen.stepHospitalAccess"),
+                              t("citizen.stepResolved"),
                             ]
                           : isJsy
                           ? [
-                              "Pregnancy Confirmed",
-                              "Eligibility Verified",
-                              "MCP Card Registration",
-                              "Facility Mapped",
-                              "Delivery Care",
-                              "Postnatal Care",
-                              "DBT Transfer",
-                              "Resolved",
+                              t("citizen.stepPregnancyConfirmed"),
+                              t("citizen.stepIdentityConfirmed"),
+                              t("citizen.stepMcpRegistration"),
+                              t("citizen.stepFacilityMapped"),
+                              t("citizen.stepDeliveryCare"),
+                              t("citizen.stepPostnatalCare"),
+                              t("citizen.stepDbtTransfer"),
+                              t("citizen.stepResolved"),
                             ]
                           : [
-                              "Request Submitted",
-                              "ASHA Accepted",
-                              "Doorstep Assistance",
-                              "Resolved",
+                              t("citizen.stepRequestSubmitted"),
+                              t("citizen.stepAshaAccepted"),
+                              t("citizen.stepDoorstepHelp"),
+                              t("citizen.stepResolved"),
                             ];
 
                         const currentStepIndex = isResolved
@@ -1780,11 +1798,11 @@ export default function CitizenPage() {
                                 {req.initiatedBy === "ASHA" ? (
                                   <span className="text-xs font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1.5">
                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                                    <span>Doorstep Help from {req.ashaName || "ASHA"}</span>
+                                    <span>{t("citizen.doorstepHelpFrom", { name: req.ashaName || "ASHA" })}</span>
                                   </span>
                                 ) : (
                                   <span className="text-xs font-semibold text-teal-900 bg-teal-50 px-2.5 py-0.5 rounded border border-teal-200">
-                                    {req.category.replace(/_/g, " ")}
+                                    {getCategoryLabel(req.category)}
                                   </span>
                                 )}
                                 {req.schemeName && (
@@ -1812,14 +1830,14 @@ export default function CitizenPage() {
                                   }`}
                                 >
                                   {isResolved
-                                    ? "✓ Completed"
+                                    ? `✓ ${t("status.completed")}`
                                     : isDeclined
-                                    ? "✕ Declined"
+                                    ? `✕ ${t("status.declined")}`
                                     : req.status === "ACCEPTED"
-                                    ? "✓ In Progress"
+                                    ? `✓ ${t("status.in_progress")}`
                                     : req.status === "IN_PROGRESS"
-                                    ? "● In Progress"
-                                    : "⏳ Awaiting Review"}
+                                    ? `● ${t("status.in_progress")}`
+                                    : `⏳ ${t("citizen.awaitingReviewBadge")}`}
                                 </span>
                                 <span className="text-[11px] text-slate-400 font-mono">
                                   {new Date(req.createdAt).toLocaleDateString()}
@@ -1830,7 +1848,7 @@ export default function CitizenPage() {
                             <div className="space-y-2 text-xs">
                               <p className="text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
                                 <span className="font-bold text-slate-500 block text-[10px] uppercase mb-0.5">
-                                  {req.initiatedBy === "ASHA" ? "ASHA Note:" : "Your Request:"}
+                                  {req.initiatedBy === "ASHA" ? t("citizen.ashaNoteLabel") : t("citizen.yourRequestLabel")}
                                 </span>
                                 {req.message}
                               </p>
@@ -1838,7 +1856,7 @@ export default function CitizenPage() {
                               {/* Simple Step Progress Indicator */}
                               <div className="mt-3 pt-2 border-t border-slate-100">
                                 <span className="text-[11px] font-semibold text-slate-600 block mb-2">
-                                  Assistance Progress:
+                                  {t("citizen.stepGuideTitle")}:
                                 </span>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                                   {steps.map((stepName, sIdx) => {

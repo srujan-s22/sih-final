@@ -134,15 +134,15 @@ export default function HomePage() {
               <div className="pt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500 font-medium">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-teal-700" />
-                  <span>Free public service</span>
+                  <span>{t("home.trustFreeService")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-teal-700" />
-                  <span>Privacy-first & consent-based</span>
+                  <span>{t("home.trustPrivacyFirst")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-teal-700" />
-                  <span>Verified government criteria</span>
+                  <span>{t("home.trustVerifiedGovt")}</span>
                 </div>
               </div>
             </div>
@@ -159,10 +159,10 @@ export default function HomePage() {
                       </div>
                       <div>
                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                          Sample Family Check
+                          {t("home.sampleFamilyCheck")}
                         </span>
                         <h4 className="text-sm font-bold text-slate-900">
-                          Sharma Family (4 Members)
+                          {t("home.sampleFamilyMembers")}
                         </h4>
                       </div>
                     </div>
