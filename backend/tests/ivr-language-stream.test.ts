@@ -9,6 +9,7 @@ import { VoiceGatewayService } from "../src/services/telephony/voice-gateway.ser
 import { ExotelStreamGatewayService } from "../src/services/telephony/exotel-stream-gateway.service.js";
 import { linear16ToMulaw } from "../src/services/telephony/audio-codec.js";
 import { toVoiceLanguage } from "../../shared/types/voice.js";
+import { VoiceResponseFormatter } from "../src/services/telephony/voice-response-formatter.js";
 
 describe("Exotel IVR → Language Selection → WebSocket Stream Transition", () => {
   let app: FastifyInstance;
@@ -25,6 +26,7 @@ describe("Exotel IVR → Language Selection → WebSocket Stream Transition", ()
 
     sessionRepo = app.voiceSessionRepository;
     sarvamService = app.sarvamService;
+    gatewayService = app.voiceGatewayService;
 
     // Spy on Sarvam STT and TTS to track language arguments
     vi.spyOn(sarvamService, "speechToText").mockImplementation(async (_audio, lang) => {
@@ -463,5 +465,141 @@ describe("Exotel IVR → Language Selection → WebSocket Stream Transition", ()
     expect(toVoiceLanguage("unknown")).toBe("en-IN");
     expect(toVoiceLanguage(null)).toBe("en-IN");
     expect(toVoiceLanguage(undefined)).toBe("en-IN");
+  });
+
+  // 11. Spoken Initial Greeting in Kannada (IVR 2 -> kn-IN)
+  it("Initial Greeting: plays localized Kannada greeting on connect and streams audio frames once", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/api/v1/voice/stream?language=kn-IN`);
+    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
+
+    const receivedMessages: any[] = [];
+    ws.on("message", (data) => {
+      try {
+        receivedMessages.push(JSON.parse(data.toString()));
+      } catch {
+        // non-json
+      }
+    });
+
+    ws.send(JSON.stringify({ event: "connected", protocol: "Call", version: "1.0.0" }));
+    ws.send(JSON.stringify({
+      event: "start",
+      start: {
+        streamSid: "stream_greeting_kn",
+        callSid: "call_greeting_kn",
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+      },
+      streamSid: "stream_greeting_kn",
+    }));
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Verify initial greeting was requested from Sarvam TTS with Kannada text & kn-IN code
+    const expectedKnGreeting = VoiceResponseFormatter.getGreeting("kn-IN");
+    expect(sarvamService.textToSpeech).toHaveBeenCalledWith(expectedKnGreeting, "kn-IN");
+
+    // Verify media frames and mark message were received on the client socket
+    const mediaMsgs = receivedMessages.filter((m) => m.event === "media");
+    const markMsgs = receivedMessages.filter((m) => m.event === "mark");
+    expect(mediaMsgs.length).toBeGreaterThan(0);
+    expect(markMsgs.some((m) => m.mark?.name === "initial_greeting")).toBe(true);
+
+    const callCountAfterStart = (sarvamService.textToSpeech as any).mock.calls.length;
+
+    // Send a silent audio chunk to ensure greeting does NOT re-trigger on media chunks
+    ws.send(JSON.stringify({
+      event: "media",
+      streamSid: "stream_greeting_kn",
+      media: { payload: Buffer.alloc(160, 0xff).toString("base64") },
+    }));
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Greeting must happen exactly once
+    expect((sarvamService.textToSpeech as any).mock.calls.length).toBe(callCountAfterStart);
+
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    ws.close();
+  });
+
+  // 12. Spoken Initial Greeting in Hindi (IVR 3 -> hi-IN)
+  it("Initial Greeting: plays localized Hindi greeting on connect and streams audio frames", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${serverPort}/api/v1/voice/stream?language=hi-IN`);
+    await new Promise<void>((resolve) => ws.on("open", () => resolve()));
+
+    const receivedMessages: any[] = [];
+    ws.on("message", (data) => {
+      try {
+        receivedMessages.push(JSON.parse(data.toString()));
+      } catch {
+        // non-json
+      }
+    });
+
+    ws.send(JSON.stringify({
+      event: "start",
+      start: {
+        streamSid: "stream_greeting_hi",
+        callSid: "call_greeting_hi",
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+      },
+      streamSid: "stream_greeting_hi",
+    }));
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Verify initial greeting was requested from Sarvam TTS with Hindi text & hi-IN code
+    const expectedHiGreeting = VoiceResponseFormatter.getGreeting("hi-IN");
+    expect(sarvamService.textToSpeech).toHaveBeenCalledWith(expectedHiGreeting, "hi-IN");
+
+    const markMsgs = receivedMessages.filter((m) => m.event === "mark");
+    expect(markMsgs.some((m) => m.mark?.name === "initial_greeting")).toBe(true);
+
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    ws.close();
+  });
+
+  // 13. Assistant UNKNOWN Intent Localized Response
+  it("Localized Fallback: UNKNOWN intent returns natural localized response in caller language", async () => {
+    // 1. Kannada session
+    const knSession = await gatewayService.createInboundSession(
+      "+919876543210",
+      "call_kn_test_13",
+      "kn-IN"
+    );
+    const knTurn = await gatewayService.processTurn(knSession.id, {
+      transcript: "ಅಸ್ಪಷ್ಟ ಶಬ್ದಗಳು ಮತ್ತು ಅರ್ಥವಾಗದ ಮಾತು",
+      languageCode: "kn-IN",
+    });
+    expect(knTurn.detectedIntent).toBe("UNKNOWN");
+    expect(knTurn.textResponse).toBe(VoiceResponseFormatter.getDefaultFallbackPrompt("kn-IN"));
+    expect(knTurn.textResponse).toContain("ಕ್ಷಮಿಸಿ");
+
+    // 2. Hindi session
+    const hiSession = await gatewayService.createInboundSession(
+      "+919876543211",
+      "call_hi_test_13",
+      "hi-IN"
+    );
+    const hiTurn = await gatewayService.processTurn(hiSession.id, {
+      transcript: "अजीब बात जो समझ नहीं आती",
+      languageCode: "hi-IN",
+    });
+    expect(hiTurn.detectedIntent).toBe("UNKNOWN");
+    expect(hiTurn.textResponse).toBe(VoiceResponseFormatter.getDefaultFallbackPrompt("hi-IN"));
+    expect(hiTurn.textResponse).toContain("क्षमा करें");
+
+    // 3. English session
+    const enSession = await gatewayService.createInboundSession(
+      "+919876543212",
+      "call_en_test_13",
+      "en-IN"
+    );
+    const enTurn = await gatewayService.processTurn(enSession.id, {
+      transcript: "gibberish completely unrecognized word string",
+      languageCode: "en-IN",
+    });
+    expect(enTurn.detectedIntent).toBe("UNKNOWN");
+    expect(enTurn.textResponse).toBe(VoiceResponseFormatter.getDefaultFallbackPrompt("en-IN"));
+    expect(enTurn.textResponse).toContain("I'm sorry");
   });
 });

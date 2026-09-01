@@ -56,6 +56,8 @@ export interface StreamSessionContext {
   turnSilenceChunks: number;
   turnTotalChunks: number;
   isProcessingTurn: boolean;
+  isPlayingGreeting: boolean;
+  initialGreetingSent: boolean;
   isStopped: boolean;
 }
 
@@ -138,6 +140,8 @@ export class ExotelStreamGatewayService {
       turnSilenceChunks: 0,
       turnTotalChunks: 0,
       isProcessingTurn: false,
+      isPlayingGreeting: false,
+      initialGreetingSent: false,
       isStopped: false,
     };
 
@@ -348,15 +352,20 @@ export class ExotelStreamGatewayService {
       context.language = toVoiceLanguage(session.language);
     }
 
-    console.log("▶️ [ExotelStreamGateway] Exotel 'start' event bound", {
+    console.log("▶️ [ExotelStreamGateway] Voice session initialized", {
       streamSid: context.streamSid,
       callSid: context.callSid,
       sessionId: context.sessionId,
       language: context.language,
-      languageSource: context.languageSource,
+      source: context.languageSource,
       encoding: context.mediaFormat.encoding,
       sampleRate: context.mediaFormat.sampleRate,
     });
+
+    // Send localized initial Voicebot spoken greeting (Sections 1, 3, 8 & 14)
+    if (!context.initialGreetingSent) {
+      await this.sendInitialGreeting(socket, context);
+    }
   }
 
   /**
@@ -394,7 +403,7 @@ export class ExotelStreamGatewayService {
     context: StreamSessionContext,
     event: any
   ): Promise<void> {
-    if (context.isProcessingTurn || context.isStopped) {
+    if (context.isProcessingTurn || context.isPlayingGreeting || context.isStopped) {
       return;
     }
 
@@ -483,7 +492,7 @@ export class ExotelStreamGatewayService {
 
       const wavBase64 = wavBuffer.toString("base64");
 
-      console.log("🗣️ [ExotelStreamGateway] Processing Speech Turn with Sarvam STT", {
+      console.log("🗣️ [ExotelStreamGateway] Sarvam STT", {
         streamSid: context.streamSid,
         turnCount: context.turnCount,
         audioLengthBytes: fullTelephonyBuffer.length,
@@ -542,6 +551,10 @@ export class ExotelStreamGatewayService {
       });
 
       // 5. Text-to-Speech Synthesis via Sarvam bulbul:v3
+      console.log("🔊 [ExotelStreamGateway] Sarvam TTS", {
+        streamSid: context.streamSid,
+        language: context.language,
+      });
       const ttsResult = await this.sarvamService.textToSpeech(responseText, context.language);
       const ttsAudioBase64 = ttsResult?.audios?.[0];
 
@@ -604,6 +617,95 @@ export class ExotelStreamGatewayService {
       console.error("⚠️ [ExotelStreamGateway] Error during speech turn loop:", err.message);
     } finally {
       context.isProcessingTurn = false;
+    }
+  }
+
+  /**
+   * Generates and streams the initial conversational Voicebot greeting
+   * in the authoritative session language (en-IN, kn-IN, hi-IN) via Sarvam TTS.
+   * Executes exactly once per Voicebot session upon start.
+   */
+  public async sendInitialGreeting(
+    socket: WebSocket,
+    context: StreamSessionContext
+  ): Promise<void> {
+    if (context.isStopped || !context.streamSid) {
+      return;
+    }
+
+    context.initialGreetingSent = true;
+    context.isPlayingGreeting = true;
+
+    try {
+      const greetingText = VoiceResponseFormatter.getGreeting(context.language);
+
+      console.log("🗣️ [ExotelStreamGateway] Initial Voicebot greeting", {
+        streamSid: context.streamSid,
+        sessionId: context.sessionId,
+        language: context.language,
+        greetingPreview: greetingText.slice(0, 80) + (greetingText.length > 80 ? "..." : ""),
+      });
+
+      console.log("🔊 [ExotelStreamGateway] Sarvam TTS", {
+        streamSid: context.streamSid,
+        language: context.language,
+      });
+
+      const ttsResult = await this.sarvamService.textToSpeech(greetingText, context.language);
+      const ttsAudioBase64 = ttsResult?.audios?.[0];
+
+      if (ttsAudioBase64 && socket.readyState === WebSocket.OPEN && context.streamSid) {
+        const rawTtsBuffer = Buffer.from(ttsAudioBase64, "base64");
+        const { pcmBuffer } = extractPcmFromWav(rawTtsBuffer);
+
+        const outboundAudio = context.mediaFormat.encoding.includes("mulaw")
+          ? linear16ToMulaw(pcmBuffer)
+          : pcmBuffer;
+
+        const chunkSize = context.mediaFormat.encoding.includes("mulaw")
+          ? FRAME_CHUNK_SIZE_MULAW
+          : FRAME_CHUNK_SIZE_PCM;
+
+        const outboundFrames = chunkAudioBuffer(outboundAudio, chunkSize);
+
+        console.log("🔊 [ExotelStreamGateway] Streaming initial greeting frames to Exotel", {
+          streamSid: context.streamSid,
+          frameCount: outboundFrames.length,
+          chunkSize,
+          language: context.language,
+        });
+
+        for (const frame of outboundFrames) {
+          if (socket.readyState !== WebSocket.OPEN || context.isStopped) break;
+          const mediaMessage: ExotelStreamOutboundMediaMessage = {
+            event: "media",
+            streamSid: context.streamSid,
+            media: {
+              payload: frame.toString("base64"),
+            },
+          };
+          socket.send(JSON.stringify(mediaMessage));
+        }
+
+        if (socket.readyState === WebSocket.OPEN) {
+          const markMessage: ExotelStreamOutboundMarkMessage = {
+            event: "mark",
+            streamSid: context.streamSid,
+            mark: {
+              name: "initial_greeting",
+            },
+          };
+          socket.send(JSON.stringify(markMessage));
+        }
+      }
+    } catch (err: any) {
+      console.error("⚠️ [ExotelStreamGateway] Error generating initial Voicebot greeting:", err.message);
+    } finally {
+      // Discard any audio accumulated during greeting transmission so echo is not treated as caller speech
+      context.audioBufferChunks = [];
+      context.turnSilenceChunks = 0;
+      context.turnTotalChunks = 0;
+      context.isPlayingGreeting = false;
     }
   }
 

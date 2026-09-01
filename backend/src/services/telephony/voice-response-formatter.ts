@@ -326,11 +326,11 @@ export class VoiceResponseFormatter {
   public static getDefaultFallbackPrompt(lang?: string): string {
     const l = toVoiceLanguage(lang);
     if (l === "kn-IN") {
-      return "ನಾನು ನಿಮಗೆ ಸರ್ಕಾರಿ ಆರೋಗ್ಯ ಯೋಜನೆಗಳ ವಿವರಗಳು, ಕುಟುಂಬದ ಅರ್ಹತೆ ಮತ್ತು ಆಶಾ ಕಾರ್ಯಕರ್ತೆಯರ ಭೇಟಿಗಳ ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ. ನೀವು 'ಆಯುಷ್ಮಾನ್ ಅರ್ಹತೆ ತಿಳಿಸಿ' ಅಥವಾ 'ಅರ್ಜಿ ಸ್ಥಿತಿ ತಿಳಿಸಿ' ಎಂದು ಕೇಳಬಹುದು.";
+      return "ಕ್ಷಮಿಸಿ, ಅದು ನನಗೆ ಸರಿಯಾಗಿ ಅರ್ಥವಾಗಲಿಲ್ಲ. ನಾನು ನಿಮಗೆ ಸರ್ಕಾರಿ ಆರೋಗ್ಯ ಯೋಜನೆಗಳ ವಿವರಗಳು, ಕುಟುಂಬದ ಅರ್ಹತೆ ಮತ್ತು ಆಶಾ ಕಾರ್ಯಕರ್ತೆಯರ ಭೇಟಿಗಳ ಬಗ್ಗೆ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ. ನೀವು 'ಆಯುಷ್ಮಾನ್ ಅರ್ಹತೆ ತಿಳಿಸಿ' ಅಥವಾ 'ಅರ್ಜಿ ಸ್ಥಿತಿ ತಿಳಿಸಿ' ಎಂದು ಕೇಳಬಹುದು.";
     }
     if (l === "hi-IN") {
-      return "मैं आपको सरकारी स्वास्थ्य योजनाओं, पारिवारिक पात्रता, आवेदन की स्थिति और आशा कार्यकर्ता के दौरों की जानकारी दे सकता हूँ। आप कह सकते हैं 'आयुष्मान पात्रता जांचें' या 'आवेदन की स्थिति बताएं'।";
+      return "क्षमा करें, मैं आपकी बात पूरी तरह समझ नहीं सका। मैं आपको सरकारी स्वास्थ्य योजनाओं, पारिवारिक पात्रता, आवेदन की स्थिति और आशा कार्यकर्ता के दौरों की जानकारी दे सकता हूँ। आप कह सकते हैं 'आयुष्मान पात्रता जांचें' या 'आवेदन की स्थिति बताएं'।";
     }
-    return "I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker follow-ups. You can say 'Check Ayushman eligibility' or 'Check application status'.";
+    return "I'm sorry, I didn't quite understand that. I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker follow-ups. You can say 'Check Ayushman eligibility' or 'Check application status'.";
   }
 }
