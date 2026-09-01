@@ -13,11 +13,13 @@ import {
   CallOutcome,
   VoiceIntentType,
   VoiceActionName,
+  toVoiceLanguage,
 } from "../../../../shared/types/voice.js";
 import { VoiceSessionRepository } from "../../repositories/voice-session.repository.js";
 import { SarvamService } from "./sarvam.service.js";
 import { ExotelService, ExotelTelephonyError } from "./exotel.service.js";
 import { VoiceActionService } from "./voice-action.service.js";
+import { VoiceResponseFormatter } from "./voice-response-formatter.js";
 import { CaseRepository } from "../../repositories/case.repository.js";
 import { HouseholdRepository } from "../../repositories/household.repository.js";
 import { UserRepository } from "../../repositories/user.repository.js";
@@ -61,12 +63,13 @@ export class VoiceGatewayService {
   public async createInboundSession(
     callerPhone: string,
     callSid?: string,
-    language: string = env.VOICE_LANGUAGE || "en-IN"
+    language?: string
   ): Promise<VoiceSession> {
     const id = `vses_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const sid = callSid || `exo_in_${Date.now()}`;
     const hash = this.hashPhoneNumber(callerPhone);
     const masked = this.maskPhoneNumber(callerPhone);
+    const resolvedLanguage = toVoiceLanguage(language || env.VOICE_LANGUAGE || "en-IN");
 
     // Attempt to lookup citizen/household by phone WITHOUT verifying yet
     let matchedCitizenId: string | null = null;
@@ -99,7 +102,7 @@ export class VoiceGatewayService {
       verificationStatus: "UNVERIFIED", // Must start unverified for privacy!
       citizenId: matchedCitizenId,
       householdId: matchedHouseholdId,
-      language,
+      language: resolvedLanguage,
       turnCount: 0,
       maxTurns: env.VOICE_MAX_TURNS || 10,
       startedAt: new Date().toISOString(),
@@ -134,8 +137,7 @@ export class VoiceGatewayService {
       session = await this.createInboundSession(callerPhone, callSid);
     }
 
-    const greetingMessage =
-      "Namaste! Welcome to SwasthyaSetu Healthcare Assistance. You can ask about government health schemes like Ayushman Bharat PM-JAY and Janani Suraksha Yojana, check your eligibility, or request help from your ASHA worker. How can I help you today?";
+    const greetingMessage = VoiceResponseFormatter.getGreeting(session.language);
 
     const passthruResponse = this.exotelService.buildPassthruResponse(greetingMessage);
     return { responseXmlOrText: passthruResponse, session };
@@ -158,7 +160,7 @@ export class VoiceGatewayService {
         sessionId,
         status: session.status,
         verificationStatus: session.verificationStatus,
-        textResponse: "This call has already ended. Thank you for using SwasthyaSetu.",
+        textResponse: VoiceResponseFormatter.getEndCall(session.language),
         detectedIntent: "END_CALL",
         shouldEndCall: true,
         language: session.language,
@@ -178,7 +180,7 @@ export class VoiceGatewayService {
         sessionId,
         status: "COMPLETED",
         verificationStatus: session.verificationStatus,
-        textResponse: "You have reached the maximum duration for this helpline call. If you need further assistance, please reach out to your local ASHA worker or visit the SwasthyaSetu portal. Goodbye!",
+        textResponse: VoiceResponseFormatter.getMaxTurnsPrompt(session.language),
         detectedIntent: "END_CALL",
         shouldEndCall: true,
         language: session.language,
@@ -219,15 +221,14 @@ export class VoiceGatewayService {
     switch (nluResult.intent) {
       case "EMERGENCY": {
         executedAction = "handleEmergencyRedirection";
-        const res = this.voiceActionService.handleEmergencyRedirection();
+        const res = this.voiceActionService.handleEmergencyRedirection(session);
         textResponse = res.message;
         actionResultData = res.data;
         break;
       }
 
       case "GREETING": {
-        textResponse =
-          "Namaste! Welcome to SwasthyaSetu. I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker visits. What would you like to know?";
+        textResponse = VoiceResponseFormatter.getGreeting(session.language);
         break;
       }
 
@@ -255,7 +256,7 @@ export class VoiceGatewayService {
 
       case "CHECK_SCHEMES": {
         executedAction = "getPublicSchemeInfo";
-        const res = await this.voiceActionService.getPublicSchemeInfo(nluResult.schemeId);
+        const res = await this.voiceActionService.getPublicSchemeInfo(nluResult.schemeId, session);
         textResponse = res.message;
         actionResultData = res.data;
         break;
@@ -263,9 +264,8 @@ export class VoiceGatewayService {
 
       case "CHECK_ELIGIBILITY": {
         if (session.verificationStatus !== "VERIFIED") {
-          // Privacy protection: prompt for verification
-          textResponse =
-            "To check personal family eligibility for Ayushman Bharat or Janani Suraksha Yojana, I need to verify your identity. Please tell me the last 4 digits of your Ration Card.";
+          // Privacy protection: prompt for verification in session language
+          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
         } else {
           executedAction = "getEligibilityForMember";
           const res = await this.voiceActionService.getEligibilityForMember(
@@ -281,8 +281,7 @@ export class VoiceGatewayService {
 
       case "CHECK_ASSISTANCE_STATUS": {
         if (session.verificationStatus !== "VERIFIED") {
-          textResponse =
-            "For your privacy, please verify your identity with your Ration Card digits before checking your active application status.";
+          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
         } else {
           executedAction = "getAssistanceStatus";
           const res = await this.voiceActionService.getAssistanceStatus(session, nluResult.schemeId);
@@ -294,8 +293,7 @@ export class VoiceGatewayService {
 
       case "CHECK_FOLLOW_UP": {
         if (session.verificationStatus !== "VERIFIED") {
-          textResponse =
-            "Please verify your identity with your Ration Card digits to view scheduled ASHA doorstep visits.";
+          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
         } else {
           executedAction = "getFollowUpStatus";
           const res = await this.voiceActionService.getFollowUpStatus(session);
@@ -307,8 +305,7 @@ export class VoiceGatewayService {
 
       case "CONTACT_ASHA": {
         if (session.verificationStatus !== "VERIFIED") {
-          textResponse =
-            "Please verify your identity to view your assigned ASHA worker's contact details.";
+          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
         } else {
           executedAction = "getConnectedAsha";
           const res = await this.voiceActionService.getConnectedAsha(session);
@@ -320,8 +317,7 @@ export class VoiceGatewayService {
 
       case "REQUEST_ASSISTANCE": {
         if (session.verificationStatus !== "VERIFIED") {
-          textResponse =
-            "To submit a doorstep assistance request to your ASHA worker, please verify your identity with your Ration Card digits.";
+          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
         } else {
           executedAction = "requestAssistance";
           const res = await this.voiceActionService.requestAssistance(
@@ -347,8 +343,7 @@ export class VoiceGatewayService {
       }
 
       default: {
-        textResponse =
-          "I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker follow-ups. You can say 'Check Ayushman eligibility' or 'Check application status'.";
+        textResponse = VoiceResponseFormatter.getDefaultFallbackPrompt(session.language);
         break;
       }
     }
@@ -466,7 +461,7 @@ export class VoiceGatewayService {
       citizenId: household.ownerUid,
       householdId: household.id,
       assignedAshaUid: targetCase.assignedAshaUid,
-      language: "hi-IN",
+      language: toVoiceLanguage((targetCase as any).preferredLanguage || (household as any).preferredLanguage || "en-IN"),
       turnCount: 0,
       maxTurns: env.VOICE_MAX_TURNS || 10,
       relatedCaseId: targetCase.id,
@@ -661,7 +656,7 @@ export class VoiceGatewayService {
       verificationStatus: "VERIFIED",
       citizenId: citizenUid,
       householdId: household?.id || null,
-      language: input.language || "hi-IN",
+      language: toVoiceLanguage(input.language),
       turnCount: 0,
       maxTurns: env.VOICE_MAX_TURNS || 10,
       outboundReason: input.reason || "Citizen Web Assistant Request",
@@ -737,7 +732,7 @@ export class VoiceGatewayService {
       assignedAshaUid: ashaUid,
       relatedCaseId: targetCase.id,
       relatedFollowUpId: input.followUpId || null,
-      language: input.language || "hi-IN",
+      language: toVoiceLanguage(input.language),
       turnCount: 0,
       maxTurns: env.VOICE_MAX_TURNS || 10,
       outboundReason: input.reason || `ASHA Outreach: ${targetCase.schemeName || "Healthcare Case"}`,

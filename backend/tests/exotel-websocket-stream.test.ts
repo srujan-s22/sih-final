@@ -442,9 +442,9 @@ describe("Phase 11 — Real-Time Exotel WebSocket Voice Streaming", () => {
 
       await streamGateway.processSpeechTurn(mockSocket, context);
 
-      // Verify farewell TTS attempted
+      // Verify farewell TTS attempted in session language (hi-IN)
       expect(sarvamService.textToSpeech).toHaveBeenCalledWith(
-        expect.stringContaining("maximum duration"),
+        expect.stringMatching(/अधिकतम|maximum/),
         "hi-IN"
       );
     });
@@ -721,8 +721,24 @@ describe("Phase 11 — Real-Time Exotel WebSocket Voice Streaming", () => {
       expect(context.audioBufferChunks.length).toBe(0);
     });
 
-    it("forces the entire voice pipeline to English (en-IN) even if Exotel start event sends hi-IN", async () => {
+    it("preserves authoritative session language (en-IN) even if Exotel start event sends hi-IN", async () => {
       const sessionRepo = new VoiceSessionRepository(null);
+      await sessionRepo.createSession({
+        id: "vses_en_test",
+        callSid: "call_en_enforce",
+        direction: "OUTBOUND",
+        provider: "TEST_MOCK",
+        callerNumberHash: "hash123",
+        maskedCallerNumber: "+91 98*** **210",
+        status: "ACTIVE",
+        verificationStatus: "UNVERIFIED",
+        language: "en-IN",
+        turnCount: 0,
+        maxTurns: 10,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as any);
+
       const sarvamService = new SarvamService();
       const gatewayService = new VoiceGatewayService(
         sessionRepo,
@@ -788,7 +804,7 @@ describe("Phase 11 — Real-Time Exotel WebSocket Voice Streaming", () => {
 
       const context = streamGateway.getActiveStream("stream_en_enforce");
       expect(context).toBeDefined();
-      expect(context?.language).toBe("en-IN"); // Overridden to en-IN!
+      expect(context?.language).toBe("en-IN"); // Preserved en-IN over Exotel hi-IN!
 
       // 2. Accumulate speech and trigger turn
       context!.audioBufferChunks = [Buffer.alloc(320, 100)];

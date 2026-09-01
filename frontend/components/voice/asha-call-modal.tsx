@@ -7,6 +7,7 @@ import { voiceService } from "@/services/voice-service";
 import {
   VoiceSession,
   CallHistoryItem,
+  toVoiceLanguage,
 } from "@shared/types/voice";
 import {
   Phone,
@@ -38,13 +39,8 @@ export interface AshaCallModalProps {
 }
 
 const DEFAULT_LANGUAGES = [
-  { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
   { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
-  { code: "te-IN", name: "Telugu", nativeName: "తెలుగు" },
-  { code: "ta-IN", name: "Tamil", nativeName: "தமிழ்" },
-  { code: "mr-IN", name: "Marathi", nativeName: "मराठी" },
-  { code: "bn-IN", name: "Bengali", nativeName: "বাংলা" },
-  { code: "gu-IN", name: "Gujarati", nativeName: "ગુજરાતી" },
+  { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
   { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
@@ -62,8 +58,8 @@ export function AshaCallModal({
   defaultReason = "Doorstep visit & document verification reminder",
   onCallComplete,
 }: AshaCallModalProps) {
-  const { t } = useTranslation();
-  const [language, setLanguage] = useState("hi-IN");
+  const { t, language: uiLanguage } = useTranslation();
+  const [language, setLanguage] = useState<string>(() => toVoiceLanguage(uiLanguage));
   const [reason, setReason] = useState(defaultReason);
   const [activeTab, setActiveTab] = useState<"call" | "history">("call");
 
@@ -84,12 +80,13 @@ export function AshaCallModal({
 
   useEffect(() => {
     if (isOpen) {
+      setLanguage(toVoiceLanguage(uiLanguage));
       setReason(defaultReason);
       loadCaseHistory();
     } else {
       resetState();
     }
-  }, [isOpen, caseId, defaultReason]);
+  }, [isOpen, caseId, defaultReason, uiLanguage]);
 
   // Handle call timer
   useEffect(() => {

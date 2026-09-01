@@ -52,18 +52,37 @@ export type VoiceActionName =
   | "requestAssistance"
   | "endCall";
 
-export type SupportedVoiceLanguage =
-  | "hi-IN"
-  | "en-IN"
-  | "kn-IN"
-  | "ta-IN"
-  | "te-IN"
-  | "bn-IN"
-  | "gu-IN"
-  | "mr-IN"
-  | "ml-IN"
-  | "pa-IN"
-  | "or-IN";
+export type SupportedVoiceLanguage = "en-IN" | "kn-IN" | "hi-IN";
+
+export const SUPPORTED_VOICE_LANGUAGES: readonly SupportedVoiceLanguage[] = [
+  "en-IN",
+  "kn-IN",
+  "hi-IN",
+] as const;
+
+/**
+ * Maps arbitrary UI locales or telephony language codes into authoritative SupportedVoiceLanguage
+ * Defaults safely to "en-IN" if unspecified or unsupported.
+ */
+export function toVoiceLanguage(lang?: string | null): SupportedVoiceLanguage {
+  if (!lang) return "en-IN";
+  const clean = lang.trim().toLowerCase();
+  if (clean === "kn" || clean === "kn-in") return "kn-IN";
+  if (clean === "hi" || clean === "hi-in") return "hi-IN";
+  if (clean === "en" || clean === "en-in") return "en-IN";
+  return "en-IN";
+}
+
+/**
+ * Maps a telephony voice language back to website UI locale ("en" | "kn" | "hi")
+ */
+export function toUiLanguage(voiceLang?: string | null): "en" | "kn" | "hi" {
+  if (!voiceLang) return "en";
+  const clean = voiceLang.trim().toLowerCase();
+  if (clean.startsWith("kn")) return "kn";
+  if (clean.startsWith("hi")) return "hi";
+  return "en";
+}
 
 /**
  * Authoritative Voice Session Entity stored in Firestore (/voice_sessions/{sessionId})

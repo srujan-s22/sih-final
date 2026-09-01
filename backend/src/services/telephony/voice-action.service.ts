@@ -6,6 +6,7 @@ import { AssistanceService } from "../assistance.service.js";
 import { CaseRepository } from "../../repositories/case.repository.js";
 import { ConnectionRepository } from "../../repositories/connection.repository.js";
 import { UserRepository } from "../../repositories/user.repository.js";
+import { VoiceResponseFormatter } from "./voice-response-formatter.js";
 
 export interface VoiceActionResult {
   success: boolean;
@@ -28,10 +29,11 @@ export class VoiceActionService {
   /**
    * 0. Emergency Escalation (Medical Safety Boundary)
    */
-  public handleEmergencyRedirection(): VoiceActionResult {
+  public handleEmergencyRedirection(sessionOrLang?: VoiceSession | string): VoiceActionResult {
+    const lang = typeof sessionOrLang === "string" ? sessionOrLang : sessionOrLang?.language;
     return {
       success: true,
-      message: "SwasthyaSetu provides administrative health scheme guidance and cannot provide emergency medical triage. If you or someone around you is experiencing a medical emergency, please call 108 or 102 immediately, or visit your nearest hospital emergency ward.",
+      message: VoiceResponseFormatter.getEmergencyRedirection(lang),
       data: { isEmergency: true, emergencyNumber: "108" },
     };
   }
@@ -39,14 +41,18 @@ export class VoiceActionService {
   /**
    * 1. Public Scheme Information (Unauthenticated safe)
    */
-  public async getPublicSchemeInfo(schemeId?: string): Promise<VoiceActionResult> {
+  public async getPublicSchemeInfo(
+    schemeId?: string,
+    sessionOrLang?: VoiceSession | string
+  ): Promise<VoiceActionResult> {
+    const lang = typeof sessionOrLang === "string" ? sessionOrLang : sessionOrLang?.language;
     const targetSchemeId = schemeId || "ab-pmjay";
     const scheme = await this.schemeService.getSchemeById(targetSchemeId);
 
     if (!scheme) {
       return {
         success: true,
-        message: "SwasthyaSetu covers major national healthcare initiatives including Ayushman Bharat PM-JAY for senior citizens and low-income families, and Janani Suraksha Yojana for maternal care.",
+        message: VoiceResponseFormatter.getGeneralSchemeInfo(lang),
         data: { schemeId: targetSchemeId },
       };
     }
@@ -55,7 +61,13 @@ export class VoiceActionService {
     const shortDesc = scheme.description.slice(0, 180);
     return {
       success: true,
-      message: `${scheme.name} (${scheme.shortName}): ${shortDesc}. Coverage up to ${cov ? "Rs. " + cov.toLocaleString() : "free treatment"}.`,
+      message: VoiceResponseFormatter.getSchemeDetails(
+        scheme.name,
+        scheme.shortName,
+        shortDesc,
+        cov,
+        lang
+      ),
       data: {
         schemeId: scheme.id,
         name: scheme.name,
@@ -73,10 +85,11 @@ export class VoiceActionService {
     session: VoiceSession,
     verificationCode?: string
   ): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (!verificationCode || verificationCode.trim().length === 0) {
       return {
         success: false,
-        message: "Please tell me the last 4 digits of your registered Ration Card or account verification PIN to verify your identity.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -92,7 +105,7 @@ export class VoiceActionService {
         if (isMatch) {
           return {
             success: true,
-            message: `Identity verified for ${household.headOfHouseholdName}'s household. How can I assist your family today?`,
+            message: VoiceResponseFormatter.getVerificationSuccess(household.headOfHouseholdName, lang),
             data: { householdId: household.id, headName: household.headOfHouseholdName },
           };
         }
@@ -107,7 +120,7 @@ export class VoiceActionService {
         if (rc.endsWith(code) || rc === code || code === "1234") {
           return {
             success: true,
-            message: `Identity verified for ${household.headOfHouseholdName}'s household.`,
+            message: VoiceResponseFormatter.getVerificationSuccess(household.headOfHouseholdName, lang),
             data: { householdId: household.id, headName: household.headOfHouseholdName },
           };
         }
@@ -116,7 +129,7 @@ export class VoiceActionService {
 
     return {
       success: false,
-      message: "The verification code provided did not match your registered household records. For your privacy, private information remains protected.",
+      message: VoiceResponseFormatter.getVerificationMismatch(lang),
       requiresVerification: true,
     };
   }
@@ -125,10 +138,11 @@ export class VoiceActionService {
    * 3. Evaluate Eligible Schemes for Verified Household
    */
   public async getEligibleSchemes(session: VoiceSession): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "To check personalized scheme entitlements for your family, we need to verify your identity. Please provide the last 4 digits of your Ration Card.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -145,18 +159,15 @@ export class VoiceActionService {
     const evalResults = await this.eligibilityService.evaluateHouseholdForSchemes(household, members);
     const eligibleSchemes = evalResults.filter((s) => s.status === "ELIGIBLE");
 
-    if (eligibleSchemes.length === 0) {
-      return {
-        success: true,
-        message: `Based on current records, no government schemes are immediately matched for ${household.headOfHouseholdName}'s family, but public health center services remain available.`,
-        data: { eligibleCount: 0 },
-      };
-    }
+    const message = VoiceResponseFormatter.getHouseholdEligibleSchemes(
+      household.headOfHouseholdName,
+      eligibleSchemes.map((s) => ({ id: s.schemeId, name: s.schemeName })),
+      lang
+    );
 
-    const schemeNames = eligibleSchemes.map((s) => s.schemeName).join(" and ");
     return {
       success: true,
-      message: `Your household is eligible for ${eligibleSchemes.length} verified scheme(s): ${schemeNames}. Would you like help applying with your ASHA worker?`,
+      message,
       data: {
         eligibleCount: eligibleSchemes.length,
         schemes: eligibleSchemes.map((s) => ({ id: s.schemeId, name: s.schemeName })),
@@ -172,10 +183,11 @@ export class VoiceActionService {
     memberIdentifier?: string,
     schemeId: string = "ab-pmjay"
   ): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "To check eligibility for specific family members, please verify your identity with your Ration Card digits.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -213,24 +225,25 @@ export class VoiceActionService {
 
     const isEligible = memberMatches.length > 0 || (schemeId === "ab-pmjay" && targetMember.age >= 70);
 
-    if (isEligible) {
-      return {
-        success: true,
-        message: `Yes! Based on your verified household records, ${targetMember.fullName} (Age ${targetMember.age}, ${targetMember.relationship}) is eligible for ${schemeId === "ab-pmjay" ? "PM-JAY Ayushman Bharat senior citizen benefits" : "scheme coverage"}. Would you like me to notify your ASHA worker to assist with registration?`,
-        data: {
-          memberId: targetMember.id,
-          memberName: targetMember.fullName,
-          age: targetMember.age,
-          isEligible: true,
-          schemeId,
-        },
-      };
-    }
+    const message = VoiceResponseFormatter.getMemberEligibility(
+      isEligible,
+      targetMember.fullName,
+      targetMember.age,
+      targetMember.relationship,
+      schemeId,
+      lang
+    );
 
     return {
       success: true,
-      message: `Based on your profile, ${targetMember.fullName} does not currently meet the deterministic criteria for this scheme.`,
-      data: { memberId: targetMember.id, memberName: targetMember.fullName, isEligible: false },
+      message,
+      data: {
+        memberId: targetMember.id,
+        memberName: targetMember.fullName,
+        age: targetMember.age,
+        isEligible,
+        schemeId,
+      },
     };
   }
 
@@ -241,10 +254,11 @@ export class VoiceActionService {
     session: VoiceSession,
     schemeId?: string
   ): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "Please verify your identity first to check your active application and assistance progress.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -260,7 +274,7 @@ export class VoiceActionService {
     if (!activeCase) {
       return {
         success: true,
-        message: "You currently have no active scheme assistance cases in progress. Would you like your ASHA worker to start one for your family?",
+        message: VoiceResponseFormatter.getAssistanceStatus(false, "", "", 0, 0, lang),
         data: { hasActiveCase: false },
       };
     }
@@ -270,17 +284,18 @@ export class VoiceActionService {
     const totalTasks = isPmjay ? 5 : 6;
     const completedTasks = (activeCase as any).completedTasksCount || 0;
 
-    if (activeCase.status === "RESOLVED" || activeCase.status === "CLOSED") {
-      return {
-        success: true,
-        message: `Your assistance for ${schemeName} has been successfully completed and resolved (${totalTasks} of ${totalTasks} field tasks complete). All benefits are active.`,
-        data: { caseId: activeCase.id, status: "RESOLVED", completedTasks, totalTasks },
-      };
-    }
+    const message = VoiceResponseFormatter.getAssistanceStatus(
+      true,
+      schemeName,
+      activeCase.status,
+      completedTasks,
+      totalTasks,
+      lang
+    );
 
     return {
       success: true,
-      message: `Your assistance for ${schemeName} is currently in progress. Your ASHA worker has completed ${completedTasks} of ${totalTasks} field tasks.`,
+      message,
       data: {
         caseId: activeCase.id,
         status: activeCase.status,
@@ -295,10 +310,11 @@ export class VoiceActionService {
    * 6. Check Follow-Up Schedule
    */
   public async getFollowUpStatus(session: VoiceSession): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "Please verify your identity to check your scheduled ASHA doorstep visits.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -309,7 +325,7 @@ export class VoiceActionService {
     if (allCases.length === 0) {
       return {
         success: true,
-        message: "You have no pending follow-up visits scheduled.",
+        message: VoiceResponseFormatter.getFollowUpStatus(false, undefined, undefined, false, lang),
       };
     }
 
@@ -328,25 +344,25 @@ export class VoiceActionService {
     if (!nearestFollowUp) {
       return {
         success: true,
-        message: "You have no pending follow-up visits. All previous visits have been completed.",
+        message: VoiceResponseFormatter.getFollowUpStatus(false, undefined, undefined, false, lang),
       };
     }
 
     const dueDate = new Date(nearestFollowUp.dueAt || nearestFollowUp.scheduledAt).toLocaleDateString();
     const isOverdue = nearestFollowUp.isOverdue || new Date(nearestFollowUp.dueAt).getTime() < Date.now();
 
-    if (isOverdue) {
-      return {
-        success: true,
-        message: `Your follow-up visit for "${nearestFollowUp.title || nearestFollowUp.reason}" was scheduled for ${dueDate} and is currently overdue. Your ASHA worker has been notified to prioritize your visit.`,
-        data: { followUpId: nearestFollowUp.id, isOverdue: true, dueDate },
-      };
-    }
+    const message = VoiceResponseFormatter.getFollowUpStatus(
+      true,
+      nearestFollowUp.title || nearestFollowUp.reason,
+      dueDate,
+      isOverdue,
+      lang
+    );
 
     return {
       success: true,
-      message: `Your next doorstep follow-up visit for "${nearestFollowUp.title || nearestFollowUp.reason}" is scheduled for ${dueDate}.`,
-      data: { followUpId: nearestFollowUp.id, isOverdue: false, dueDate },
+      message,
+      data: { followUpId: nearestFollowUp.id, isOverdue, dueDate },
     };
   }
 
@@ -354,10 +370,11 @@ export class VoiceActionService {
    * 7. Check Connected ASHA Details
    */
   public async getConnectedAsha(session: VoiceSession): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "Please verify your identity to view your assigned ASHA worker details.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -366,7 +383,7 @@ export class VoiceActionService {
     if (!connection || connection.status !== "ACTIVE") {
       return {
         success: true,
-        message: "Your household is not currently linked to a dedicated ASHA worker. You can link with your local ASHA using her Service Code on the SwasthyaSetu portal.",
+        message: VoiceResponseFormatter.getConnectedAsha(false, undefined, undefined, lang),
       };
     }
 
@@ -376,7 +393,7 @@ export class VoiceActionService {
 
     return {
       success: true,
-      message: `Your assigned ASHA worker is ${ashaName} covering ${area}.`,
+      message: VoiceResponseFormatter.getConnectedAsha(true, ashaName, area, lang),
       data: {
         ashaUid: connection.ashaUid,
         ashaName,
@@ -394,10 +411,11 @@ export class VoiceActionService {
     memberId?: string,
     notes?: string
   ): Promise<VoiceActionResult> {
+    const lang = session.language;
     if (session.verificationStatus !== "VERIFIED" || !session.householdId) {
       return {
         success: false,
-        message: "To submit an assistance request, we need to verify your identity. Please provide your Ration Card digits.",
+        message: VoiceResponseFormatter.getVerificationPrompt(lang),
         requiresVerification: true,
       };
     }
@@ -411,9 +429,16 @@ export class VoiceActionService {
     if (matchingCase) {
       const isPmjay = matchingCase.schemeId === "ab-pmjay";
       const totalTasks = isPmjay ? 5 : 6;
+      const completedTasks = (matchingCase as any).completedTasksCount || 0;
       return {
         success: true,
-        message: `An assistance workflow for ${matchingCase.schemeName || schemeId} already exists and is currently in progress (${(matchingCase as any).completedTasksCount || 0} of ${totalTasks} tasks complete). Your ASHA worker has already been assigned.`,
+        message: VoiceResponseFormatter.getRequestAssistanceResult(
+          true,
+          matchingCase.schemeName || schemeId,
+          completedTasks,
+          totalTasks,
+          lang
+        ),
         data: { caseId: matchingCase.id, isExisting: true },
       };
     }
@@ -445,9 +470,16 @@ export class VoiceActionService {
         priority: "HIGH",
       });
 
+      const totalTasks = schemeId === "ab-pmjay" ? 5 : 6;
       return {
         success: true,
-        message: `Your assistance request for ${schemeName} has been submitted. Your assigned ASHA worker has been notified and will coordinate a field visit with you.`,
+        message: VoiceResponseFormatter.getRequestAssistanceResult(
+          false,
+          schemeName,
+          0,
+          totalTasks,
+          lang
+        ),
         data: {
           requestId: created.id,
           isExisting: false,
@@ -465,10 +497,11 @@ export class VoiceActionService {
   /**
    * 9. End Call
    */
-  public async endCall(_session: VoiceSession): Promise<VoiceActionResult> {
+  public async endCall(session?: VoiceSession | string): Promise<VoiceActionResult> {
+    const lang = typeof session === "string" ? session : session?.language;
     return {
       success: true,
-      message: "Thank you for calling SwasthyaSetu Healthcare Helpline. Stay healthy, and have a good day. Goodbye!",
+      message: VoiceResponseFormatter.getEndCall(lang),
       data: { shouldEndCall: true },
     };
   }

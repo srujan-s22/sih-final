@@ -1,5 +1,9 @@
 import { env } from "../../config/env.js";
-import { VoiceIntentType, SupportedVoiceLanguage } from "../../../../shared/types/voice.js";
+import {
+  VoiceIntentType,
+  SupportedVoiceLanguage,
+  toVoiceLanguage,
+} from "../../../../shared/types/voice.js";
 
 export interface SarvamSttResponse {
   transcript: string;
@@ -45,14 +49,14 @@ export class SarvamService {
   /**
    * Speech-to-Text via Sarvam AI API
    * POST /speech-to-text
-   * Uses production saaras:v3 model with Indic language coverage
+   * Uses production saaras:v3 model with Indic language coverage (en-IN, kn-IN, hi-IN)
    */
   public async speechToText(
     audioBase64: string,
-    languageCode: string = env.VOICE_LANGUAGE || "en-IN",
+    languageCode?: string,
     audioFormat: string = "wav"
   ): Promise<SarvamSttResponse> {
-    const effectiveLanguage = env.VOICE_LANGUAGE || languageCode || "en-IN";
+    const effectiveLanguage = toVoiceLanguage(languageCode || env.VOICE_LANGUAGE || "en-IN");
 
     if (!this.isConfigured()) {
       return {
@@ -132,14 +136,14 @@ export class SarvamService {
    */
   public async textToSpeech(
     text: string,
-    targetLanguageCode: string = env.VOICE_LANGUAGE || "en-IN",
+    targetLanguageCode?: string,
     speaker?: string
   ): Promise<SarvamTtsResponse> {
     if (!this.isConfigured()) {
       return { audios: [] };
     }
 
-    const effectiveLanguage = env.VOICE_LANGUAGE || targetLanguageCode || "en-IN";
+    const effectiveLanguage = toVoiceLanguage(targetLanguageCode || env.VOICE_LANGUAGE || "en-IN");
     const sanitizedText = (text || "").trim().slice(0, 2500);
     if (!sanitizedText) {
       return { audios: [] };
@@ -212,13 +216,15 @@ export class SarvamService {
   /**
    * Extract Structured Intent & Entities from Transcript
    * Deterministic pattern matching with language-aware context mapping
+   * Supports English, Kannada, and Hindi (with natural code-switching / Hinglish / Kanglish)
    */
   public understandIntent(
     transcript: string,
-    sessionLanguage: string = env.VOICE_LANGUAGE || "en-IN"
+    sessionLanguage?: string
   ): SarvamIntentExtractionResult {
     const raw = transcript.trim();
     const normalized = raw.toLowerCase();
+    const resolvedLanguage = toVoiceLanguage(sessionLanguage || env.VOICE_LANGUAGE || "en-IN");
 
     // 0. Check for Medical Emergency (Instant safety redirection)
     if (
@@ -234,13 +240,28 @@ export class SarvamService {
       normalized.includes("unconscious") ||
       normalized.includes("behosh") ||
       normalized.includes("accident") ||
-      normalized.includes("saans nahi aa rahi")
+      normalized.includes("saans nahi aa rahi") ||
+      // Kannada keywords
+      normalized.includes("ತುರ್ತು") ||
+      normalized.includes("ಆಂಬ್ಯುಲೆನ್ಸ್") ||
+      normalized.includes("ಎದೆ ನೋವು") ||
+      normalized.includes("ಹೃದಯಾಘಾತ") ||
+      normalized.includes("ರಕ್ತಸ್ರಾವ") ||
+      normalized.includes("ಉಸಿರಾಟ") ||
+      normalized.includes("ಪ್ರಜ್ಞೆ") ||
+      normalized.includes("ಅಪಘಾತ") ||
+      // Hindi keywords
+      normalized.includes("आपातकालीन") ||
+      normalized.includes("एम्बुलेंस") ||
+      normalized.includes("सीने में दर्द") ||
+      normalized.includes("खून") ||
+      normalized.includes("बेहोश")
     ) {
       return {
         intent: "EMERGENCY",
         confidence: 0.99,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -253,13 +274,22 @@ export class SarvamService {
       normalized.includes("dhanyawad") ||
       normalized.includes("band karo") ||
       normalized.includes("end call") ||
-      normalized.includes("hang up")
+      normalized.includes("hang up") ||
+      // Kannada keywords
+      normalized.includes("ಧನ್ಯವಾದ") ||
+      normalized.includes("ಮುಕ್ತಾಯ") ||
+      normalized.includes("ಸಾಕು") ||
+      normalized.includes("ಕಟ್ ಮಾಡಿ") ||
+      // Hindi keywords
+      normalized.includes("धन्यवाद") ||
+      normalized.includes("अलविदा") ||
+      normalized.includes("कॉल समाप्त")
     ) {
       return {
         intent: "END_CALL",
         confidence: 0.95,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -271,6 +301,17 @@ export class SarvamService {
       normalized.includes("pin") ||
       normalized.includes("code") ||
       normalized.includes("verify") ||
+      // Kannada keywords
+      normalized.includes("ರೇಷನ್") ||
+      normalized.includes("ಪಡಿತರ") ||
+      normalized.includes("ಕಾರ್ಡ್ ಸಂಖ್ಯೆ") ||
+      normalized.includes("ಕೋಡ್") ||
+      normalized.includes("ಪರಿಶೀಲನೆ") ||
+      // Hindi keywords
+      normalized.includes("राशन") ||
+      normalized.includes("कार्ड नंबर") ||
+      normalized.includes("पिन") ||
+      normalized.includes("सत्यापन") ||
       digitsMatch
     ) {
       return {
@@ -278,7 +319,7 @@ export class SarvamService {
         confidence: 0.9,
         verificationCode: digitsMatch ? digitsMatch[0] : undefined,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -290,20 +331,40 @@ export class SarvamService {
       normalized.includes("kab milega") ||
       normalized.includes("application status") ||
       normalized.includes("card bana") ||
-      normalized.includes("card status")
+      normalized.includes("card status") ||
+      // Kannada keywords
+      normalized.includes("ಸ್ಥಿತಿ") ||
+      normalized.includes("ಪ್ರಗತಿ") ||
+      normalized.includes("ಎಲ್ಲಿಯವರೆಗೆ ಬಂತು") ||
+      normalized.includes("ಯಾವಾಗ ಬರುತ್ತೆ") ||
+      normalized.includes("ಅರ್ಜಿ ಸ್ಥಿತಿ") ||
+      normalized.includes("ಕಾರ್ಡ್ ಬಂದಿದೆಯಾ") ||
+      // Hindi keywords
+      normalized.includes("स्थिति") ||
+      normalized.includes("प्रगति") ||
+      normalized.includes("आवेदन स्थिति")
     ) {
-      const schemeId = normalized.includes("ayushman") || normalized.includes("pmjay") || normalized.includes("pm-jay")
-        ? "ab-pmjay"
-        : normalized.includes("janani") || normalized.includes("jsy") || normalized.includes("maternity")
-        ? "jsy"
-        : undefined;
+      const schemeId =
+        normalized.includes("ayushman") ||
+        normalized.includes("pmjay") ||
+        normalized.includes("pm-jay") ||
+        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
+        normalized.includes("आयुष्मान")
+          ? "ab-pmjay"
+          : normalized.includes("janani") ||
+            normalized.includes("jsy") ||
+            normalized.includes("maternity") ||
+            normalized.includes("ಜನನಿ") ||
+            normalized.includes("जननी")
+          ? "jsy"
+          : undefined;
 
       return {
         intent: "CHECK_ASSISTANCE_STATUS",
         confidence: 0.9,
         schemeId,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -316,13 +377,22 @@ export class SarvamService {
       normalized.includes("kab aayenge") ||
       normalized.includes("next visit") ||
       normalized.includes("asha kab") ||
-      normalized.includes("appointment")
+      normalized.includes("appointment") ||
+      // Kannada keywords
+      normalized.includes("ಭೇಟಿ") ||
+      normalized.includes("ಆಶಾ ಯಾವಾಗ ಬರುತ್ತಾರೆ") ||
+      normalized.includes("ಮನೆಭೇಟಿ") ||
+      normalized.includes("ಮುಂದಿನ ಭೇಟಿ") ||
+      // Hindi keywords
+      normalized.includes("दौरा") ||
+      normalized.includes("आशा कब आएंगी") ||
+      normalized.includes("अगली भेंट")
     ) {
       return {
         intent: "CHECK_FOLLOW_UP",
         confidence: 0.88,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -331,25 +401,50 @@ export class SarvamService {
       normalized.includes("help") ||
       normalized.includes("madad") ||
       normalized.includes("apply") ||
-      normalized.includes("form") ||
+      /\bform\b/.test(normalized) ||
       normalized.includes("sahayata") ||
       normalized.includes("banwana hai") ||
       normalized.includes("apply karna hai") ||
       normalized.includes("request assistance") ||
-      normalized.includes("enroll")
+      normalized.includes("enroll") ||
+      // Kannada keywords
+      normalized.includes("ಸಹಾಯ") ||
+      normalized.includes("ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು") ||
+      normalized.includes("ಮಾಡಿಸಿಕೊಡಿ") ||
+      normalized.includes("ಸಹಾಯ ಬೇಕು") ||
+      normalized.includes("ನೋಂದಣಿ") ||
+      // Hindi keywords
+      normalized.includes("मदद") ||
+      normalized.includes("सहायता") ||
+      normalized.includes("आवेदन करना है") ||
+      normalized.includes("बनवाना है") ||
+      normalized.includes("पंजीकरण")
     ) {
-      const schemeId = normalized.includes("ayushman") || normalized.includes("pmjay") || normalized.includes("pm-jay") || normalized.includes("senior")
-        ? "ab-pmjay"
-        : normalized.includes("janani") || normalized.includes("jsy") || normalized.includes("pregnancy") || normalized.includes("delivery")
-        ? "jsy"
-        : undefined;
+      const schemeId =
+        normalized.includes("ayushman") ||
+        normalized.includes("pmjay") ||
+        normalized.includes("pm-jay") ||
+        normalized.includes("senior") ||
+        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
+        normalized.includes("आयुष्मान")
+          ? "ab-pmjay"
+          : normalized.includes("janani") ||
+            normalized.includes("jsy") ||
+            normalized.includes("pregnancy") ||
+            normalized.includes("delivery") ||
+            normalized.includes("ಜನನಿ") ||
+            normalized.includes("जननी") ||
+            normalized.includes("ಗರ್ಭಿಣಿ") ||
+            normalized.includes("गर्भवती")
+          ? "jsy"
+          : undefined;
 
       return {
         intent: "REQUEST_ASSISTANCE",
         confidence: 0.85,
         schemeId,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -370,17 +465,65 @@ export class SarvamService {
       normalized.includes("70") ||
       normalized.includes("71") ||
       normalized.includes("pregnant") ||
-      normalized.includes("garbhwati")
+      normalized.includes("garbhwati") ||
+      normalized.includes("senior") ||
+      // Kannada keywords
+      normalized.includes("ಅರ್ಹತೆ") ||
+      normalized.includes("ಅರ್ಹರೇ") ||
+      normalized.includes("ಸಿಗುತ್ತಾ") ||
+      normalized.includes("ಸಿಗುವುದೇ") ||
+      normalized.includes("ತಾತ") ||
+      normalized.includes("ಅಜ್ಜ") ||
+      normalized.includes("ಅಜ್ಜಿ") ||
+      normalized.includes("ಹಿರಿಯ") ||
+      normalized.includes("ಗರ್ಭಿಣಿ") ||
+      // Hindi keywords
+      normalized.includes("पात्र") ||
+      normalized.includes("पात्रता") ||
+      normalized.includes("योग्यता") ||
+      normalized.includes("मिलेगा क्या") ||
+      normalized.includes("दादा") ||
+      normalized.includes("दादी") ||
+      normalized.includes("बुजुर्ग") ||
+      normalized.includes("गर्भवती")
     ) {
-      const schemeId = normalized.includes("janani") || normalized.includes("jsy") || normalized.includes("pregnant") || normalized.includes("maternity")
-        ? "jsy"
-        : "ab-pmjay";
+      const schemeId =
+        normalized.includes("janani") ||
+        normalized.includes("jsy") ||
+        normalized.includes("pregnant") ||
+        normalized.includes("maternity") ||
+        normalized.includes("ಜನನಿ") ||
+        normalized.includes("जननी") ||
+        normalized.includes("ಗರ್ಭಿಣಿ") ||
+        normalized.includes("गर्भवती")
+          ? "jsy"
+          : "ab-pmjay";
 
-      const memberIdentifier = normalized.includes("grandfather") || normalized.includes("dada") || normalized.includes("71") || normalized.includes("senior")
-        ? "senior_grandfather"
-        : normalized.includes("pregnant") || normalized.includes("wife") || normalized.includes("mother")
-        ? "maternal_mother"
-        : undefined;
+      const memberIdentifier =
+        normalized.includes("grandfather") ||
+        normalized.includes("dada") ||
+        normalized.includes("dadi") ||
+        normalized.includes("71") ||
+        normalized.includes("70") ||
+        normalized.includes("senior") ||
+        normalized.includes("bujurg") ||
+        normalized.includes("ತಾತ") ||
+        normalized.includes("ಅಜ್ಜ") ||
+        normalized.includes("ಅಜ್ಜಿ") ||
+        normalized.includes("ಹಿರಿಯ") ||
+        normalized.includes("दादा") ||
+        normalized.includes("दादी") ||
+        normalized.includes("बुजुर्ग")
+          ? "senior_grandfather"
+          : normalized.includes("pregnant") ||
+            normalized.includes("wife") ||
+            normalized.includes("mother") ||
+            normalized.includes("garbhwati") ||
+            normalized.includes("ಗರ್ಭಿಣಿ") ||
+            normalized.includes("ತಾಯಿ") ||
+            normalized.includes("गर्भवती")
+          ? "maternal_mother"
+          : undefined;
 
       return {
         intent: "CHECK_ELIGIBILITY",
@@ -388,7 +531,7 @@ export class SarvamService {
         schemeId,
         memberIdentifier,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -398,13 +541,22 @@ export class SarvamService {
       normalized.includes("asha didi") ||
       normalized.includes("meri asha") ||
       normalized.includes("contact asha") ||
-      normalized.includes("asha number")
+      normalized.includes("asha number") ||
+      // Kannada keywords
+      normalized.includes("ಆಶಾ ಕಾರ್ಯಕರ್ತೆ") ||
+      normalized.includes("ನಮ್ಮ ಆಶಾ") ||
+      normalized.includes("ಆಶಾ ನಂಬರ್") ||
+      // Hindi keywords
+      normalized.includes("आशा दीदी") ||
+      normalized.includes("मेरी आशा") ||
+      normalized.includes("आशा नंबर") ||
+      normalized.includes("आशा कार्यकर्ता")
     ) {
       return {
         intent: "CONTACT_ASHA",
         confidence: 0.85,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -416,13 +568,40 @@ export class SarvamService {
       normalized.includes("benefits") ||
       normalized.includes("list") ||
       normalized.includes("ayushman") ||
-      normalized.includes("janani")
+      normalized.includes("janani") ||
+      normalized.includes("pmjay") ||
+      normalized.includes("pm-jay") ||
+      // Kannada keywords
+      normalized.includes("ಯೋಜನೆ") ||
+      normalized.includes("ಸರ್ಕಾರಿ") ||
+      normalized.includes("ಆಯುಷ್ಮಾನ್") ||
+      normalized.includes("ಜನನಿ") ||
+      // Hindi keywords
+      normalized.includes("योजना") ||
+      normalized.includes("सरकारी") ||
+      normalized.includes("आयुष्मान") ||
+      normalized.includes("जननी")
     ) {
+      const schemeId =
+        normalized.includes("ayushman") ||
+        normalized.includes("pmjay") ||
+        normalized.includes("pm-jay") ||
+        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
+        normalized.includes("आयुष्मान")
+          ? "ab-pmjay"
+          : normalized.includes("janani") ||
+            normalized.includes("jsy") ||
+            normalized.includes("ಜನನಿ") ||
+            normalized.includes("जननी")
+          ? "jsy"
+          : undefined;
+
       return {
         intent: "CHECK_SCHEMES",
         confidence: 0.8,
+        schemeId,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -433,13 +612,19 @@ export class SarvamService {
       normalized.includes("hi") ||
       normalized.includes("pranam") ||
       normalized.includes("vanakkam") ||
-      normalized.includes("namaskara")
+      normalized.includes("namaskara") ||
+      // Kannada keywords
+      normalized.includes("ನಮಸ್ಕಾರ") ||
+      normalized.includes("ಹಲೋ") ||
+      // Hindi keywords
+      normalized.includes("नमस्ते") ||
+      normalized.includes("प्रणाम")
     ) {
       return {
         intent: "GREETING",
         confidence: 0.9,
         rawTranscript: raw,
-        language: sessionLanguage,
+        language: resolvedLanguage,
       };
     }
 
@@ -447,7 +632,7 @@ export class SarvamService {
       intent: "UNKNOWN",
       confidence: 0.5,
       rawTranscript: raw,
-      language: sessionLanguage,
+      language: resolvedLanguage,
     };
   }
 }

@@ -27,6 +27,7 @@ import {
 } from "../../../shared/schemas/voice.schema.js";
 import { requireAuth, requireRole } from "../plugins/guards.js";
 import { env } from "../config/env.js";
+import { toVoiceLanguage } from "../../../shared/types/voice.js";
 
 export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
   const db = (fastify as any).firestore || null;
@@ -118,7 +119,7 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const body = (request.body || {}) as any;
       const callerPhone = body.callerPhone || "+919876543210";
-      const language = body.language || "hi-IN";
+      const language = toVoiceLanguage(body.language || "en-IN");
 
       const session = await gatewayService.createInboundSession(callerPhone, undefined, language);
       return reply.send({ success: true, data: session });

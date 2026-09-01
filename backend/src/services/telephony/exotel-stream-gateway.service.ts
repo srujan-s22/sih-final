@@ -12,11 +12,13 @@ import {
   ExotelStreamOutboundMarkMessage,
   ExotelStreamOutboundClearMessage,
   ExotelStreamMediaFormat,
+  toVoiceLanguage,
 } from "../../../../shared/types/voice.js";
 import { ExotelStreamInboundMessageSchema } from "../../../../shared/schemas/voice.schema.js";
 import { VoiceGatewayService } from "./voice-gateway.service.js";
 import { VoiceSessionRepository } from "../../repositories/voice-session.repository.js";
 import { SarvamService } from "./sarvam.service.js";
+import { VoiceResponseFormatter } from "./voice-response-formatter.js";
 import {
   mulawToLinear16,
   linear16ToMulaw,
@@ -33,8 +35,8 @@ const SILENCE_ENERGY_THRESHOLD = 300; // RMS threshold for voice activity on 16-
 const SILENCE_CHUNKS_THRESHOLD = 45; // ~900ms of consecutive silence after speech (20ms frames)
 const MIN_SPEECH_CHUNKS = 12; // Minimum ~240ms of accumulated speech before triggering STT
 const MAX_TURN_CHUNKS = 350; // Maximum ~7 seconds of accumulated audio per speech turn
-const FRAME_CHUNK_SIZE_MULAW = 160; // 20ms of 8kHz 8-bit μ-law audio
-const FRAME_CHUNK_SIZE_PCM = 320; // 20ms of 8kHz 16-bit linear PCM audio
+export const FRAME_CHUNK_SIZE_MULAW = 160; // 20ms of 8kHz 8-bit μ-law audio
+export const FRAME_CHUNK_SIZE_PCM = 320; // 20ms of 8kHz 16-bit linear PCM audio
 
 export interface StreamSessionContext {
   streamSid: string | null;
@@ -231,8 +233,24 @@ export class ExotelStreamGatewayService {
       event.customParameters ||
       {};
 
-    const enforcedLanguage = env.VOICE_LANGUAGE || "en-IN";
-    context.language = enforcedLanguage;
+    // Authoritative Precedence:
+    // 1. If an existing VoiceSession exists for callSid (e.g. initiated from website), KEEP session.language
+    // 2. Otherwise, check Exotel start metadata (customParameters.language or startData.language)
+    // 3. Fallback safely to "en-IN"
+    let session = callSid ? await this.sessionRepository.getSessionByCallSid(callSid) : null;
+    let resolvedLanguage: string = "en-IN";
+
+    if (session && session.language) {
+      resolvedLanguage = toVoiceLanguage(session.language);
+    } else {
+      const rawExotelLang =
+        customParams?.language ||
+        startData?.language ||
+        event?.language;
+      resolvedLanguage = toVoiceLanguage(rawExotelLang || env.VOICE_LANGUAGE || "en-IN");
+    }
+
+    context.language = resolvedLanguage;
 
     if (streamSid) {
       this.activeStreams.set(streamSid, context);
@@ -240,15 +258,14 @@ export class ExotelStreamGatewayService {
 
     // Associate or create VoiceSession
     if (callSid) {
-      let session = await this.sessionRepository.getSessionByCallSid(callSid);
       if (!session) {
         // Inbound call direct into stream applet
         const callerPhone = customParams?.callerPhone || "+919876543210";
-        session = await this.gatewayService.createInboundSession(callerPhone, callSid, enforcedLanguage);
+        session = await this.gatewayService.createInboundSession(callerPhone, callSid, resolvedLanguage);
       }
       context.session = session;
       context.sessionId = session.id;
-      context.language = enforcedLanguage;
+      context.language = resolvedLanguage;
     }
 
     console.log("▶️ [ExotelStreamGateway] Exotel 'start' event bound", {
@@ -467,8 +484,7 @@ export class ExotelStreamGatewayService {
    * Graceful termination when maximum turn limit is exceeded
    */
   private async handleMaxTurnsReached(socket: WebSocket, context: StreamSessionContext): Promise<void> {
-    const farewell =
-      "You have reached the maximum duration for this helpline call. Please contact your ASHA worker or visit the SwasthyaSetu portal for further assistance. Goodbye!";
+    const farewell = VoiceResponseFormatter.getMaxTurnsPrompt(context.language);
     try {
       const ttsResult = await this.sarvamService.textToSpeech(farewell, context.language);
       const ttsAudio = ttsResult?.audios?.[0];

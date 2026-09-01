@@ -9,6 +9,7 @@ import {
   VoiceSession,
   VoicePublicConfig,
   CallHistoryItem,
+  toVoiceLanguage,
 } from "@shared/types/voice";
 import {
   Phone,
@@ -41,13 +42,8 @@ const QUICK_REASONS = [
 ];
 
 const DEFAULT_LANGUAGES = [
-  { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
   { code: "kn-IN", name: "Kannada", nativeName: "ಕನ್ನಡ" },
-  { code: "te-IN", name: "Telugu", nativeName: "తెలుగు" },
-  { code: "ta-IN", name: "Tamil", nativeName: "தமிழ்" },
-  { code: "mr-IN", name: "Marathi", nativeName: "मराठी" },
-  { code: "bn-IN", name: "Bengali", nativeName: "বাংলা" },
-  { code: "gu-IN", name: "Gujarati", nativeName: "ગુજરાતી" },
+  { code: "hi-IN", name: "Hindi", nativeName: "हिन्दी" },
   { code: "en-IN", name: "English", nativeName: "English" },
 ];
 
@@ -59,11 +55,11 @@ export function CitizenCallModal({
   defaultPhone = "",
   householdHeadName,
 }: CitizenCallModalProps) {
-  const { t } = useTranslation();
+  const { t, language: uiLanguage } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState(
     defaultPhone.replace(/^\+91/, "").replace(/\D/g, "")
   );
-  const [language, setLanguage] = useState("hi-IN");
+  const [language, setLanguage] = useState<string>(() => toVoiceLanguage(uiLanguage));
   const [reason, setReason] = useState(QUICK_REASONS[0]);
   const [activeTab, setActiveTab] = useState<"call" | "history">("call");
 
@@ -86,6 +82,7 @@ export function CitizenCallModal({
   // Load configuration & default phone
   useEffect(() => {
     if (isOpen) {
+      setLanguage(toVoiceLanguage(uiLanguage));
       voiceService.getVoiceConfig().then((res) => {
         if (res.success && res.data) {
           setConfig(res.data);
@@ -98,7 +95,7 @@ export function CitizenCallModal({
     } else {
       resetState();
     }
-  }, [isOpen, defaultPhone]);
+  }, [isOpen, defaultPhone, uiLanguage]);
 
   // Handle call timer
   useEffect(() => {
