@@ -28,17 +28,46 @@ export type CallOutcome =
 
 export type VoiceIntentType =
   | "GREETING"
-  | "EMERGENCY"
+  | "HELP"
+  | "ABOUT_SWASTHYASETU"
   | "CHECK_SCHEMES"
+  | "SCHEME_INFORMATION"
+  | "SPECIFIC_SCHEME_INFORMATION"
   | "CHECK_ELIGIBILITY"
+  | "HOW_TO_USE_WEBSITE"
+  | "CITIZEN_PORTAL_INFO"
+  | "ASHA_PORTAL_INFO"
+  | "ADMIN_PORTAL_INFO"
+  | "HOUSEHOLD_INFORMATION"
+  | "FAMILY_INFORMATION"
+  | "DOCUMENT_HELP"
+  | "NEXT_STEPS"
+  | "ASHA_HELP"
+  | "ASHA_CONNECTION"
   | "REQUEST_ASSISTANCE"
   | "CHECK_ASSISTANCE_STATUS"
   | "CHECK_FOLLOW_UP"
   | "CONTACT_ASHA"
   | "VERIFY_IDENTITY"
   | "GENERAL_SCHEME_INFO"
+  | "VOICE_ASSISTANT_HELP"
   | "END_CALL"
+  | "EMERGENCY"
   | "UNKNOWN";
+
+export interface ExtractedVoiceEntities {
+  age?: number;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  relation?: string;
+  pregnancyStatus?: boolean;
+  nursingStatus?: boolean;
+  disabilityStatus?: boolean;
+  householdCategory?: "BPL" | "AAY" | "APL" | "OTHER";
+  schemeId?: string;
+  serviceCode?: string;
+  verificationCode?: string;
+  topic?: string;
+}
 
 export type VoiceActionName =
   | "handleEmergencyRedirection"
@@ -50,6 +79,7 @@ export type VoiceActionName =
   | "getFollowUpStatus"
   | "getConnectedAsha"
   | "requestAssistance"
+  | "getGroundedKnowledge"
   | "endCall";
 
 export type SupportedVoiceLanguage = "en-IN" | "kn-IN" | "hi-IN";
@@ -174,6 +204,7 @@ export interface VoiceSession {
   relatedCaseId?: string | null;            // Linked case for outbound calls
   relatedFollowUpId?: string | null;        // Linked follow-up for outbound reminder calls
   outboundReason?: string | null;
+  conversationContext?: Record<string, any>;
   startedAt: string;
   endedAt?: string | null;
   createdAt: string;

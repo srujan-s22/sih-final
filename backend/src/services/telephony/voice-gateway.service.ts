@@ -24,6 +24,7 @@ import { SarvamService } from "./sarvam.service.js";
 import { ExotelService, ExotelTelephonyError } from "./exotel.service.js";
 import { VoiceActionService } from "./voice-action.service.js";
 import { VoiceResponseFormatter } from "./voice-response-formatter.js";
+import { voiceKnowledgeService } from "./voice-knowledge.service.js";
 import { CaseRepository } from "../../repositories/case.repository.js";
 import { HouseholdRepository } from "../../repositories/household.repository.js";
 import { UserRepository } from "../../repositories/user.repository.js";
@@ -294,9 +295,32 @@ export class VoiceGatewayService {
       }
     }
 
-    // Step 2: Extract Intent & Entities
-    const nluResult = this.sarvamService.understandIntent(transcript, session.language);
+    // Step 2: Extract Intent & Entities with multi-turn context
+    const nluResult = this.sarvamService.understandIntent(
+      transcript,
+      session.language,
+      session.conversationContext
+    );
     session.currentIntent = nluResult.intent;
+
+    // Persist extracted entities to conversation context for subsequent turns
+    if (!session.conversationContext) {
+      session.conversationContext = {};
+    }
+    if (nluResult.entities) {
+      if (nluResult.entities.age !== undefined) {
+        session.conversationContext.lastMemberAge = nluResult.entities.age;
+      }
+      if (nluResult.entities.relation) {
+        session.conversationContext.lastMemberRelation = nluResult.entities.relation;
+      }
+      if (nluResult.entities.gender) {
+        session.conversationContext.lastMemberGender = nluResult.entities.gender;
+      }
+      if (nluResult.entities.schemeId) {
+        session.conversationContext.lastSchemeId = nluResult.entities.schemeId;
+      }
+    }
 
     // If explicit verificationCode is passed in request, override
     if (request.verificationCode) {
@@ -309,7 +333,7 @@ export class VoiceGatewayService {
     let actionResultData: Record<string, unknown> | undefined;
     let shouldEndCall = false;
 
-    // Step 3: Dispatch to Strict Allowlisted VoiceActionService
+    // Step 3: Dispatch to Strict Allowlisted VoiceActionService or Grounded Knowledge Layer
     switch (nluResult.intent) {
       case "EMERGENCY": {
         executedAction = "handleEmergencyRedirection";
@@ -321,6 +345,32 @@ export class VoiceGatewayService {
 
       case "GREETING": {
         textResponse = VoiceResponseFormatter.getGreeting(session.language);
+        break;
+      }
+
+      case "ABOUT_SWASTHYASETU":
+      case "HOW_TO_USE_WEBSITE":
+      case "CITIZEN_PORTAL_INFO":
+      case "ASHA_PORTAL_INFO":
+      case "ADMIN_PORTAL_INFO":
+      case "SPECIFIC_SCHEME_INFORMATION":
+      case "SCHEME_INFORMATION":
+      case "VOICE_ASSISTANT_HELP":
+      case "HELP": {
+        executedAction = "getGroundedKnowledge";
+        const knowRes = voiceKnowledgeService.queryKnowledge({
+          transcript,
+          language: session.language,
+          intent: nluResult.intent,
+          topic: nluResult.topic,
+          schemeId: nluResult.schemeId,
+        });
+        if (knowRes.found) {
+          textResponse = knowRes.text;
+          actionResultData = { topic: knowRes.topic, category: knowRes.category };
+        } else {
+          textResponse = VoiceResponseFormatter.getGeneralSchemeInfo(session.language);
+        }
         break;
       }
 
@@ -348,16 +398,52 @@ export class VoiceGatewayService {
 
       case "CHECK_SCHEMES": {
         executedAction = "getPublicSchemeInfo";
-        const res = await this.voiceActionService.getPublicSchemeInfo(nluResult.schemeId, session);
-        textResponse = res.message;
-        actionResultData = res.data;
+        const knowRes = voiceKnowledgeService.queryKnowledge({
+          transcript,
+          language: session.language,
+          intent: nluResult.intent,
+          topic: nluResult.topic,
+          schemeId: nluResult.schemeId,
+        });
+        if (knowRes.found) {
+          textResponse = knowRes.text;
+          actionResultData = { schemeId: nluResult.schemeId, topic: knowRes.topic, category: knowRes.category };
+        } else {
+          const res = await this.voiceActionService.getPublicSchemeInfo(nluResult.schemeId, session);
+          textResponse = res.message;
+          actionResultData = res.data;
+        }
         break;
       }
 
       case "CHECK_ELIGIBILITY": {
-        if (session.verificationStatus !== "VERIFIED") {
-          // Privacy protection: prompt for verification in session language
-          textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
+        if (nluResult.clarificationPrompt) {
+          textResponse = nluResult.clarificationPrompt;
+        } else if (session.verificationStatus !== "VERIFIED") {
+          // If caller provided general attributes (e.g. 70+ senior citizen or pregnancy),
+          // explain the general scheme matching based on official criteria before asking for ration card verification
+          if (nluResult.entities?.age !== undefined && nluResult.entities.age >= 70) {
+            const lang = toVoiceLanguage(session.language);
+            if (lang === "kn-IN") {
+              textResponse = "70 ವರ್ಷ ಮತ್ತು ಮೇಲ್ಪಟ್ಟ ಹಿರಿಯ ನಾಗರಿಕರಿಗೆ ಸಾರ್ವತ್ರಿಕ ಆಯುಷ್ಮಾನ್ ಭಾರತ್ PM-JAY ಅಡಿಯಲ್ಲಿ 5 ಲಕ್ಷ ರೂಪಾಯಿಗಳ ಉಚಿತ ಆಸ್ಪತ್ರೆ ಚಿಕಿತ್ಸೆ ಲಭ್ಯವಿದೆ. ನಿಮ್ಮ ಕುಟುಂಬದ ನಿಖರ ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ದಯವಿಟ್ಟು ಪಡಿತರ ಚೀಟಿ ಸಂಖ್ಯೆಯನ್ನು ತಿಳಿಸಿ.";
+            } else if (lang === "hi-IN") {
+              textResponse = "70 वर्ष और उससे अधिक उम्र के बुजुर्गों के लिए आयुष्मान भारत PM-JAY के तहत 5 लाख रुपये का कैशलेस इलाज उपलब्ध है। अपने पारिवारिक रिकॉर्ड के सत्यापन के लिए कृपया राशन कार्ड नंबर बताएं।";
+            } else {
+              textResponse = "Senior citizens aged 70 and above qualify for up to ₹5 lakh cashless hospital cover under universal Ayushman Bharat PM-JAY. To verify your family's official record, please provide your ration card number.";
+            }
+          } else if (nluResult.entities?.pregnancyStatus) {
+            const lang = toVoiceLanguage(session.language);
+            if (lang === "kn-IN") {
+              textResponse = "ಗರ್ಭಿಣಿಯರಿಗೆ ಜನನಿ ಸುರಕ್ಷಾ ಯೋಜನೆ ಮತ್ತು ಮಾತೃ ವಂದನಾ ಯೋಜನೆ ಅಡಿಯಲ್ಲಿ ಆಸ್ಪತ್ರೆ ಹೆರಿಗೆ ಧನಸಹಾಯ ಮತ್ತು ಉಚಿತ ತಪಾಸಣೆ ಲಭ್ಯವಿದೆ. ನಿಮ್ಮ ಕುಟುಂಬದ ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ದಯವಿಟ್ಟು ಪಡಿತರ ಚೀಟಿ ಸಂಖ್ಯೆಯನ್ನು ತಿಳಿಸಿ.";
+            } else if (lang === "hi-IN") {
+              textResponse = "गर्भवती महिलाओं को जननी सुरक्षा योजना और मातृ वंदना योजना के तहत संस्थागत प्रसव सहायता और नकद लाभ मिलता है। पारिवारिक रिकॉर्ड सत्यापन के लिए कृपया राशन कार्ड नंबर बताएं।";
+            } else {
+              textResponse = "Pregnant women qualify for institutional delivery cash assistance and free checkups under JSY and PMMVY. To verify your family's official record, please provide your ration card number.";
+            }
+          } else {
+            // Privacy protection: prompt for verification in session language
+            textResponse = VoiceResponseFormatter.getVerificationPrompt(session.language);
+          }
         } else {
           executedAction = "getEligibilityForMember";
           const res = await this.voiceActionService.getEligibilityForMember(

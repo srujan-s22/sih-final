@@ -2,8 +2,10 @@ import { env } from "../../config/env.js";
 import {
   VoiceIntentType,
   SupportedVoiceLanguage,
+  ExtractedVoiceEntities,
   toVoiceLanguage,
 } from "../../../../shared/types/voice.js";
+import { multilingualNLU } from "./multilingual-nlu.js";
 
 export interface SarvamSttResponse {
   transcript: string;
@@ -20,6 +22,9 @@ export interface SarvamIntentExtractionResult {
   schemeId?: string;
   memberIdentifier?: string;
   verificationCode?: string;
+  entities?: ExtractedVoiceEntities;
+  topic?: string;
+  clarificationPrompt?: string;
   notes?: string;
   rawTranscript: string;
   language: string;
@@ -215,424 +220,47 @@ export class SarvamService {
 
   /**
    * Extract Structured Intent & Entities from Transcript
-   * Deterministic pattern matching with language-aware context mapping
+   * Deterministic multilingual NLU with entity extraction and context mapping
    * Supports English, Kannada, and Hindi (with natural code-switching / Hinglish / Kanglish)
    */
   public understandIntent(
     transcript: string,
-    sessionLanguage?: string
+    sessionLanguage?: string,
+    conversationContext?: Record<string, any>
   ): SarvamIntentExtractionResult {
-    const raw = transcript.trim();
-    const normalized = raw.toLowerCase();
-    const resolvedLanguage = toVoiceLanguage(sessionLanguage || env.VOICE_LANGUAGE || "en-IN");
+    const parseRes = multilingualNLU.parseTranscript(
+      transcript,
+      sessionLanguage,
+      conversationContext
+    );
 
-    // 0. Check for Medical Emergency (Instant safety redirection)
+    // Compute backward-compatible memberIdentifier for legacy test harnesses
+    let memberIdentifier: string | undefined;
     if (
-      normalized.includes("emergency") ||
-      normalized.includes("ambulance") ||
-      normalized.includes("108") ||
-      normalized.includes("102") ||
-      normalized.includes("chest pain") ||
-      normalized.includes("heart attack") ||
-      normalized.includes("dil ka daura") ||
-      normalized.includes("bleeding") ||
-      normalized.includes("khoon nikal") ||
-      normalized.includes("unconscious") ||
-      normalized.includes("behosh") ||
-      normalized.includes("accident") ||
-      normalized.includes("saans nahi aa rahi") ||
-      // Kannada keywords
-      normalized.includes("ತುರ್ತು") ||
-      normalized.includes("ಆಂಬ್ಯುಲೆನ್ಸ್") ||
-      normalized.includes("ಎದೆ ನೋವು") ||
-      normalized.includes("ಹೃದಯಾಘಾತ") ||
-      normalized.includes("ರಕ್ತಸ್ರಾವ") ||
-      normalized.includes("ಉಸಿರಾಟ") ||
-      normalized.includes("ಪ್ರಜ್ಞೆ") ||
-      normalized.includes("ಅಪಘಾತ") ||
-      // Hindi keywords
-      normalized.includes("आपातकालीन") ||
-      normalized.includes("एम्बुलेंस") ||
-      normalized.includes("सीने में दर्द") ||
-      normalized.includes("खून") ||
-      normalized.includes("बेहोश")
+      parseRes.entities.pregnancyStatus ||
+      parseRes.entities.relation === "mother" ||
+      parseRes.entities.relation === "wife"
     ) {
-      return {
-        intent: "EMERGENCY",
-        confidence: 0.99,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 1. Check for Termination / End Call
-    if (
-      normalized.includes("bye") ||
-      normalized.includes("alvida") ||
-      normalized.includes("shukriya") ||
-      normalized.includes("thank you") ||
-      normalized.includes("dhanyawad") ||
-      normalized.includes("band karo") ||
-      normalized.includes("end call") ||
-      normalized.includes("hang up") ||
-      // Kannada keywords
-      normalized.includes("ಧನ್ಯವಾದ") ||
-      normalized.includes("ಮುಕ್ತಾಯ") ||
-      normalized.includes("ಸಾಕು") ||
-      normalized.includes("ಕಟ್ ಮಾಡಿ") ||
-      // Hindi keywords
-      normalized.includes("धन्यवाद") ||
-      normalized.includes("अलविदा") ||
-      normalized.includes("कॉल समाप्त")
+      memberIdentifier = "maternal_mother";
+    } else if (
+      parseRes.entities.relation === "grandfather" ||
+      parseRes.entities.relation === "grandmother" ||
+      (parseRes.entities.age !== undefined && parseRes.entities.age >= 60)
     ) {
-      return {
-        intent: "END_CALL",
-        confidence: 0.95,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 2. Check for Verification / Digits PIN
-    const digitsMatch = raw.match(/\b\d{4,12}\b/);
-    if (
-      normalized.includes("ration") ||
-      normalized.includes("card number") ||
-      normalized.includes("pin") ||
-      normalized.includes("code") ||
-      normalized.includes("verify") ||
-      // Kannada keywords
-      normalized.includes("ರೇಷನ್") ||
-      normalized.includes("ಪಡಿತರ") ||
-      normalized.includes("ಕಾರ್ಡ್ ಸಂಖ್ಯೆ") ||
-      normalized.includes("ಕೋಡ್") ||
-      normalized.includes("ಪರಿಶೀಲನೆ") ||
-      // Hindi keywords
-      normalized.includes("राशन") ||
-      normalized.includes("कार्ड नंबर") ||
-      normalized.includes("पिन") ||
-      normalized.includes("सत्यापन") ||
-      digitsMatch
-    ) {
-      return {
-        intent: "VERIFY_IDENTITY",
-        confidence: 0.9,
-        verificationCode: digitsMatch ? digitsMatch[0] : undefined,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 3. Check for Assistance Status
-    if (
-      normalized.includes("status") ||
-      normalized.includes("progress") ||
-      normalized.includes("kaha tak") ||
-      normalized.includes("kab milega") ||
-      normalized.includes("application status") ||
-      normalized.includes("card bana") ||
-      normalized.includes("card status") ||
-      // Kannada keywords
-      normalized.includes("ಸ್ಥಿತಿ") ||
-      normalized.includes("ಪ್ರಗತಿ") ||
-      normalized.includes("ಎಲ್ಲಿಯವರೆಗೆ ಬಂತು") ||
-      normalized.includes("ಯಾವಾಗ ಬರುತ್ತೆ") ||
-      normalized.includes("ಅರ್ಜಿ ಸ್ಥಿತಿ") ||
-      normalized.includes("ಕಾರ್ಡ್ ಬಂದಿದೆಯಾ") ||
-      // Hindi keywords
-      normalized.includes("स्थिति") ||
-      normalized.includes("प्रगति") ||
-      normalized.includes("आवेदन स्थिति")
-    ) {
-      const schemeId =
-        normalized.includes("ayushman") ||
-        normalized.includes("pmjay") ||
-        normalized.includes("pm-jay") ||
-        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
-        normalized.includes("आयुष्मान")
-          ? "ab-pmjay"
-          : normalized.includes("janani") ||
-            normalized.includes("jsy") ||
-            normalized.includes("maternity") ||
-            normalized.includes("ಜನನಿ") ||
-            normalized.includes("जननी")
-          ? "jsy"
-          : undefined;
-
-      return {
-        intent: "CHECK_ASSISTANCE_STATUS",
-        confidence: 0.9,
-        schemeId,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 4. Check for Follow-up Schedule
-    if (
-      normalized.includes("follow up") ||
-      normalized.includes("followup") ||
-      normalized.includes("visit") ||
-      normalized.includes("kab aayengi") ||
-      normalized.includes("kab aayenge") ||
-      normalized.includes("next visit") ||
-      normalized.includes("asha kab") ||
-      normalized.includes("appointment") ||
-      // Kannada keywords
-      normalized.includes("ಭೇಟಿ") ||
-      normalized.includes("ಆಶಾ ಯಾವಾಗ ಬರುತ್ತಾರೆ") ||
-      normalized.includes("ಮನೆಭೇಟಿ") ||
-      normalized.includes("ಮುಂದಿನ ಭೇಟಿ") ||
-      // Hindi keywords
-      normalized.includes("दौरा") ||
-      normalized.includes("आशा कब आएंगी") ||
-      normalized.includes("अगली भेंट")
-    ) {
-      return {
-        intent: "CHECK_FOLLOW_UP",
-        confidence: 0.88,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 5. Check for Request Assistance / ASHA Help
-    if (
-      normalized.includes("help") ||
-      normalized.includes("madad") ||
-      normalized.includes("apply") ||
-      /\bform\b/.test(normalized) ||
-      normalized.includes("sahayata") ||
-      normalized.includes("banwana hai") ||
-      normalized.includes("apply karna hai") ||
-      normalized.includes("request assistance") ||
-      normalized.includes("enroll") ||
-      // Kannada keywords
-      normalized.includes("ಸಹಾಯ") ||
-      normalized.includes("ಅರ್ಜಿ ಸಲ್ಲಿಸಬೇಕು") ||
-      normalized.includes("ಮಾಡಿಸಿಕೊಡಿ") ||
-      normalized.includes("ಸಹಾಯ ಬೇಕು") ||
-      normalized.includes("ನೋಂದಣಿ") ||
-      // Hindi keywords
-      normalized.includes("मदद") ||
-      normalized.includes("सहायता") ||
-      normalized.includes("आवेदन करना है") ||
-      normalized.includes("बनवाना है") ||
-      normalized.includes("पंजीकरण")
-    ) {
-      const schemeId =
-        normalized.includes("ayushman") ||
-        normalized.includes("pmjay") ||
-        normalized.includes("pm-jay") ||
-        normalized.includes("senior") ||
-        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
-        normalized.includes("आयुष्मान")
-          ? "ab-pmjay"
-          : normalized.includes("janani") ||
-            normalized.includes("jsy") ||
-            normalized.includes("pregnancy") ||
-            normalized.includes("delivery") ||
-            normalized.includes("ಜನನಿ") ||
-            normalized.includes("जननी") ||
-            normalized.includes("ಗರ್ಭಿಣಿ") ||
-            normalized.includes("गर्भवती")
-          ? "jsy"
-          : undefined;
-
-      return {
-        intent: "REQUEST_ASSISTANCE",
-        confidence: 0.85,
-        schemeId,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 6. Check for Specific Eligibility / Member check
-    if (
-      normalized.includes("eligible") ||
-      normalized.includes("eligibility") ||
-      normalized.includes("patra") ||
-      normalized.includes("patrata") ||
-      normalized.includes("yogyata") ||
-      normalized.includes("milega kya") ||
-      normalized.includes("qualify") ||
-      normalized.includes("qualification") ||
-      normalized.includes("grandfather") ||
-      normalized.includes("dada") ||
-      normalized.includes("dadi") ||
-      normalized.includes("bujurg") ||
-      normalized.includes("70") ||
-      normalized.includes("71") ||
-      normalized.includes("pregnant") ||
-      normalized.includes("garbhwati") ||
-      normalized.includes("senior") ||
-      // Kannada keywords
-      normalized.includes("ಅರ್ಹತೆ") ||
-      normalized.includes("ಅರ್ಹರೇ") ||
-      normalized.includes("ಸಿಗುತ್ತಾ") ||
-      normalized.includes("ಸಿಗುವುದೇ") ||
-      normalized.includes("ತಾತ") ||
-      normalized.includes("ಅಜ್ಜ") ||
-      normalized.includes("ಅಜ್ಜಿ") ||
-      normalized.includes("ಹಿರಿಯ") ||
-      normalized.includes("ಗರ್ಭಿಣಿ") ||
-      // Hindi keywords
-      normalized.includes("पात्र") ||
-      normalized.includes("पात्रता") ||
-      normalized.includes("योग्यता") ||
-      normalized.includes("मिलेगा क्या") ||
-      normalized.includes("दादा") ||
-      normalized.includes("दादी") ||
-      normalized.includes("बुजुर्ग") ||
-      normalized.includes("गर्भवती")
-    ) {
-      const schemeId =
-        normalized.includes("janani") ||
-        normalized.includes("jsy") ||
-        normalized.includes("pregnant") ||
-        normalized.includes("maternity") ||
-        normalized.includes("ಜನನಿ") ||
-        normalized.includes("जननी") ||
-        normalized.includes("ಗರ್ಭಿಣಿ") ||
-        normalized.includes("गर्भवती")
-          ? "jsy"
-          : "ab-pmjay";
-
-      const memberIdentifier =
-        normalized.includes("grandfather") ||
-        normalized.includes("dada") ||
-        normalized.includes("dadi") ||
-        normalized.includes("71") ||
-        normalized.includes("70") ||
-        normalized.includes("senior") ||
-        normalized.includes("bujurg") ||
-        normalized.includes("ತಾತ") ||
-        normalized.includes("ಅಜ್ಜ") ||
-        normalized.includes("ಅಜ್ಜಿ") ||
-        normalized.includes("ಹಿರಿಯ") ||
-        normalized.includes("दादा") ||
-        normalized.includes("दादी") ||
-        normalized.includes("बुजुर्ग")
-          ? "senior_grandfather"
-          : normalized.includes("pregnant") ||
-            normalized.includes("wife") ||
-            normalized.includes("mother") ||
-            normalized.includes("garbhwati") ||
-            normalized.includes("ಗರ್ಭಿಣಿ") ||
-            normalized.includes("ತಾಯಿ") ||
-            normalized.includes("गर्भवती")
-          ? "maternal_mother"
-          : undefined;
-
-      return {
-        intent: "CHECK_ELIGIBILITY",
-        confidence: 0.85,
-        schemeId,
-        memberIdentifier,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 7. Check for Connected ASHA Worker details
-    if (
-      normalized.includes("asha worker") ||
-      normalized.includes("asha didi") ||
-      normalized.includes("meri asha") ||
-      normalized.includes("contact asha") ||
-      normalized.includes("asha number") ||
-      // Kannada keywords
-      normalized.includes("ಆಶಾ ಕಾರ್ಯಕರ್ತೆ") ||
-      normalized.includes("ನಮ್ಮ ಆಶಾ") ||
-      normalized.includes("ಆಶಾ ನಂಬರ್") ||
-      // Hindi keywords
-      normalized.includes("आशा दीदी") ||
-      normalized.includes("मेरी आशा") ||
-      normalized.includes("आशा नंबर") ||
-      normalized.includes("आशा कार्यकर्ता")
-    ) {
-      return {
-        intent: "CONTACT_ASHA",
-        confidence: 0.85,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 8. Check for Public / General Schemes
-    if (
-      normalized.includes("scheme") ||
-      normalized.includes("yojana") ||
-      normalized.includes("sarkari") ||
-      normalized.includes("benefits") ||
-      normalized.includes("list") ||
-      normalized.includes("ayushman") ||
-      normalized.includes("janani") ||
-      normalized.includes("pmjay") ||
-      normalized.includes("pm-jay") ||
-      // Kannada keywords
-      normalized.includes("ಯೋಜನೆ") ||
-      normalized.includes("ಸರ್ಕಾರಿ") ||
-      normalized.includes("ಆಯುಷ್ಮಾನ್") ||
-      normalized.includes("ಜನನಿ") ||
-      // Hindi keywords
-      normalized.includes("योजना") ||
-      normalized.includes("सरकारी") ||
-      normalized.includes("आयुष्मान") ||
-      normalized.includes("जननी")
-    ) {
-      const schemeId =
-        normalized.includes("ayushman") ||
-        normalized.includes("pmjay") ||
-        normalized.includes("pm-jay") ||
-        normalized.includes("ಆಯುಷ್ಮಾನ್") ||
-        normalized.includes("आयुष्मान")
-          ? "ab-pmjay"
-          : normalized.includes("janani") ||
-            normalized.includes("jsy") ||
-            normalized.includes("ಜನನಿ") ||
-            normalized.includes("जननी")
-          ? "jsy"
-          : undefined;
-
-      return {
-        intent: "CHECK_SCHEMES",
-        confidence: 0.8,
-        schemeId,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
-    }
-
-    // 9. Greeting / Start
-    if (
-      normalized.includes("namaste") ||
-      normalized.includes("hello") ||
-      normalized.includes("hi") ||
-      normalized.includes("pranam") ||
-      normalized.includes("vanakkam") ||
-      normalized.includes("namaskara") ||
-      // Kannada keywords
-      normalized.includes("ನಮಸ್ಕಾರ") ||
-      normalized.includes("ಹಲೋ") ||
-      // Hindi keywords
-      normalized.includes("नमस्ते") ||
-      normalized.includes("प्रणाम")
-    ) {
-      return {
-        intent: "GREETING",
-        confidence: 0.9,
-        rawTranscript: raw,
-        language: resolvedLanguage,
-      };
+      memberIdentifier = "senior_grandfather";
     }
 
     return {
-      intent: "UNKNOWN",
-      confidence: 0.5,
-      rawTranscript: raw,
-      language: resolvedLanguage,
+      intent: parseRes.intent,
+      confidence: parseRes.confidence,
+      schemeId: parseRes.schemeId,
+      memberIdentifier,
+      verificationCode: parseRes.entities.verificationCode,
+      entities: parseRes.entities,
+      topic: parseRes.topic,
+      clarificationPrompt: parseRes.clarificationPrompt,
+      rawTranscript: parseRes.rawTranscript,
+      language: parseRes.language,
     };
   }
 }
