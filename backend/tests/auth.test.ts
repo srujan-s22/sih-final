@@ -66,6 +66,38 @@ describe("Phase 2: Authentication, Roles & Consent Tests", () => {
       expect(data.user.consentStatus).toBe("pending");
       expect(data.isConsentRequired).toBe(true);
     });
+
+    it("Should reject test_token_ when running in production mode", async () => {
+      const originalEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = "production";
+        const res = await app.inject({
+          method: "GET",
+          url: "/api/v1/auth/me",
+          headers: {
+            authorization: "Bearer test_token_attacker_ADMIN",
+          },
+        });
+
+        expect(res.statusCode).toBe(401);
+        const body = JSON.parse(res.payload) as ApiErrorResponse;
+        expect(body.success).toBe(false);
+        expect(body.code).toBe("TEST_TOKEN_FORBIDDEN");
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+
+    it("Should include standard HTTP security headers on responses", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/health",
+      });
+
+      expect(res.headers["x-content-type-options"]).toBe("nosniff");
+      expect(res.headers["x-frame-options"]).toBe("DENY");
+      expect(res.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    });
   });
 
   describe("2. Idempotent User Sync & Strict Role Preservation", () => {

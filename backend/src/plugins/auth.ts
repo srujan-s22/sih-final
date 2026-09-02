@@ -32,6 +32,7 @@ import { ExotelService } from "../services/telephony/exotel.service.js";
 import { VoiceActionService } from "../services/telephony/voice-action.service.js";
 import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
+import { env } from "../config/env.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -239,8 +240,25 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
     let decodedToken: admin.auth.DecodedIdToken;
 
-    // Test token support for local testing / Vitest mock mode
+    // Test token support for local testing / Vitest mock mode (strictly forbidden in production/staging)
     if (token.startsWith("test_token_")) {
+      if (
+        env.NODE_ENV === "production" ||
+        env.NODE_ENV === "staging" ||
+        process.env.NODE_ENV === "production" ||
+        process.env.NODE_ENV === "staging"
+      ) {
+        request.log.warn({ correlationId }, "Rejected mock test token in non-development/test environment");
+        return reply.status(HTTP_STATUS.UNAUTHORIZED).send({
+          success: false,
+          error: "Unauthorized",
+          message: "Test tokens are not permitted in production or staging environments.",
+          code: "TEST_TOKEN_FORBIDDEN",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const parts = token.replace("test_token_", "").split("_");
       const uid = parts[0] || "test-user-uid";
       decodedToken = {

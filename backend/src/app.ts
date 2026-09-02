@@ -26,7 +26,13 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     ...opts,
   });
 
-  // 1. Core Plugins
+  // 1. Core Plugins & Security Headers
+  app.addHook("onSend", async (_request, reply) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  });
+
   app.register(correlationPlugin);
   app.register(corsPlugin);
   app.register(websocketPlugin, {

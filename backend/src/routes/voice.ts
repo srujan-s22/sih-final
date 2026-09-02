@@ -316,7 +316,11 @@ export const voiceRoutes: FastifyPluginAsync = async (fastify) => {
     );
 
     if (!isSecretAuthorized) {
-      if (!request.user || (request.user.role !== "ASHA" && request.user.role !== "ADMIN")) {
+      await request.server.authenticate(request, reply);
+      if (reply.sent) return;
+
+      const role = request.userProfile?.role;
+      if (!role || (role !== "ASHA" && role !== "ADMIN")) {
         return reply.status(403).send({
           success: false,
           error: { code: "FORBIDDEN", message: "Only authorized ASHA workers, Admins, or automation secret can initiate outbound reminder calls." },
