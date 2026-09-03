@@ -19,7 +19,7 @@ describe("Phase 8: GeminiService Unit Tests", () => {
   it("reports configured when a non-empty API key is provided", () => {
     const service = new GeminiService("test-gemini-key-2026");
     expect(service.isConfigured()).toBe(true);
-    expect(service.getModelName()).toBe("gemini-2.5-flash");
+    expect(service.getModelName()).toBe("gemini-3.6-flash");
   });
 
   it("fails closed with 503 GEMINI_UNCONFIGURED when generateContent is called without API key", async () => {

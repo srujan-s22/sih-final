@@ -84,9 +84,27 @@ export interface AISchemeSummary {
   schemeId: string;
   name: string;
   shortName: string;
+  description: string;
   category: string;
   level: "CENTRAL" | "STATE";
+  authority: string;
   benefitSummary: string;
+  benefitDetails?: string[];
+  eligibilitySummary: string;
+  requiredDocuments: Array<{
+    id: string;
+    name: string;
+    required: boolean;
+    description: string;
+    issuingAuthority?: string;
+  }>;
+  actions: Array<{
+    id: string;
+    title: string;
+    description: string;
+    actionType: string;
+  }>;
+  sourceUrl?: string;
   isVerified: boolean;
 }
 

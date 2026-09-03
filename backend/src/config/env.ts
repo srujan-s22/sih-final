@@ -38,8 +38,8 @@ const envSchema = z.object({
 
   // Phase 8 Gemini Conversational Assistant (Server-Side Only)
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
-  GEMINI_TIMEOUT_MS: z.coerce.number().default(15000),
+  GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
+  GEMINI_TIMEOUT_MS: z.coerce.number().default(45000),
   GEMINI_MAX_OUTPUT_TOKENS: z.coerce.number().default(2048),
 
   // Phase 10 n8n Automation & Webhooks

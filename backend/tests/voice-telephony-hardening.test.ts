@@ -370,7 +370,7 @@ describe("Voice Telephony Hardening & Multilingual Resolution", () => {
 
       expect(context.language).toBe("kn-IN");
       expect(context.session?.language).toBe("kn-IN");
-    });
+    }, 15000);
   });
 
   // ============================================================

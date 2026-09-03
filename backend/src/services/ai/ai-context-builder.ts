@@ -53,6 +53,7 @@ export class AIContextBuilder {
     evidence?: EvidenceRecord[];
     existingActions?: ActionPlanItem[];
     targetSchemeId?: string;
+    targetSchemeIds?: string[];
   }): AIContext {
     const language = params.language || "en";
     const members = params.members || [];
@@ -81,9 +82,23 @@ export class AIContextBuilder {
       chronicConditionsCount: Array.isArray(m.chronicConditions) ? m.chronicConditions.length : 0,
     }));
 
-    // Filter by target scheme if requested
-    const filteredEligibility = params.targetSchemeId
-      ? eligibility.filter((e) => e.schemeId === params.targetSchemeId)
+    // Resolve target scheme filters (supports single targetSchemeId or multiple targetSchemeIds)
+    const targetSchemeIdSet = new Set<string>();
+    if (params.targetSchemeId && params.targetSchemeId.trim()) {
+      targetSchemeIdSet.add(params.targetSchemeId.trim().toLowerCase());
+    }
+    if (Array.isArray((params as any).targetSchemeIds)) {
+      for (const id of (params as any).targetSchemeIds) {
+        if (id && typeof id === "string" && id.trim()) {
+          targetSchemeIdSet.add(id.trim().toLowerCase());
+        }
+      }
+    }
+    const hasTargetFilter = targetSchemeIdSet.size > 0;
+
+    // Filter by target scheme(s) if requested
+    const filteredEligibility = hasTargetFilter
+      ? eligibility.filter((e) => targetSchemeIdSet.has(e.schemeId.toLowerCase()))
       : eligibility;
 
     // 3. Eligibility Summaries
@@ -99,8 +114,12 @@ export class AIContextBuilder {
       isVerifiedScheme: e.isVerifiedScheme,
     }));
 
-    // 4. Gap Summaries
-    const gapResults: AIGapSummary[] = gaps.map((g) => ({
+    // 4. Gap Summaries (filtered to target schemes if focused query)
+    const filteredGaps = hasTargetFilter
+      ? gaps.filter((g) => !g.schemeId || targetSchemeIdSet.has(g.schemeId.toLowerCase()))
+      : gaps;
+
+    const gapResults: AIGapSummary[] = filteredGaps.map((g) => ({
       gapId: g.id,
       schemeId: g.schemeId,
       schemeName: g.schemeName,
@@ -111,20 +130,47 @@ export class AIContextBuilder {
       reason: g.reason,
     }));
 
-    // 5. Scheme Summaries
-    const schemeSummaries: AISchemeSummary[] = schemes.map((s) => ({
+    // 5. Scheme Summaries (filtered to target schemes if focused query, with rich authoritative details)
+    const filteredSchemes = hasTargetFilter
+      ? schemes.filter((s) => targetSchemeIdSet.has(s.id.toLowerCase()))
+      : schemes;
+
+    const schemeSummaries: AISchemeSummary[] = filteredSchemes.map((s) => ({
       schemeId: s.id,
       name: s.name,
       shortName: s.shortName,
+      description: s.description || "",
       category: s.category,
       level: s.level,
+      authority: s.authority || "Government of India",
       benefitSummary: s.benefitSummary,
+      benefitDetails: Array.isArray(s.benefitDetails) ? s.benefitDetails : [],
+      eligibilitySummary: s.eligibilitySummary || "",
+      requiredDocuments: Array.isArray(s.requiredDocuments)
+        ? s.requiredDocuments.map((doc) => ({
+            id: doc.id,
+            name: doc.name,
+            required: doc.required,
+            description: doc.description,
+            issuingAuthority: doc.issuingAuthority,
+          }))
+        : [],
+      actions: Array.isArray(s.actions)
+        ? s.actions.map((act) => ({
+            id: act.id,
+            title: act.title,
+            description: act.description,
+            actionType: act.actionType,
+          }))
+        : [],
+      sourceUrl: s.sourceMetadata?.sourceUrl,
       isVerified: s.sourceMetadata?.isVerified ?? false,
     }));
 
-    // 6. Verified Evidence ONLY (STRICT INVARIANT: No PENDING_REVIEW, DISCOVERED, or REJECTED)
+    // 6. Verified Evidence ONLY (filtered to target schemes if focused query)
     const verifiedEvidence: AIVerifiedEvidenceSummary[] = evidence
       .filter((ev) => ev.verificationStatus === "VERIFIED")
+      .filter((ev) => (hasTargetFilter ? targetSchemeIdSet.has(ev.schemeId.toLowerCase()) : true))
       .map((ev) => ({
         id: ev.id,
         schemeId: ev.schemeId,

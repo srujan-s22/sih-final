@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AssistantService } from "../src/services/ai/assistant.service.js";
+import { AssistantService, sanitizeAssistantReply } from "../src/services/ai/assistant.service.js";
 import { HouseholdRepository } from "../src/repositories/household.repository.js";
 import { SchemeRepository } from "../src/repositories/scheme.repository.js";
 import { EvidenceRepository } from "../src/repositories/evidence.repository.js";
@@ -112,7 +112,7 @@ describe("Phase 8: AssistantService Orchestration & Grounding Tests", () => {
   it("1. getStatus returns configured state and model identifier", () => {
     const status = assistantService.getStatus("CITIZEN");
     expect(status.isConfigured).toBe(true);
-    expect(status.model).toBe("gemini-2.5-flash");
+    expect(status.model).toBe("gemini-3.6-flash");
     expect(status.role).toBe("CITIZEN");
     expect(status.supportedLanguages).toContain("en");
   });
@@ -376,5 +376,246 @@ describe("Phase 8: AssistantService Orchestration & Grounding Tests", () => {
 
     expect(generateSpy).toHaveBeenCalledTimes(1);
     expect(res.reply).toBeDefined();
+  });
+
+  it("11. routes PMMVY questions to focused scheme mode and excludes unrelated schemes from AI context", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("What documents are required to enroll in PMMVY?");
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("pmmvy");
+    expect(routing.intent).toBe("DOCUMENTS");
+
+    const res = await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "What documents are required to enroll in PMMVY?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    // Context must contain PMMVY
+    expect(callArgs.systemInstruction).toContain("Pradhan Mantri Matru Vandana Yojana (PMMVY)");
+    expect(callArgs.systemInstruction).toContain("QUERY FOCUS: The user is asking specifically about PMMVY");
+
+    // Negative invariant: Must NOT dump AB-PMJAY or JSY scheme knowledge in focused PMMVY context
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana");
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Janani Suraksha Yojana");
+
+    // Invariant: Husband's Aadhaar must explicitly NOT be listed as mandatory
+    expect(callArgs.systemInstruction).toContain("HUSBAND'S AADHAAR IS NOT MANDATORY");
+    expect(res.reply).toBeDefined();
+  });
+
+  it("12. routes AB-PMJAY eligibility questions to focused scheme mode and excludes PMMVY/JSY", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("Am I eligible for Ayushman Bharat (AB-PMJAY)?");
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("ab-pmjay");
+    expect(routing.intent).toBe("ELIGIBILITY");
+
+    const res = await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "Am I eligible for Ayushman Bharat (AB-PMJAY)?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    // Context must contain AB-PMJAY
+    expect(callArgs.systemInstruction).toContain("Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana (AB-PMJAY)");
+    expect(callArgs.systemInstruction).toContain("QUERY FOCUS: The user is asking specifically about AB-PMJAY");
+
+    // Negative invariant: Must NOT dump PMMVY or JSY scheme knowledge
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Pradhan Mantri Matru Vandana Yojana");
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Janani Suraksha Yojana");
+    expect(res.reply).toBeDefined();
+  });
+
+  it("13. scopes verified citations strictly to targeted scheme during focused query", async () => {
+    const res = await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "What documents are required to enroll in PMMVY?",
+      },
+    });
+
+    // If citations are returned, none should point to PM-JAY or JSY
+    if (res.groundingData && res.groundingData.citedEvidence.length > 0) {
+      for (const ev of res.groundingData.citedEvidence) {
+        expect(ev.schemeId.toLowerCase()).toBe("pmmvy");
+      }
+    }
+  });
+
+  it("14. sanitizeAssistantReply strips raw markdown headings, dividers, and excess newlines", () => {
+    const messyOutput = `### Required Documents for PMMVY
+---
+1. Aadhaar Card of Mother
+2. MCP Card
+---
+### Next Steps
+Visit nearest Anganwadi Centre.`;
+
+    const cleaned = sanitizeAssistantReply(messyOutput);
+    expect(cleaned).not.toContain("###");
+    expect(cleaned).not.toContain("---");
+    expect(cleaned).toContain("Required Documents for PMMVY");
+    expect(cleaned).toContain("1. Aadhaar Card of Mother");
+    expect(cleaned).toContain("Visit nearest Anganwadi Centre.");
+  });
+
+  it("15. respects explicit schemeId parameter and routes directly to that scheme", async () => {
+    const routing = assistantService.detectQueryRouting(
+      "What are the benefits?",
+      "pmmvy"
+    );
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("pmmvy");
+    expect(routing.intent).toBe("BENEFITS");
+  });
+
+  it("16. focused information query 'What is PMMVY?' scopes context to PMMVY and excludes household and unrelated schemes", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("What is PMMVY?");
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("pmmvy");
+    expect(routing.intent).toBe("GENERAL");
+
+    await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "What is PMMVY?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    // Must contain PMMVY
+    expect(callArgs.systemInstruction).toContain("Pradhan Mantri Matru Vandana Yojana (PMMVY)");
+    expect(callArgs.systemInstruction).toContain("QUERY FOCUS: The user is asking specifically about PMMVY");
+
+    // Invariant: Must NOT dump household evaluation or unrelated schemes
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana");
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Janani Suraksha Yojana");
+    expect(callArgs.systemInstruction).toContain("No household eligibility evaluation requested or available.");
+  });
+
+  it("17. document query 'What documents are required for PMMVY?' scopes to documents and conditional proof guidance", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("What documents are required for PMMVY?");
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("pmmvy");
+    expect(routing.intent).toBe("DOCUMENTS");
+
+    await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "What documents are required for PMMVY?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    expect(callArgs.systemInstruction).toContain("INTENT: The user is asking specifically about required documents");
+    expect(callArgs.systemInstruction).toContain("HUSBAND'S AADHAAR IS NOT MANDATORY");
+    expect(callArgs.systemInstruction).toContain("Mother and Child Protection (MCP) Card");
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Ayushman Bharat");
+    expect(callArgs.systemInstruction).toContain("No household eligibility evaluation requested or available.");
+  });
+
+  it("18. personalized query 'Am I eligible for PMMVY?' includes household evaluation and missing requirements guidance", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("Am I eligible for PMMVY?");
+    expect(routing.mode).toBe("FOCUSED_SCHEME");
+    expect(routing.targetSchemeId).toBe("pmmvy");
+    expect(routing.intent).toBe("ELIGIBILITY");
+
+    await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "Am I eligible for PMMVY?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    // Must evaluate eligibility deterministically
+    expect(callArgs.systemInstruction).toContain("SCHEME: Pradhan Mantri Matru Vandana Yojana (pmmvy)");
+    expect(callArgs.systemInstruction).toContain("Deterministic Evaluation Status:");
+    expect(callArgs.systemInstruction).toContain("Never simply say \"Insufficient information\"");
+  });
+
+  it("19. broad query 'What healthcare schemes can my family get?' includes household context and all relevant schemes", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("What healthcare schemes can my family get?");
+    expect(routing.mode).toBe("BROAD_DISCOVERY");
+
+    const res = await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "What healthcare schemes can my family get?",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    expect(callArgs.systemInstruction).toContain("QUERY FOCUS: The user is asking a broad question about available schemes");
+    expect(callArgs.systemInstruction).toContain("SCHEME: Ayushman Bharat");
+    expect(res.groundingData.evaluatedSchemesCount).toBeGreaterThan(0);
+    expect(res.certainty).toBe("VERIFIED");
+  });
+
+  it("20. comparison query 'PMMVY vs JSY' includes only PMMVY and JSY and excludes AB-PMJAY", async () => {
+    const generateSpy = vi.spyOn(geminiService, "generateContent");
+    generateSpy.mockClear();
+
+    const routing = assistantService.detectQueryRouting("PMMVY vs JSY");
+    expect(routing.mode).toBe("COMPARISON");
+    expect(routing.targetSchemeIds).toContain("pmmvy");
+    expect(routing.targetSchemeIds).toContain("jsy");
+
+    await assistantService.chat({
+      authenticatedUserUid: mockUid,
+      userRole: "CITIZEN",
+      request: {
+        message: "PMMVY vs JSY",
+      },
+    });
+
+    expect(generateSpy).toHaveBeenCalledTimes(1);
+    const callArgs = generateSpy.mock.calls[0][0];
+
+    expect(callArgs.systemInstruction).toContain("QUERY FOCUS: The user is comparing schemes");
+    expect(callArgs.systemInstruction).toContain("Pradhan Mantri Matru Vandana Yojana (PMMVY)");
+    expect(callArgs.systemInstruction).toContain("Janani Suraksha Yojana");
+    expect(callArgs.systemInstruction).toContain("(JSY)");
+    expect(callArgs.systemInstruction).not.toContain("SCHEME: Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana");
   });
 });

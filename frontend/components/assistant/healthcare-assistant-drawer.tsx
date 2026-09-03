@@ -39,6 +39,179 @@ interface ChatEntry extends AssistantMessage {
   isError?: boolean;
 }
 
+function renderInlineFormatted(text: string) {
+  // Support both **bold** and __bold__ syntax
+  const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__)/g);
+  return parts.map((part, i) => {
+    if (
+      (part.startsWith("**") && part.endsWith("**")) ||
+      (part.startsWith("__") && part.endsWith("__"))
+    ) {
+      return (
+        <strong key={i} className="font-semibold text-slate-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
+function FormattedMessageContent({ content }: { content: string }) {
+  if (!content) return null;
+
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  let currentList: { type: "ul" | "ol"; items: string[] } | null = null;
+  let currentTable: { headers: string[]; rows: string[][] } | null = null;
+
+  const flushList = (key: string) => {
+    if (!currentList) return;
+    if (currentList.type === "ul") {
+      elements.push(
+        <ul key={key} className="my-2 pl-4 list-disc space-y-1 text-slate-800">
+          {currentList.items.map((item, idx) => (
+            <li key={idx}>{renderInlineFormatted(item)}</li>
+          ))}
+        </ul>
+      );
+    } else {
+      elements.push(
+        <ol key={key} className="my-2 pl-4 list-decimal space-y-1 text-slate-800">
+          {currentList.items.map((item, idx) => (
+            <li key={idx}>{renderInlineFormatted(item)}</li>
+          ))}
+        </ol>
+      );
+    }
+    currentList = null;
+  };
+
+  const flushTable = (key: string) => {
+    if (!currentTable) return;
+    elements.push(
+      <div key={key} className="my-2.5 overflow-x-auto rounded-lg border border-slate-200 shadow-2xs">
+        <table className="w-full text-xs text-left border-collapse">
+          {currentTable.headers.length > 0 && (
+            <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+              <tr>
+                {currentTable.headers.map((h, i) => (
+                  <th key={i} className="px-3 py-2">
+                    {renderInlineFormatted(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody className="divide-y divide-slate-200">
+            {currentTable.rows.map((row, rIdx) => (
+              <tr key={rIdx} className={rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                {row.map((cell, cIdx) => (
+                  <td key={cIdx} className="px-3 py-2 text-slate-800">
+                    {renderInlineFormatted(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    currentTable = null;
+  };
+
+  const flushAll = (key: string) => {
+    flushList(`${key}-list`);
+    flushTable(`${key}-table`);
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    // Skip horizontal dividers (---, ***, ___)
+    if (/^[-*_]{3,}$/.test(trimmed)) {
+      flushAll(`divider-${idx}`);
+      return;
+    }
+
+    // Markdown Table handling: lines starting and ending with |
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      flushList(`table-start-${idx}`);
+      // Table separator row: |---|---| or |:---|---:|
+      if (/^\|(\s*:?-+:?\s*\|)+$/.test(trimmed)) {
+        return; // Suppress separator line
+      }
+      const cells = trimmed
+        .slice(1, -1)
+        .split("|")
+        .map((c) => c.trim());
+
+      if (!currentTable) {
+        currentTable = { headers: cells, rows: [] };
+      } else {
+        currentTable.rows.push(cells);
+      }
+      return;
+    }
+
+    // Non-table line encountered
+    flushTable(`table-end-${idx}`);
+
+    // Clean leading heading markers (###, ##, #)
+    const isHeading = /^#{1,6}\s+/.test(trimmed);
+    const cleanedLine = trimmed.replace(/^#{1,6}\s+/, "");
+
+    // Check unordered bullet (•, -, *)
+    const ulMatch = cleanedLine.match(/^[•\-*]\s+(.*)$/);
+    if (ulMatch) {
+      if (currentList && currentList.type !== "ul") {
+        flushList(`list-${idx}`);
+      }
+      if (!currentList) {
+        currentList = { type: "ul", items: [] };
+      }
+      currentList.items.push(ulMatch[1]);
+      return;
+    }
+
+    // Check numbered list (1., 2.)
+    const olMatch = cleanedLine.match(/^\d+\.\s+(.*)$/);
+    if (olMatch) {
+      if (currentList && currentList.type !== "ol") {
+        flushList(`list-${idx}`);
+      }
+      if (!currentList) {
+        currentList = { type: "ol", items: [] };
+      }
+      currentList.items.push(olMatch[1]);
+      return;
+    }
+
+    // Regular line
+    flushList(`list-${idx}`);
+
+    if (cleanedLine.length > 0) {
+      if (isHeading) {
+        elements.push(
+          <h4 key={`h-${idx}`} className="font-semibold text-slate-900 mt-2.5 mb-1 text-sm">
+            {renderInlineFormatted(cleanedLine)}
+          </h4>
+        );
+      } else {
+        elements.push(
+          <p key={`p-${idx}`} className="my-1.5 leading-relaxed text-slate-800">
+            {renderInlineFormatted(cleanedLine)}
+          </p>
+        );
+      }
+    }
+  });
+
+  flushAll("final");
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
 export function HealthcareAssistantDrawer({
   isOpen,
   onClose,
@@ -344,7 +517,11 @@ export function HealthcareAssistantDrawer({
                       : "bg-slate-50 text-slate-800 border border-slate-200/80 shadow-2xs"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  {msg.role === "user" ? (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  ) : (
+                    <FormattedMessageContent content={msg.content} />
+                  )}
 
                   {/* Verified Citations Box */}
                   {msg.groundingData &&

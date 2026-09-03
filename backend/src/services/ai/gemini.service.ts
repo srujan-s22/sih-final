@@ -37,8 +37,8 @@ export class GeminiService {
     maxTokens?: number
   ) {
     this.apiKey = apiKey ?? env.GEMINI_API_KEY;
-    this.defaultModel = model ?? env.GEMINI_MODEL ?? "gemini-2.5-flash";
-    this.defaultTimeoutMs = timeoutMs ?? env.GEMINI_TIMEOUT_MS ?? 15000;
+    this.defaultModel = model ?? env.GEMINI_MODEL ?? "gemini-3.6-flash";
+    this.defaultTimeoutMs = timeoutMs ?? env.GEMINI_TIMEOUT_MS ?? 45000;
     this.defaultMaxTokens = maxTokens ?? env.GEMINI_MAX_OUTPUT_TOKENS ?? 2048;
 
     if (this.apiKey && this.apiKey.trim().length > 0) {

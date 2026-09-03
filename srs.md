@@ -340,7 +340,7 @@ The platform enforces three strictly separated roles defined in `shared/types/au
 | **Schema Validation** | Zod | `3.24.2` | Runtime API payload validation and schema contracts shared across frontend/backend |
 | **Backend Auth SDK** | Firebase Admin SDK | `13.10.0` | Cryptographic verification of Firebase ID tokens and server-side profile syncing |
 | **Database** | Google Cloud Firestore | Native API | Serverless NoSQL document database storing users, households, cases, and sessions |
-| **Conversational AI** | `@google/genai` (Gemini) | `2.19.0` | Grounded multi-turn contextual assistance via model `gemini-2.5-flash` |
+| **Conversational AI** | `@google/genai` (Gemini) | `2.19.0` | Grounded multi-turn contextual assistance via model `gemini-3.6-flash` |
 | **Voice STT** | Sarvam AI (Saaras) | `saaras:v3` | High-accuracy Indian English, Kannada, and Hindi speech-to-text transcription |
 | **Voice TTS** | Sarvam AI (Bulbul) | `bulbul:v3` | Natural regional speech synthesis at 8000Hz (Speaker: `shubh`) |
 | **Telephony Gateway** | Exotel PSTN & Stream Applet | Cloud REST / WSS | Carrier-grade PSTN inbound/outbound call bridging with real-time WebSocket streaming |
@@ -1251,7 +1251,7 @@ SwasthyaSetu implements an exhaustive automated test suite powered by **Vitest 3
 | `EXOTEL_API_TOKEN` | Backend Only | Exotel telephony API token. **NEVER EXPOSE.** |
 | `EXOTEL_VIRTUAL_NUMBER`| Backend & Public | Virtual phone number displayed on landing page for inbound calls. |
 | `GEMINI_API_KEY` | Backend Only | Google Gemini API key for assistant chat. **NEVER EXPOSE.** |
-| `GEMINI_MODEL` | Backend | Gemini model identifier (`gemini-2.5-flash`). |
+| `GEMINI_MODEL` | Backend | Gemini model identifier (`gemini-3.6-flash`). |
 | `TAVILY_API_KEY` | Backend Only | Tavily search API key for circular discovery. **NEVER EXPOSE.** |
 | `LYZR_API_KEY` | Backend Only | Lyzr AI studio API key. **NEVER EXPOSE.** |
 | `N8N_WEBHOOK_URL` | Backend Only | Outbound webhook endpoint for n8n orchestrator. |
