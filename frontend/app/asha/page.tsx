@@ -104,10 +104,12 @@ export default function AshaWorkspacePage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
 
   // Case Detail Modal State
+  type CaseDetailTab = "overview" | "journey" | "gaps" | "schemes" | "notes" | "followups" | "history";
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseDetail, setCaseDetail] = useState<CaseDetailResponse | null>(null);
+  const [selectedRequestContext, setSelectedRequestContext] = useState<AshaAssistanceRequest | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [detailTab, setDetailTab] = useState<"overview" | "journey" | "gaps" | "schemes" | "notes" | "followups" | "history">("overview");
+  const [detailTab, setDetailTab] = useState<CaseDetailTab>("overview");
 
   // Tasks & Journey State
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -373,9 +375,14 @@ export default function AshaWorkspacePage() {
   };
 
   // Load Case Detail
-  const openCaseDetail = async (caseId: string) => {
+  const openCaseDetail = async (
+    caseId: string,
+    initialTab: CaseDetailTab = "overview",
+    requestContext: AshaAssistanceRequest | null = null
+  ) => {
     setSelectedCaseId(caseId);
-    setDetailTab("overview");
+    setSelectedRequestContext(requestContext);
+    setDetailTab(initialTab);
     setIsDetailLoading(true);
     try {
       const res = await caseService.getCaseDetail(caseId);
@@ -392,10 +399,14 @@ export default function AshaWorkspacePage() {
   };
 
   // Open Case Detail by Household ID
-  const openCaseDetailByHousehold = (householdId: string) => {
+  const openCaseDetailByHousehold = (
+    householdId: string,
+    initialTab: CaseDetailTab = "overview",
+    requestContext: AshaAssistanceRequest | null = null
+  ) => {
     const matchingCase = cases.find((c) => c.householdId === householdId);
     if (matchingCase) {
-      openCaseDetail(matchingCase.id);
+      openCaseDetail(matchingCase.id, initialTab, requestContext);
     } else {
       setErrorMessage("Case for this household not found in your assigned caseload.");
     }
@@ -404,6 +415,7 @@ export default function AshaWorkspacePage() {
   const closeCaseDetail = () => {
     setSelectedCaseId(null);
     setCaseDetail(null);
+    setSelectedRequestContext(null);
   };
 
   // Status / Priority Update
@@ -1723,8 +1735,31 @@ export default function AshaWorkspacePage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => {
-                                    openCaseDetailByHousehold(req.householdId);
-                                    setDetailTab("journey");
+                                    // 1. Resolve master case ID safely (Priority A: req.caseId, Priority B: household case lookup)
+                                    const targetCase =
+                                      (req.caseId ? cases.find((c) => c.id === req.caseId) : null) ||
+                                      cases.find((c) => c.householdId === req.householdId);
+                                    const targetCaseId = req.caseId || targetCase?.id;
+
+                                    if (targetCaseId) {
+                                      // 2. Select initial tab based on category and scheme matching
+                                      let targetTab: CaseDetailTab = "overview";
+                                      if (
+                                        req.category === "SCHEME_ENROLLMENT" &&
+                                        req.schemeId &&
+                                        targetCase?.schemeId === req.schemeId
+                                      ) {
+                                        targetTab = "journey";
+                                      } else if (req.category === "FOLLOW_UP") {
+                                        targetTab = "followups";
+                                      } else if (req.category === "DOCUMENT_HELP") {
+                                        targetTab = "overview";
+                                      }
+
+                                      openCaseDetail(targetCaseId, targetTab, req);
+                                    } else {
+                                      setErrorMessage("Case for this household not found in your assigned caseload.");
+                                    }
                                   }}
                                   className="text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
                                 >
@@ -2363,6 +2398,43 @@ export default function AshaWorkspacePage() {
                 </div>
               )}
 
+              {/* Request Context Banner (when opened from an Assistance Request) */}
+              {selectedRequestContext && (
+                <div className="px-6 py-2.5 bg-teal-50/90 border-b border-teal-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-[10px] uppercase px-2 py-0.5 rounded bg-teal-800 text-white tracking-wider">
+                      {selectedRequestContext.category.replace(/_/g, " ")}
+                    </span>
+                    {selectedRequestContext.schemeName && (
+                      <span className="font-bold text-teal-950">
+                        {selectedRequestContext.schemeName}
+                      </span>
+                    )}
+                    {selectedRequestContext.beneficiaryName && (
+                      <span className="text-teal-800 flex items-center gap-1 font-medium">
+                        • <UserCheck className="w-3.5 h-3.5 text-teal-700 inline" />
+                        <span>{selectedRequestContext.beneficiaryName}</span>
+                        {selectedRequestContext.beneficiaryRelationship && (
+                          <span className="text-teal-600 text-[11px]">
+                            ({selectedRequestContext.beneficiaryRelationship}
+                            {selectedRequestContext.beneficiaryAge
+                              ? `, ${selectedRequestContext.beneficiaryAge}y`
+                              : ""}
+                            )
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-teal-700">
+                    <span className="font-mono">Req #{selectedRequestContext.id.slice(-6)}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 font-bold uppercase text-[10px]">
+                      {selectedRequestContext.status}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Sub-Tabs */}
               <div className="flex border-b border-slate-200 bg-white px-6 text-xs font-semibold overflow-x-auto">
                 <button
@@ -2450,6 +2522,40 @@ export default function AshaWorkspacePage() {
                     {/* TAB 0: SCHEME JOURNEY & FIELD TASKS */}
                     {detailTab === "journey" && (
                       <div>
+                        {/* Selected Request Scheme Mismatch Callout */}
+                        {selectedRequestContext?.schemeId &&
+                          caseDetail.case.schemeId &&
+                          selectedRequestContext.schemeId !== caseDetail.case.schemeId && (
+                            <div className="p-3.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1">
+                              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                                <span>Active Case Scheme vs. Selected Request</span>
+                              </div>
+                              <p className="text-amber-800 leading-relaxed">
+                                This master household case currently tracks the active journey for{" "}
+                                <strong>{caseDetail.case.schemeName || caseDetail.case.schemeId}</strong>.
+                                The selected assistance request is for{" "}
+                                <strong>{selectedRequestContext.schemeName || selectedRequestContext.schemeId}</strong>
+                                {selectedRequestContext.beneficiaryName
+                                  ? ` (Beneficiary: ${selectedRequestContext.beneficiaryName})`
+                                  : ""}
+                                . The milestones and checklist below belong to the case&apos;s active scheme.
+                              </p>
+                            </div>
+                          )}
+
+                        {/* Selected Request Non-Scheme Category Callout */}
+                        {selectedRequestContext && !selectedRequestContext.schemeId && (
+                          <div className="p-3 mb-5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                            <span className="font-bold text-slate-800">
+                              Selected Request: {selectedRequestContext.category.replace(/_/g, " ")}
+                            </span>
+                            <p className="text-slate-600">
+                              This request does not track a specific scheme milestone journey. Refer to the Household Info or Notes tabs.
+                            </p>
+                          </div>
+                        )}
+
                         {/* 1. When Scheme Assistance is NOT Started */}
                         {!caseDetail.case.schemeId ||
                         caseDetail.case.status === "NEW" ||
