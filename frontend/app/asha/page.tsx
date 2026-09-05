@@ -898,19 +898,36 @@ export default function AshaWorkspacePage() {
 
   const actionableFollowUpBadge = overdueFollowUpsCount + dueTodayFollowUpsCount;
 
+  const activeLeaveBadge = leaveRequests.filter((r) => r.status === "PENDING" || r.status === "APPROVED").length;
+
   const navTabs = [
     { id: "overview", label: t("navigation.dashboard"), icon: Activity },
-    { id: "cases", label: `${t("navigation.caseload")} (${totalAssignedHouseholds})`, icon: Users },
-    { id: "requests", label: `${t("navigation.assistance")} (${totalActiveRequestsCount})`, icon: Inbox },
-    { id: "attention", label: `${t("navigation.attentionSignals")} (${totalAttentionSignalsCount})`, icon: AlertCircle },
+    { id: "cases", label: t("navigation.caseload"), badge: totalAssignedHouseholds, icon: Users },
+    {
+      id: "requests",
+      label: t("navigation.assistance"),
+      badge: totalActiveRequestsCount > 0 ? totalActiveRequestsCount : undefined,
+      badgeVariant: "warning" as const,
+      icon: Inbox,
+    },
+    {
+      id: "attention",
+      label: t("navigation.attentionSignals"),
+      badge: totalAttentionSignalsCount > 0 ? totalAttentionSignalsCount : undefined,
+      badgeVariant: "danger" as const,
+      icon: AlertCircle,
+    },
     {
       id: "followups",
-      label: `${t("navigation.followUps")}${actionableFollowUpBadge > 0 ? ` (${actionableFollowUpBadge})` : ""}`,
+      label: t("navigation.followUps"),
+      badge: actionableFollowUpBadge > 0 ? actionableFollowUpBadge : undefined,
       icon: Clock,
     },
     {
       id: "leave",
-      label: `Leave (${leaveRequests.filter((r) => r.status === "PENDING" || r.status === "APPROVED").length})`,
+      label: "Leave & Coverage",
+      badge: activeLeaveBadge > 0 ? activeLeaveBadge : undefined,
+      badgeVariant: "primary" as const,
       icon: Calendar,
     },
   ];
@@ -969,7 +986,6 @@ export default function AshaWorkspacePage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
-            <LanguageSelector size="sm" />
             {userProfile?.ashaServiceCode && (
               <button
                 onClick={copyServiceCode}

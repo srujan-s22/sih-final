@@ -624,15 +624,17 @@ export default function AdminPage() {
   // --- Navigation Tabs ---
   const navTabs = [
     { id: "overview", label: t("navigation.dashboard"), icon: Building2 },
-    { id: "households", label: `${t("navigation.directory")} (${totalHouseholdsCount})`, icon: Users },
-    { id: "ashas", label: `${t("navigation.workforce")} (${totalAshasCount})`, icon: ShieldCheck },
-    { id: "cases", label: `${t("navigation.oversight")} (${activeCasesCount})`, icon: Inbox },
+    { id: "households", label: t("navigation.directory"), badge: totalHouseholdsCount, icon: Users },
+    { id: "ashas", label: t("navigation.workforce"), badge: totalAshasCount, icon: ShieldCheck },
+    { id: "cases", label: t("navigation.oversight"), badge: activeCasesCount, icon: Inbox },
     {
       id: "leave",
-      label: pendingLeavesCount > 0 ? `ASHA Leaves (${pendingLeavesCount})` : "ASHA Leaves",
+      label: "ASHA Leaves",
+      badge: pendingLeavesCount > 0 ? pendingLeavesCount : undefined,
+      badgeVariant: "warning" as const,
       icon: Calendar,
     },
-    { id: "schemes", label: `${t("navigation.registry")} (${schemes.length})`, icon: Layers },
+    { id: "schemes", label: t("navigation.registry"), badge: schemes.length, icon: Layers },
     { id: "monitoring", label: t("navigation.monitoring"), icon: Activity },
   ];
 
@@ -783,7 +785,6 @@ export default function AdminPage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
-            <LanguageSelector size="sm" />
             <Button
               variant="outline"
               size="sm"

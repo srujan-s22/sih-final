@@ -535,18 +535,31 @@ export default function CitizenPage() {
     }
   };
 
-  const navTabs = [
-    { id: "overview", label: t("navigation.overview"), icon: Users },
-    { id: "household", label: t("navigation.household"), icon: MapPin },
-    { id: "family", label: t("navigation.family"), icon: Users },
-    { id: "asha-connection", label: t("navigation.ashaConnect"), icon: UserCheck },
-    { id: "support", label: t("navigation.schemes"), icon: ShieldCheck },
-    { id: "actions", label: t("common.next"), icon: FileCheck },
-  ];
-
   const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
   const gapsCount = guidance?.gaps?.length || 0;
   const pendingAssistanceCount = assistanceRequests.filter((r) => r.status === "PENDING" || r.status === "IN_PROGRESS").length;
+  const familyCount = members.length > 0 ? members.length : undefined;
+
+  const navTabs = [
+    { id: "overview", label: t("navigation.overview"), icon: Users },
+    { id: "household", label: t("navigation.household"), icon: MapPin },
+    { id: "family", label: t("navigation.family"), badge: familyCount, icon: Users },
+    { id: "asha-connection", label: t("navigation.ashaConnect"), icon: UserCheck },
+    {
+      id: "support",
+      label: t("navigation.schemes"),
+      badge: eligibleCount > 0 ? eligibleCount : undefined,
+      badgeVariant: "success" as const,
+      icon: ShieldCheck,
+    },
+    {
+      id: "actions",
+      label: t("common.next"),
+      badge: pendingAssistanceCount > 0 ? pendingAssistanceCount : undefined,
+      badgeVariant: "warning" as const,
+      icon: FileCheck,
+    },
+  ];
 
   return (
     <ProtectedRoute allowedRoles={["CITIZEN"]}>
@@ -583,7 +596,6 @@ export default function CitizenPage() {
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
-            <LanguageSelector size="sm" />
             <Button
               variant="outline"
               size="sm"
