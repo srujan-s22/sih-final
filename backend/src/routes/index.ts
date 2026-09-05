@@ -13,6 +13,7 @@ import { connectionRoutes } from "./connection.js";
 import { assistanceRoutes } from "./assistance.js";
 import { voiceRoutes } from "./voice.js";
 import { testAuthRoutes } from "./test-auth.js";
+import { leaveRoutes } from "./leave.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Register health routes
@@ -53,6 +54,9 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Register Voice & Telephony routes (Phase 11)
   await fastify.register(voiceRoutes);
+
+  // Register ASHA Leave Request and Temporary Reassignment routes
+  await fastify.register(leaveRoutes);
 
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);

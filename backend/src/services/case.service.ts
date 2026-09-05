@@ -69,6 +69,12 @@ export class CaseService {
     private automationService?: AutomationService
   ) {}
 
+  private leaveService?: { evaluateAndRestoreExpiredLeaves: () => Promise<any> };
+
+  public setLeaveService(service: { evaluateAndRestoreExpiredLeaves: () => Promise<any> }): void {
+    this.leaveService = service;
+  }
+
   /**
    * Server-side authorization check:
    * ASHA can only access cases assigned to their specific UID.
@@ -100,6 +106,10 @@ export class CaseService {
     ashaUid: string,
     filter?: { status?: CaseStatus; priority?: CasePriority; search?: string }
   ): Promise<AshaCase[]> {
+    if (this.leaveService) {
+      await this.leaveService.evaluateAndRestoreExpiredLeaves();
+    }
+
     let cases = await this.caseRepo.listCasesByAsha(ashaUid, {
       status: filter?.status,
       priority: filter?.priority,
@@ -122,6 +132,10 @@ export class CaseService {
    * Computes real operational summary metrics for an ASHA worker's caseload
    */
   public async getAshaCaseSummary(ashaUid: string): Promise<CaseSummaryResponse> {
+    if (this.leaveService) {
+      await this.leaveService.evaluateAndRestoreExpiredLeaves();
+    }
+
     const cases = await this.caseRepo.listCasesByAsha(ashaUid);
     const now = new Date();
 
@@ -1182,8 +1196,18 @@ export class CaseService {
 
     if (existingCase) {
       const oldAsha = existingCase.assignedAshaUid;
+      // UPGRADE 6: If this case has an active temporary assignment from a leave request,
+      // mark it as SUPERSEDED_BY_MANUAL so that automatic restoration preserves this intentional admin reassignment.
+      const updatedTemporaryAssignment = existingCase.temporaryAssignment
+        ? {
+            ...existingCase.temporaryAssignment,
+            status: "SUPERSEDED_BY_MANUAL" as const,
+          }
+        : undefined;
+
       const updated = await this.caseRepo.updateCase(existingCase.id, {
         assignedAshaUid: ashaUid,
+        ...(updatedTemporaryAssignment ? { temporaryAssignment: updatedTemporaryAssignment } : {}),
       });
 
       await this.caseRepo.createActivity(existingCase.id, {
@@ -1253,6 +1277,9 @@ export class CaseService {
         HTTP_STATUS.FORBIDDEN,
         "FORBIDDEN_ROLE"
       );
+    }
+    if (this.leaveService) {
+      await this.leaveService.evaluateAndRestoreExpiredLeaves();
     }
     return this.caseRepo.listAllCases(filter);
   }

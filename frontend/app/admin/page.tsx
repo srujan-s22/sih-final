@@ -18,10 +18,12 @@ import {
   CaseDetailResponse,
 } from "@shared/types/case";
 import { VoiceHealthResponse } from "@shared/types/voice";
+import { AshaLeaveRequest, LeaveRequestStatus } from "@shared/types/leave";
 import { schemeService } from "@/services/scheme-service";
 import { evidenceService } from "@/services/evidence-service";
 import { caseService } from "@/services/case-service";
 import { voiceService } from "@/services/voice-service";
+import { leaveService, AvailableAshaWorker } from "@/services/leave-service";
 import {
   Building2,
   ShieldCheck,
@@ -52,6 +54,8 @@ import {
   HeartPulse,
   Share2,
   ArrowRight,
+  ArrowRightLeft,
+  UserMinus,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
 
@@ -114,16 +118,68 @@ export default function AdminPage() {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [actionSuccessBanner, setActionSuccessBanner] = useState<string | null>(null);
 
+  // --- ASHA Leave & Temporary Reassignment State ---
+  const [adminLeaves, setAdminLeaves] = useState<AshaLeaveRequest[]>([]);
+  const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
+  const [leaveFilter, setLeaveFilter] = useState<string>("ALL");
+  const [leaveSearch, setLeaveSearch] = useState("");
+  const [availableAshas, setAvailableAshas] = useState<AvailableAshaWorker[]>([]);
+  const [availableAshasCount, setAvailableAshasCount] = useState<number | null>(null);
+  const [isLoadingAvailableAshas, setIsLoadingAvailableAshas] = useState(false);
+
+  // Approve Modal State
+  const [selectedLeaveToApprove, setSelectedLeaveToApprove] = useState<AshaLeaveRequest | null>(null);
+  const [selectedReplacementUid, setSelectedReplacementUid] = useState("");
+  const [manualAshaCode, setManualAshaCode] = useState("");
+  const [approvalNotes, setApprovalNotes] = useState("");
+  const [isApproving, setIsApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
+
+  const selectedReplacementWorker = useMemo(() => {
+    if (!selectedReplacementUid) return null;
+    return (
+      availableAshas.find(
+        (a) =>
+          a.uid === selectedReplacementUid ||
+          (a.ashaServiceCode && a.ashaServiceCode.toLowerCase() === selectedReplacementUid.toLowerCase())
+      ) || null
+    );
+  }, [availableAshas, selectedReplacementUid]);
+
+  // Reject Modal State
+  const [selectedLeaveToReject, setSelectedLeaveToReject] = useState<AshaLeaveRequest | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
+
+  // Restoration Check State
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreBanner, setRestoreBanner] = useState<string | null>(null);
+
   // --- Assistant Drawer ---
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   // ============================================================================
   // DATA LOADERS
   // ============================================================================
+  const loadAdminLeaves = useCallback(async () => {
+    setIsLoadingLeaves(true);
+    try {
+      const res = await leaveService.getAllLeaveRequestsForAdmin();
+      if (res.success && res.data) {
+        setAdminLeaves(res.data.leaveRequests || []);
+      }
+    } catch {
+      // Non-blocking catch
+    } finally {
+      setIsLoadingLeaves(false);
+    }
+  }, []);
+
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [schemesRes, conflictsRes, casesRes, automationRes, followUpsRes, voiceRes] =
+      const [schemesRes, conflictsRes, casesRes, automationRes, followUpsRes, voiceRes, leavesRes] =
         await Promise.all([
           schemeService.getActiveSchemes(),
           evidenceService.getEvidenceConflicts(),
@@ -131,6 +187,7 @@ export default function AdminPage() {
           caseService.getAutomationHealth(),
           caseService.listAllFollowUpsForAdmin(),
           voiceService.getVoiceTelemetry(),
+          leaveService.getAllLeaveRequestsForAdmin(),
         ]);
 
       if (schemesRes.success && schemesRes.data) {
@@ -151,6 +208,9 @@ export default function AdminPage() {
       }
       if (voiceRes.success && voiceRes.data) {
         setVoiceTelemetry(voiceRes.data);
+      }
+      if (leavesRes.success && leavesRes.data) {
+        setAdminLeaves(leavesRes.data.leaveRequests || []);
       }
     } catch {
       // Non-blocking catch
@@ -225,6 +285,139 @@ export default function AdminPage() {
       setIsReassigning(false);
     }
   };
+
+  // --- Leave Management Handlers ---
+  const openApproveModal = useCallback(async (leave: AshaLeaveRequest) => {
+    setSelectedLeaveToApprove(leave);
+    setSelectedReplacementUid("");
+    setManualAshaCode("");
+    setApprovalNotes("");
+    setApproveError(null);
+    setIsLoadingAvailableAshas(true);
+    try {
+      const res = await leaveService.getEligibleReplacementAshas(leave.ashaId, leave.id);
+      if (res.success && res.data) {
+        setAvailableAshas(res.data.ashas || []);
+        setAvailableAshasCount(res.data.count ?? res.data.ashas?.length ?? 0);
+      } else {
+        setAvailableAshas([]);
+        setAvailableAshasCount(0);
+      }
+    } catch {
+      setAvailableAshas([]);
+      setAvailableAshasCount(0);
+    } finally {
+      setIsLoadingAvailableAshas(false);
+    }
+  }, []);
+
+  const handleApproveLeave = useCallback(async () => {
+    if (!selectedLeaveToApprove) return;
+    if (!selectedReplacementUid) {
+      setApproveError("Please select an available ASHA worker or enter an ASHA code.");
+      return;
+    }
+
+    setIsApproving(true);
+    setApproveError(null);
+    try {
+      const res = await leaveService.approveLeaveRequest(selectedLeaveToApprove.id, {
+        replacementAshaId: selectedReplacementUid,
+        notes: approvalNotes.trim() || undefined,
+      });
+
+      if (!res.success) {
+        setApproveError(res.error?.message || "Failed to approve leave request.");
+        return;
+      }
+
+      const rep = availableAshas.find(
+        (a) =>
+          a.uid === selectedReplacementUid ||
+          (a.ashaServiceCode && a.ashaServiceCode.toLowerCase() === selectedReplacementUid.toLowerCase())
+      );
+      const repName = rep ? `${rep.displayName} (${rep.ashaServiceCode})` : selectedReplacementUid;
+      const skipMsg = res.data.skippedCount > 0 ? ` (${res.data.skippedCount} conflicted/skipped)` : "";
+
+      setActionSuccessBanner(
+        `Leave approved for ${selectedLeaveToApprove.ashaName}. ${res.data.reassignedCount} households temporarily reassigned to ${repName}${skipMsg}.`
+      );
+
+      setSelectedLeaveToApprove(null);
+      await Promise.all([
+        loadAdminLeaves(),
+        caseService.listAllCasesForAdmin().then((c) => {
+          if (c.success && c.data) setAdminCases(c.data.cases || []);
+        }),
+      ]);
+    } catch (err: any) {
+      setApproveError(err.message || "An unexpected error occurred during approval.");
+    } finally {
+      setIsApproving(false);
+    }
+  }, [selectedLeaveToApprove, selectedReplacementUid, approvalNotes, availableAshas, loadAdminLeaves]);
+
+  const openRejectModal = useCallback((leave: AshaLeaveRequest) => {
+    setSelectedLeaveToReject(leave);
+    setRejectionReason("");
+    setRejectError(null);
+  }, []);
+
+  const handleRejectLeave = useCallback(async () => {
+    if (!selectedLeaveToReject) return;
+    if (!rejectionReason.trim() || rejectionReason.trim().length < 5) {
+      setRejectError("Please provide a rejection reason (minimum 5 characters).");
+      return;
+    }
+
+    setIsRejecting(true);
+    setRejectError(null);
+    try {
+      const res = await leaveService.rejectLeaveRequest(selectedLeaveToReject.id, {
+        reason: rejectionReason.trim(),
+      });
+
+      if (!res.success) {
+        setRejectError(res.error?.message || "Failed to reject leave request.");
+        return;
+      }
+
+      setActionSuccessBanner(`Leave request for ${selectedLeaveToReject.ashaName} was rejected.`);
+      setSelectedLeaveToReject(null);
+      await loadAdminLeaves();
+    } catch (err: any) {
+      setRejectError(err.message || "An unexpected error occurred during rejection.");
+    } finally {
+      setIsRejecting(false);
+    }
+  }, [selectedLeaveToReject, rejectionReason, loadAdminLeaves]);
+
+  const handleTriggerRestoreCheck = useCallback(async () => {
+    setIsRestoring(true);
+    setRestoreBanner(null);
+    try {
+      const res = await leaveService.triggerRestorationCheck();
+      if (res.success && res.data) {
+        const { evaluatedLeavesCount, restoredCount, skippedCount, reviewRequiredLeavesCount } = res.data;
+        setRestoreBanner(
+          `Restoration Check Complete: ${evaluatedLeavesCount} expired leaves evaluated. ${restoredCount} cases restored to original ASHA. ${skippedCount} assignments skipped/preserved. ${reviewRequiredLeavesCount > 0 ? `${reviewRequiredLeavesCount} leaves flagged for review.` : "0 conflicts."}`
+        );
+        await Promise.all([
+          loadAdminLeaves(),
+          caseService.listAllCasesForAdmin().then((c) => {
+            if (c.success && c.data) setAdminCases(c.data.cases || []);
+          }),
+        ]);
+      } else {
+        const errorMsg = (res as any).error?.message || (res as any).message || "Failed to run restoration check.";
+        setRestoreBanner(errorMsg);
+      }
+    } catch (err: any) {
+      setRestoreBanner(err.message || "Error running restoration check.");
+    } finally {
+      setIsRestoring(false);
+    }
+  }, [loadAdminLeaves]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || userProfile?.role !== "ADMIN") {
@@ -407,12 +600,38 @@ export default function AdminPage() {
     [schemes, adminCases]
   );
 
+  // 5. Leave & Temporary Reassignment Metrics
+  const pendingLeavesCount = useMemo(
+    () => adminLeaves.filter((l) => l.status === "PENDING").length,
+    [adminLeaves]
+  );
+  const activeLeavesCount = useMemo(
+    () => adminLeaves.filter((l) => l.status === "APPROVED").length,
+    [adminLeaves]
+  );
+  const completedLeavesCount = useMemo(
+    () => adminLeaves.filter((l) => l.status === "COMPLETED").length,
+    [adminLeaves]
+  );
+  const totalReassignedCasesCount = useMemo(
+    () =>
+      adminCases.filter(
+        (c) => c.temporaryAssignment && c.temporaryAssignment.status === "ACTIVE"
+      ).length,
+    [adminCases]
+  );
+
   // --- Navigation Tabs ---
   const navTabs = [
     { id: "overview", label: t("navigation.dashboard"), icon: Building2 },
     { id: "households", label: `${t("navigation.directory")} (${totalHouseholdsCount})`, icon: Users },
     { id: "ashas", label: `${t("navigation.workforce")} (${totalAshasCount})`, icon: ShieldCheck },
     { id: "cases", label: `${t("navigation.oversight")} (${activeCasesCount})`, icon: Inbox },
+    {
+      id: "leave",
+      label: pendingLeavesCount > 0 ? `ASHA Leaves (${pendingLeavesCount})` : "ASHA Leaves",
+      icon: Calendar,
+    },
     { id: "schemes", label: `${t("navigation.registry")} (${schemes.length})`, icon: Layers },
     { id: "monitoring", label: t("navigation.monitoring"), icon: Activity },
   ];
@@ -537,6 +756,21 @@ export default function AdminPage() {
       );
     });
   }, [adminFollowUps, followUpFilter, followUpSearch, todayIsoStr]);
+
+  const filteredLeaves = useMemo(() => {
+    return adminLeaves.filter((l) => {
+      if (leaveFilter !== "ALL" && l.status !== leaveFilter) return false;
+      if (leaveSearch.trim()) {
+        const q = leaveSearch.trim().toLowerCase();
+        const matchesName = (l.ashaName || "").toLowerCase().includes(q);
+        const matchesCode = (l.ashaServiceCode || "").toLowerCase().includes(q);
+        const matchesReplacement = (l.replacementAshaName || "").toLowerCase().includes(q);
+        const matchesReason = (l.reason || "").toLowerCase().includes(q);
+        if (!matchesName && !matchesCode && !matchesReplacement && !matchesReason) return false;
+      }
+      return true;
+    });
+  }, [adminLeaves, leaveFilter, leaveSearch]);
 
   return (
     <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -1991,6 +2225,426 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+
+            {/* ============================================================ */}
+            {/* C6. ASHA LEAVE & TEMPORARY REASSIGNMENT MANAGEMENT TAB */}
+            {/* ============================================================ */}
+            {activeTab === "leave" && (
+              <div className="space-y-6">
+                {/* Header and Restoration Trigger */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-teal-700" />
+                      <span>ASHA Leave &amp; Temporary Reassignment</span>
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500">
+                      Review leave requests, assign temporary household coverage with concurrency protection, and monitor automatic lazy restoration.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTriggerRestoreCheck}
+                      disabled={isRestoring}
+                      className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Run lazy restoration evaluation for expired leaves"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRestoring ? "animate-spin text-teal-600" : "text-teal-700"}`} />
+                      <span>{isRestoring ? "Checking Expiries..." : "Check & Restore Expired Leaves"}</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        loadAdminLeaves();
+                        caseService.listAllCasesForAdmin().then((c) => {
+                          if (c.success && c.data) setAdminCases(c.data.cases || []);
+                        });
+                      }}
+                      disabled={isLoadingLeaves}
+                      className="text-xs cursor-pointer"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLeaves ? "animate-spin" : ""}`} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Restoration banner if triggered */}
+                {restoreBanner && (
+                  <div className="rounded-xl border border-teal-200 bg-teal-50/80 p-4 text-xs text-teal-900 flex items-start justify-between shadow-2xs">
+                    <div className="flex items-start gap-2.5">
+                      <ArrowRightLeft className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-teal-950">Restoration Evaluation Report</p>
+                        <p className="text-teal-800 leading-relaxed">{restoreBanner}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setRestoreBanner(null)}
+                      className="text-teal-700 hover:text-teal-900 font-bold ml-3 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Pending Review</span>
+                      <Clock className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="text-2xl font-bold text-slate-900 flex items-baseline gap-2">
+                      <span>{pendingLeavesCount}</span>
+                      {pendingLeavesCount > 0 && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                          Action Required
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">Awaiting admin review &amp; replacement</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Active Coverage</span>
+                      <Users className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-teal-900">
+                      {activeLeavesCount}
+                    </div>
+                    <p className="text-[11px] text-slate-400">Leaves currently underway</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Reassigned Cases</span>
+                      <ArrowRightLeft className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-blue-900">
+                      {totalReassignedCasesCount}
+                    </div>
+                    <p className="text-[11px] text-slate-400">Households under temporary care</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Completed / Restored</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-900">
+                      {completedLeavesCount}
+                    </div>
+                    <p className="text-[11px] text-slate-400">Assignments restored to original ASHA</p>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {[
+                      { id: "ALL", label: `All (${adminLeaves.length})` },
+                      { id: "PENDING", label: `Pending (${pendingLeavesCount})` },
+                      { id: "APPROVED", label: `Approved / Active (${activeLeavesCount})` },
+                      { id: "COMPLETED", label: `Completed (${completedLeavesCount})` },
+                      { id: "REJECTED", label: `Rejected (${adminLeaves.filter(l => l.status === "REJECTED").length})` },
+                      { id: "CANCELLED", label: `Cancelled (${adminLeaves.filter(l => l.status === "CANCELLED").length})` },
+                    ].map((pill) => (
+                      <button
+                        key={pill.id}
+                        onClick={() => setLeaveFilter(pill.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+                          leaveFilter === pill.id
+                            ? "bg-slate-900 text-white shadow-2xs"
+                            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        }`}
+                      >
+                        {pill.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="w-full sm:w-72">
+                    <Input
+                      placeholder="Search ASHA, ID, replacement, reason..."
+                      value={leaveSearch}
+                      onChange={(e) => setLeaveSearch(e.target.value)}
+                      className="text-xs bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Leaves Table & Cards */}
+                {filteredLeaves.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-500 space-y-2 shadow-2xs">
+                    <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-1" />
+                    <p className="font-bold text-slate-800 text-sm">No Leave Requests Found</p>
+                    <p className="text-slate-500 max-w-sm mx-auto">
+                      {leaveSearch || leaveFilter !== "ALL"
+                        ? "No leave requests match your search query or filter."
+                        : "No ASHA worker has filed for leave yet."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop View */}
+                    <div className="hidden lg:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                          <tr>
+                            <th className="py-3 px-4">ASHA Worker</th>
+                            <th className="py-3 px-4">Leave Window (IST)</th>
+                            <th className="py-3 px-4">Reason</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Coverage &amp; Caseload</th>
+                            <th className="py-3 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredLeaves.map((leave) => {
+                            const isPending = leave.status === "PENDING";
+                            const isApproved = leave.status === "APPROVED";
+                            const isCompleted = leave.status === "COMPLETED";
+                            const isRejected = leave.status === "REJECTED";
+                            const isCancelled = leave.status === "CANCELLED";
+
+                            return (
+                              <tr key={leave.id} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="font-bold text-slate-900">{leave.ashaName}</div>
+                                  <div className="text-[10px] font-mono text-slate-500">
+                                    Code: {leave.ashaServiceCode || leave.ashaId}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="font-medium text-slate-800 flex items-center gap-1">
+                                    <span>{leave.startDate}</span>
+                                    <span className="text-slate-400">→</span>
+                                    <span>{leave.endDate}</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    Until 23:59 IST
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 max-w-xs">
+                                  <p className="text-slate-700 truncate" title={leave.reason}>
+                                    &ldquo;{leave.reason}&rdquo;
+                                  </p>
+                                </td>
+                                <td className="py-3 px-4">
+                                  {isPending && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                      <Clock className="w-3 h-3 text-amber-600" />
+                                      Pending Review
+                                    </span>
+                                  )}
+                                  {isApproved && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                      <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                                      Active Coverage
+                                    </span>
+                                  )}
+                                  {isCompleted && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                      Restored
+                                    </span>
+                                  )}
+                                  {isRejected && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                      <X className="w-3 h-3 text-rose-600" />
+                                      Rejected
+                                    </span>
+                                  )}
+                                  {isCancelled && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                      Cancelled
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  {isApproved && (
+                                    <div className="space-y-0.5">
+                                      <div className="text-slate-900 font-semibold flex items-center gap-1">
+                                        <ArrowRightLeft className="w-3 h-3 text-teal-600" />
+                                        <span>Replacement: {leave.replacementAshaName || leave.replacementAshaId}</span>
+                                      </div>
+                                      <div className="text-[11px] text-slate-500">
+                                        {leave.affectedHouseholdCount || 0} households transferred
+                                      </div>
+                                    </div>
+                                  )}
+                                  {isCompleted && (
+                                    <div className="space-y-0.5 text-[11px]">
+                                      <span className="text-emerald-800 font-semibold">
+                                        {leave.affectedHouseholdCount || 0} households restored to {leave.ashaName}
+                                      </span>
+                                      {leave.restorationStatus === "REQUIRES_REVIEW" && (
+                                        <div className="text-amber-800 font-semibold flex items-center gap-1">
+                                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                          <span>{leave.restorationNotes || "Review Needed"}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {isRejected && (
+                                    <div className="text-rose-700 text-[11px]">
+                                      Reason: {leave.reviewNotes || "Declined by administrator"}
+                                    </div>
+                                  )}
+                                  {isPending && (
+                                    <span className="text-slate-400 text-[11px] italic">
+                                      {leave.affectedHouseholdCount || 0} households will be temporarily reassigned upon approval
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  {isPending ? (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => openApproveModal(leave)}
+                                        className="text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer shadow-2xs"
+                                      >
+                                        Approve &amp; Reassign
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openRejectModal(leave)}
+                                        className="text-xs text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
+                                      >
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[11px]">
+                                      {new Date(leave.updatedAt).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Card List */}
+                    <div className="lg:hidden space-y-3">
+                      {filteredLeaves.map((leave) => {
+                        const isPending = leave.status === "PENDING";
+                        const isApproved = leave.status === "APPROVED";
+                        const isCompleted = leave.status === "COMPLETED";
+                        const isRejected = leave.status === "REJECTED";
+
+                        return (
+                          <div
+                            key={leave.id}
+                            className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-sm">{leave.ashaName}</h4>
+                                <p className="text-[10px] font-mono text-slate-500">
+                                  Code: {leave.ashaServiceCode || leave.ashaId}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isPending
+                                    ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                    : isApproved
+                                    ? "bg-teal-50 text-teal-800 border border-teal-200"
+                                    : isCompleted
+                                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                    : isRejected
+                                    ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {leave.status}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 bg-slate-50 rounded-lg text-xs space-y-1">
+                              <div className="flex justify-between text-slate-600">
+                                <span className="text-slate-400">Leave Window:</span>
+                                <span className="font-medium text-slate-800">
+                                  {leave.startDate} → {leave.endDate}
+                                </span>
+                              </div>
+                              <div className="text-slate-700 italic">
+                                &ldquo;{leave.reason}&rdquo;
+                              </div>
+                            </div>
+
+                            {isApproved && (
+                              <div className="text-xs bg-teal-50/50 p-2.5 rounded-lg border border-teal-100 text-teal-900 space-y-0.5">
+                                <div className="font-semibold flex items-center gap-1">
+                                  <ArrowRightLeft className="w-3.5 h-3.5 text-teal-700" />
+                                  <span>Coverage: {leave.replacementAshaName || leave.replacementAshaId}</span>
+                                </div>
+                                <div className="text-[11px] text-teal-700">
+                                  {leave.affectedHouseholdCount || 0} households temporarily transferred
+                                </div>
+                              </div>
+                            )}
+
+                            {isCompleted && (
+                              <div className="text-xs bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 text-emerald-900">
+                                <span className="font-semibold">
+                                  {leave.affectedHouseholdCount || 0} households restored
+                                </span>
+                                {leave.restorationStatus === "REQUIRES_REVIEW" && (
+                                  <span className="text-[11px] block text-amber-700 font-semibold">
+                                    {leave.restorationNotes || "Review Needed"}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {isRejected && (
+                              <div className="text-xs bg-rose-50 p-2.5 rounded-lg border border-rose-100 text-rose-800">
+                                <span className="font-semibold">Rejection reason: </span>
+                                <span>{leave.reviewNotes || "Declined by administrator"}</span>
+                              </div>
+                            )}
+
+                            {isPending && (
+                              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => openApproveModal(leave)}
+                                  className="flex-1 text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
+                                >
+                                  Approve &amp; Reassign
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openRejectModal(leave)}
+                                  className="text-xs text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -2299,6 +2953,320 @@ export default function AdminPage() {
                   className="text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer"
                 >
                   {isReassigning ? t("common.submitting") : t("common.confirm")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* APPROVE LEAVE & TEMPORARY REASSIGNMENT MODAL */}
+        {/* ============================================================ */}
+        {selectedLeaveToApprove && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-teal-700" />
+                  <h3 className="font-bold text-slate-900 text-base">Approve Leave &amp; Reassign Households</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedLeaveToApprove(null)}
+                  className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* Leave Context Summary */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-900 text-sm">{selectedLeaveToApprove.ashaName}</span>
+                    <span className="font-mono text-[11px] text-slate-500">{selectedLeaveToApprove.ashaServiceCode || selectedLeaveToApprove.ashaId}</span>
+                  </div>
+                  <div className="text-slate-600 flex items-center gap-2">
+                    <span className="font-semibold text-slate-700">Period:</span>
+                    <span>{selectedLeaveToApprove.startDate} to {selectedLeaveToApprove.endDate} (until 23:59 IST)</span>
+                  </div>
+                  <div className="text-slate-600">
+                    <span className="font-semibold text-slate-700">Reason:</span> &ldquo;{selectedLeaveToApprove.reason}&rdquo;
+                  </div>
+                </div>
+
+                {/* Concurrency & Safety Notice */}
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                    <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
+                    <span>Authoritative Assignment &amp; Concurrency Safe</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-blue-800">
+                    All households currently owned by {selectedLeaveToApprove.ashaName} will be temporarily transferred to the chosen replacement worker. Case histories, notes, and milestones remain untouched. Any household manually moved to another worker will not be overwritten.
+                  </p>
+                </div>
+
+                {/* Replacement ASHA Dual Selection */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-slate-800 block text-xs">
+                      Replacement ASHA <span className="text-rose-600">*</span>
+                    </label>
+                    <span className="text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                      Available ASHA Workers: {isLoadingAvailableAshas ? "..." : (availableAshasCount ?? 0)}
+                    </span>
+                  </div>
+
+                  {isLoadingAvailableAshas ? (
+                    <div className="p-4 bg-slate-50 rounded-xl text-center text-slate-500 text-xs">
+                      <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1 text-teal-600" />
+                      Loading active peer ASHAs...
+                    </div>
+                  ) : availableAshas.length === 0 ? (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>No ASHA workers are currently available for temporary assignment.</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-slate-500 font-medium">Select from available workers:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                        {availableAshas.map((worker) => {
+                          const isSelected =
+                            selectedReplacementUid === worker.uid ||
+                            (manualAshaCode &&
+                              worker.ashaServiceCode &&
+                              manualAshaCode.trim().toLowerCase() === worker.ashaServiceCode.toLowerCase());
+                          return (
+                            <button
+                              type="button"
+                              key={worker.uid}
+                              onClick={() => {
+                                setSelectedReplacementUid(worker.uid);
+                                setManualAshaCode(worker.ashaServiceCode || "");
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
+                                isSelected
+                                  ? "border-teal-700 bg-teal-50/90 text-teal-950 font-semibold ring-2 ring-teal-700/20 shadow-2xs"
+                                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-800"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-bold text-xs">{worker.ashaServiceCode || worker.uid.slice(0, 8)}</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-100 text-slate-600">
+                                  {worker.activeCaseCount} cases
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-900 font-medium truncate">
+                                {worker.displayName}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {worker.serviceArea || "Field Jurisdiction"}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OR Divider */}
+                  <div className="relative flex py-0.5 items-center">
+                    <div className="flex-grow border-t border-slate-200" />
+                    <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">OR</span>
+                    <div className="flex-grow border-t border-slate-200" />
+                  </div>
+
+                  {/* Manual ASHA Code Input */}
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 text-xs block">
+                      Enter ASHA Code
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., ASHA-002 or worker UID..."
+                      value={manualAshaCode}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        setManualAshaCode(code);
+                        const trimmed = code.trim();
+                        // Find match in available list to sync
+                        const match = availableAshas.find(
+                          (w) =>
+                            (w.ashaServiceCode && w.ashaServiceCode.toLowerCase() === trimmed.toLowerCase()) ||
+                            w.uid.toLowerCase() === trimmed.toLowerCase()
+                        );
+                        if (match) {
+                          setSelectedReplacementUid(match.uid);
+                        } else {
+                          setSelectedReplacementUid(trimmed);
+                        }
+                      }}
+                      className="text-xs font-mono bg-white uppercase"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Enter the worker&apos;s designated service code. Backend will validate existence and eligibility.
+                    </p>
+                  </div>
+
+                  {/* Selected Replacement Summary Card */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Selected Replacement
+                      </span>
+                      {selectedReplacementWorker && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Ready for Reassignment
+                        </span>
+                      )}
+                    </div>
+                    {selectedReplacementWorker ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">
+                            {selectedReplacementWorker.displayName}
+                          </p>
+                          <p className="text-[11px] font-mono text-slate-500">
+                            {selectedReplacementWorker.ashaServiceCode} • {selectedReplacementWorker.serviceArea}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+                          Current: {selectedReplacementWorker.activeCaseCount} cases
+                        </span>
+                      </div>
+                    ) : selectedReplacementUid ? (
+                      <div>
+                        <p className="text-xs font-mono font-bold text-slate-800">
+                          Target Code: {selectedReplacementUid}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Worker will be resolved and verified against backend eligibility upon approval.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">
+                        No replacement selected yet. Choose an available worker above or enter an ASHA code.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Approval Notes */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 block">
+                    Administrative Notes (Optional):
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g., Coordinating ward coverage for immunization drive..."
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    className="text-xs bg-white"
+                  />
+                </div>
+
+                {approveError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                    <span>{approveError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedLeaveToApprove(null)}
+                  disabled={isApproving}
+                  className="text-xs cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleApproveLeave}
+                  disabled={isApproving || !selectedReplacementUid.trim()}
+                  className="text-xs font-bold bg-teal-800 hover:bg-teal-900 text-white cursor-pointer shadow-2xs"
+                >
+                  {isApproving ? "Approving & Reassigning..." : "Confirm Approval & Reassign"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* REJECT LEAVE MODAL */}
+        {/* ============================================================ */}
+        {selectedLeaveToReject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <X className="w-5 h-5 text-rose-600" />
+                  <h3 className="font-bold text-slate-900 text-base">Reject Leave Request</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedLeaveToReject(null)}
+                  className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <p className="font-bold text-slate-900 text-sm">{selectedLeaveToReject.ashaName}</p>
+                  <p className="text-slate-600">
+                    Window: {selectedLeaveToReject.startDate} → {selectedLeaveToReject.endDate}
+                  </p>
+                  <p className="text-slate-500 italic">&ldquo;{selectedLeaveToReject.reason}&rdquo;</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 block">
+                    Reason for Rejection <span className="text-rose-600">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="State reason for rejecting this leave request..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    This reason will be visible to the ASHA worker on their portal.
+                  </p>
+                </div>
+
+                {rejectError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                    <span>{rejectError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedLeaveToReject(null)}
+                  disabled={isRejecting}
+                  className="text-xs cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleRejectLeave}
+                  disabled={isRejecting || rejectionReason.trim().length < 5}
+                  className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-2xs"
+                >
+                  {isRejecting ? "Rejecting..." : "Confirm Rejection"}
                 </Button>
               </div>
             </div>

@@ -34,6 +34,9 @@ export type CasePriority =
 export type CaseActivityType =
   | "CASE_CREATED"
   | "CASE_ASSIGNED"
+  | "CASE_TEMPORARILY_REASSIGNED"
+  | "CASE_ASSIGNMENT_RESTORED"
+  | "CASE_RESTORATION_SKIPPED"
   | "STATUS_CHANGED"
   | "PRIORITY_CHANGED"
   | "NOTE_ADDED"
@@ -110,6 +113,17 @@ export interface AshaCase {
   eligibleSchemesCount: number;
   lastContactAt: string | null;
   nextFollowUpAt: string | null;
+  temporaryAssignment?: {
+    originalAshaUid: string;
+    temporaryAshaUid: string;
+    leaveRequestId: string;
+    effectiveFrom: string;
+    effectiveUntil: string;
+    reason: string;
+    assignedAt: string;
+    assignedByUid: string;
+    status: "ACTIVE" | "COMPLETED" | "SUPERSEDED_BY_MANUAL";
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

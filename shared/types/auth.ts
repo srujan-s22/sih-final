@@ -24,6 +24,7 @@ export interface UserProfile {
   ashaServiceCode?: string | null;
   serviceArea?: string | null;
   preferredLanguage?: "en" | "kn" | "hi" | null;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

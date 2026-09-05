@@ -45,6 +45,8 @@ import { caseService } from "@/services/case-service";
 import { connectionService } from "@/services/connection-service";
 import { assistanceService } from "@/services/assistance-service";
 import { voiceService } from "@/services/voice-service";
+import { leaveService } from "@/services/leave-service";
+import { AshaLeaveRequest } from "@shared/types/leave";
 import {
   AshaCase,
   CaseDetailResponse,
@@ -181,6 +183,84 @@ export default function AshaWorkspacePage() {
   // Phase 8 Assistant Integration
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
+  // Leave Request State (ASHA Leave & Reassignment)
+  const [leaveRequests, setLeaveRequests] = useState<AshaLeaveRequest[]>([]);
+  const [isLeaveLoading, setIsLeaveLoading] = useState(false);
+  const [isLeaveSubmitting, setIsLeaveSubmitting] = useState(false);
+  const [leaveStartDate, setLeaveStartDate] = useState("");
+  const [leaveEndDate, setLeaveEndDate] = useState("");
+  const [leaveReason, setLeaveReason] = useState("");
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaveSuccess, setLeaveSuccess] = useState<string | null>(null);
+  const [cancellingLeaveId, setCancellingLeaveId] = useState<string | null>(null);
+
+  const loadLeaveRequests = useCallback(async () => {
+    setIsLeaveLoading(true);
+    try {
+      const res = await leaveService.getMyLeaveRequests();
+      if (res.success && res.data?.leaveRequests) {
+        setLeaveRequests(res.data.leaveRequests);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLeaveLoading(false);
+    }
+  }, []);
+
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLeaveError(null);
+    setLeaveSuccess(null);
+    if (!leaveStartDate || !leaveEndDate) {
+      setLeaveError("Please select both start and end dates.");
+      return;
+    }
+    if (new Date(leaveStartDate) > new Date(leaveEndDate)) {
+      setLeaveError("Start date cannot be after end date.");
+      return;
+    }
+    if (leaveReason.trim().length < 5) {
+      setLeaveError("Please provide a reason of at least 5 characters.");
+      return;
+    }
+    setIsLeaveSubmitting(true);
+    try {
+      const res = await leaveService.submitLeaveRequest({
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        reason: leaveReason.trim(),
+      });
+      if (res.success) {
+        setLeaveSuccess("Leave request submitted successfully and is pending administrator review.");
+        setLeaveStartDate("");
+        setLeaveEndDate("");
+        setLeaveReason("");
+        await loadLeaveRequests();
+      } else {
+        setLeaveError(res.error?.message || "Failed to submit leave request.");
+      }
+    } catch (err: any) {
+      setLeaveError(err.message || "Error submitting leave request.");
+    } finally {
+      setIsLeaveSubmitting(false);
+    }
+  };
+
+  const handleCancelLeave = async (id: string) => {
+    setCancellingLeaveId(id);
+    try {
+      const res = await leaveService.cancelLeaveRequest(id);
+      if (res.success) {
+        await loadLeaveRequests();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCancellingLeaveId(null);
+    }
+  };
+
   // Load ASHA Caseload & Summary
   const loadCaseload = useCallback(async () => {
     setIsLoading(true);
@@ -270,7 +350,8 @@ export default function AshaWorkspacePage() {
     loadAttentionSignals();
     loadPendingRequests();
     loadAssistanceRequests();
-  }, [authLoading, isAuthenticated, userProfile?.role, loadCaseload, loadFollowUps, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests]);
+    loadLeaveRequests();
+  }, [authLoading, isAuthenticated, userProfile?.role, loadCaseload, loadFollowUps, loadAttentionSignals, loadPendingRequests, loadAssistanceRequests, loadLeaveRequests]);
 
   // Handle Proactive Scheme Initiation
   const handleInitiateScheme = async (
@@ -827,6 +908,11 @@ export default function AshaWorkspacePage() {
       label: `${t("navigation.followUps")}${actionableFollowUpBadge > 0 ? ` (${actionableFollowUpBadge})` : ""}`,
       icon: Clock,
     },
+    {
+      id: "leave",
+      label: `Leave (${leaveRequests.filter((r) => r.status === "PENDING" || r.status === "APPROVED").length})`,
+      icon: Calendar,
+    },
   ];
 
   // Filtered Cases
@@ -861,7 +947,9 @@ export default function AshaWorkspacePage() {
             ? t("navigation.attentionSignals")
             : activeTab === "followups"
             ? t("navigation.followUps")
-            : t("citizen.welcome", { name: userProfile?.displayName || "ASHA Worker" })
+            : activeTab === "leave"
+            ? "Leave & Temporary Reassignment"
+            : t("navigation.dashboard")
         }
         description={
           activeTab === "cases"
@@ -872,6 +960,8 @@ export default function AshaWorkspacePage() {
             ? t("asha.attentionRequired")
             : activeTab === "followups"
             ? t("asha.dueFollowUps")
+            : activeTab === "leave"
+            ? "Request absence and monitor temporary caseload transfer"
             : t("asha.workspaceDesc")
         }
         navTabs={navTabs}
@@ -2307,6 +2397,272 @@ export default function AshaWorkspacePage() {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: LEAVE & REASSIGNMENT MANAGEMENT */}
+            {/* ============================================================ */}
+            {activeTab === "leave" && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Information Header Banner */}
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-blue-500/10 border border-teal-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Calendar className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">
+                        ASHA Leave Request & Temporary Caseload Reassignment
+                      </h2>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Request planned absence. Once approved by an Administrator, your assigned households will be temporarily reassigned to a designated replacement ASHA and automatically returned when your leave period ends.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2.5 rounded-xl bg-white/80 backdrop-blur-xs border border-teal-200/80 shadow-xs flex items-center gap-3 shrink-0">
+                    <Users className="w-4 h-4 text-teal-700" />
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Currently Assigned</p>
+                      <p className="text-base font-extrabold text-teal-900">{totalAssignedHouseholds} Households</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Request Leave Form */}
+                  <div className="lg:col-span-1 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs h-fit">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-sm font-bold text-slate-900">Submit New Leave Request</h3>
+                    </div>
+
+                    {leaveError && (
+                      <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>{leaveError}</div>
+                      </div>
+                    )}
+
+                    {leaveSuccess && (
+                      <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>{leaveSuccess}</div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleLeaveSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Start Date <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={leaveStartDate}
+                          onChange={(e) => setLeaveStartDate(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          End Date <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={leaveEndDate}
+                          onChange={(e) => setLeaveEndDate(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Reason for Absence <span className="text-rose-500">*</span>
+                          </label>
+                          <span className="text-[10px] text-slate-400">{leaveReason.length}/1000</span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={leaveReason}
+                          onChange={(e) => setLeaveReason(e.target.value)}
+                          placeholder="e.g. Attending district health training or medical leave..."
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                          maxLength={1000}
+                          required
+                        />
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+                        <p className="font-semibold text-slate-700">Authoritative Process:</p>
+                        <p>• Requires approval by PHC Administrator.</p>
+                        <p>• {totalAssignedHouseholds} assigned households will temporarily switch to replacement worker.</p>
+                        <p>• Tasks, notes, and records remain completely intact.</p>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isLeaveSubmitting}
+                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        {isLeaveSubmitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Submitting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Submit Leave Request</span>
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </div>
+
+                  {/* Right Column: Leave History & Status Table */}
+                  <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <History className="w-4 h-4 text-slate-600" />
+                        <h3 className="text-sm font-bold text-slate-900">Your Leave Requests & Reassignment History</h3>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={loadLeaveRequests}
+                        disabled={isLeaveLoading}
+                        className="text-xs font-medium cursor-pointer"
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {isLeaveLoading ? (
+                      <div className="py-12 text-center text-xs text-slate-500">
+                        <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        Loading leave requests...
+                      </div>
+                    ) : leaveRequests.length === 0 ? (
+                      <div className="py-12 text-center rounded-xl bg-slate-50 border border-slate-200/60 p-6">
+                        <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-700">No leave requests found</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Use the form on the left to submit a leave request when needed.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {leaveRequests.map((req) => {
+                          const isPending = req.status === "PENDING";
+                          const isApproved = req.status === "APPROVED";
+                          const isRejected = req.status === "REJECTED";
+                          const isCompleted = req.status === "COMPLETED";
+
+                          return (
+                            <div
+                              key={req.id}
+                              className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-all"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 ${
+                                      isPending
+                                        ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                        : isApproved
+                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                        : isRejected
+                                        ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                        : "bg-blue-100 text-blue-800 border border-blue-300"
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                    {isPending
+                                      ? "Pending Admin Approval"
+                                      : isApproved
+                                      ? "Approved & Active"
+                                      : isRejected
+                                      ? "Rejected"
+                                      : "Completed"}
+                                  </span>
+
+                                  {req.restorationStatus === "RESTORED" && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                                      Assignments Restored
+                                    </span>
+                                  )}
+                                  {req.restorationStatus === "REQUIRES_REVIEW" && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                      Review Required
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isPending && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={cancellingLeaveId === req.id}
+                                    onClick={() => handleCancelLeave(req.id)}
+                                    className="text-[11px] text-rose-700 border-rose-200 hover:bg-rose-50 h-7 px-2.5 cursor-pointer"
+                                  >
+                                    {cancellingLeaveId === req.id ? "Cancelling..." : "Cancel Request"}
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
+                                <div>
+                                  <span className="font-semibold text-slate-700">Leave Period: </span>
+                                  <span className="font-medium text-slate-900">{req.startDate} → {req.endDate}</span>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-slate-700">Affected Households: </span>
+                                  <span className="font-medium text-slate-900">{req.affectedHouseholdCount}</span>
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-slate-700 mb-2 bg-white p-2.5 rounded-lg border border-slate-200/60">
+                                <span className="font-semibold text-slate-800">Reason: </span>
+                                <span>{req.reason}</span>
+                              </div>
+
+                              {/* Replacement Worker info if approved */}
+                              {isApproved && req.replacementAshaName && (
+                                <div className="p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-900 flex items-center justify-between">
+                                  <div>
+                                    <span className="font-semibold">Designated Replacement: </span>
+                                    <span>{req.replacementAshaName}</span>
+                                  </div>
+                                  <span className="text-[10px] text-emerald-700 font-mono">
+                                    Until {req.endDate}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Rejection Note */}
+                              {isRejected && req.reviewNotes && (
+                                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                                  <span className="font-semibold">Review Note: </span>
+                                  <span>{req.reviewNotes}</span>
+                                </div>
+                              )}
+
+                              {/* Completed restoration notes */}
+                              {isCompleted && req.restorationNotes && (
+                                <div className="p-2 rounded-lg bg-slate-100 text-[11px] text-slate-600 mt-1">
+                                  {req.restorationNotes}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

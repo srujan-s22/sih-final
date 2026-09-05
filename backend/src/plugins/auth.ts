@@ -31,6 +31,8 @@ import { SarvamService } from "../services/telephony/sarvam.service.js";
 import { ExotelService } from "../services/telephony/exotel.service.js";
 import { VoiceActionService } from "../services/telephony/voice-action.service.js";
 import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
+import { LeaveRepository } from "../repositories/leave.repository.js";
+import { LeaveService } from "../services/leave.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { env } from "../config/env.js";
 
@@ -43,6 +45,8 @@ declare module "fastify" {
     householdService: HouseholdService;
     caseRepository: CaseRepository;
     caseService: CaseService;
+    leaveRepository: LeaveRepository;
+    leaveService: LeaveService;
     automationService: AutomationService;
     connectionRepository: ConnectionRepository;
     connectionService: ConnectionService;
@@ -178,6 +182,15 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     automationService
   );
 
+  const leaveRepository = new LeaveRepository(firestoreInstance);
+  const leaveService = new LeaveService(
+    leaveRepository,
+    caseRepository,
+    userRepository,
+    connectionRepository
+  );
+  caseService.setLeaveService(leaveService);
+
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
   fastify.decorate("privilegedAuthService", privilegedAuthService);
@@ -207,6 +220,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("exotelService", exotelService);
   fastify.decorate("voiceActionService", voiceActionService);
   fastify.decorate("voiceGatewayService", voiceGatewayService);
+  fastify.decorate("leaveRepository", leaveRepository);
+  fastify.decorate("leaveService", leaveService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 
