@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -44,8 +45,6 @@ import {
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
 import { nfcService } from "@/services/nfc-service";
-import { AshaNfcModal } from "@/components/nfc/asha-nfc-modal";
-import { HouseholdNfcStatusResponse } from "@shared/types/nfc";
 import { connectionService } from "@/services/connection-service";
 import { assistanceService } from "@/services/assistance-service";
 import { voiceService } from "@/services/voice-service";
@@ -53,15 +52,11 @@ import { leaveService } from "@/services/leave-service";
 import { AshaLeaveRequest } from "@shared/types/leave";
 import {
   AshaCase,
-  CaseDetailResponse,
   CaseSummaryResponse,
   CaseFollowUp,
   FollowUpSummaryResponse,
   CaseStatus,
   CasePriority,
-  CaseTask,
-  CaseTaskStatus,
-  SchemeJourneyStep,
   AshaAttentionSignal,
 } from "@shared/types/case";
 import { AshaConnectionRequest } from "@shared/types/connection";
@@ -108,31 +103,8 @@ export default function AshaWorkspacePage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
 
-  // Case Detail Modal State
-  type CaseDetailTab = "overview" | "journey" | "gaps" | "schemes" | "notes" | "followups" | "history";
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [caseDetail, setCaseDetail] = useState<CaseDetailResponse | null>(null);
-  const [selectedRequestContext, setSelectedRequestContext] = useState<AshaAssistanceRequest | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [detailTab, setDetailTab] = useState<CaseDetailTab>("overview");
-
-  // NFC Management State
-  const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
-  const [caseNfcStatus, setCaseNfcStatus] = useState<HouseholdNfcStatusResponse | null>(null);
+  const router = useRouter();
   const [nfcStatusMap, setNfcStatusMap] = useState<Record<string, boolean>>({});
-
-  // Tasks & Journey State
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDesc, setNewTaskDesc] = useState("");
-  const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
-
-  // New Note / Follow-up inputs
-  const [newNoteContent, setNewNoteContent] = useState("");
-  const [isNoteSubmitting, setIsNoteSubmitting] = useState(false);
-
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [followUpReason, setFollowUpReason] = useState("");
-  const [isFollowUpSubmitting, setIsFollowUpSubmitting] = useState(false);
 
   // Phase 10 Follow-ups State
   const [followUpSummary, setFollowUpSummary] = useState<FollowUpSummaryResponse | null>(null);
@@ -384,8 +356,7 @@ export default function AshaWorkspacePage() {
           } doorstep assistance journey.`
         );
         await Promise.all([loadCaseload(), loadAttentionSignals(), loadAssistanceRequests()]);
-        await openCaseDetail(caseId);
-        setDetailTab("journey");
+        openCaseDetail(caseId, "journey");
       } else {
         const errMsg = (res as any).error?.message || (res as any).message || "Failed to initiate scheme assistance.";
         setErrorMessage(errMsg);
@@ -461,54 +432,31 @@ export default function AshaWorkspacePage() {
     }
   };
 
-  // Load Case Detail
-  const openCaseDetail = async (
+  // Navigate to Dedicated Case Details Page
+  const openCaseDetail = (
     caseId: string,
-    initialTab: CaseDetailTab = "overview",
+    initialTab: string = "overview",
     requestContext: AshaAssistanceRequest | null = null
   ) => {
-    setSelectedCaseId(caseId);
-    setSelectedRequestContext(requestContext);
-    setDetailTab(initialTab);
-    setIsDetailLoading(true);
-    try {
-      const res = await caseService.getCaseDetail(caseId);
-      if (res.success && res.data) {
-        setCaseDetail(res.data);
-        if (res.data.household?.id) {
-          fetchNfcStatus(res.data.household.id);
-        }
-      } else {
-        setErrorMessage(res.success ? null : (res as any).error?.message || "Failed to load case details.");
-      }
-    } catch {
-      setErrorMessage("Error retrieving case details.");
-    } finally {
-      setIsDetailLoading(false);
+    let url = `/asha/cases/${encodeURIComponent(caseId)}`;
+    const params = new URLSearchParams();
+    if (initialTab && initialTab !== "overview") {
+      params.append("tab", initialTab);
     }
+    if (requestContext?.id) {
+      params.append("requestId", requestContext.id);
+    }
+    const qs = params.toString();
+    if (qs) {
+      url += `?${qs}`;
+    }
+    router.push(url);
   };
-
-  const fetchNfcStatus = useCallback(async (householdId: string) => {
-    try {
-      const res = await nfcService.getHouseholdNfcStatus(householdId);
-      if (res.success && res.data) {
-        setCaseNfcStatus(res.data);
-        setNfcStatusMap((prev) => ({
-          ...prev,
-          [householdId]: res.data.hasActiveNfc,
-        }));
-      } else {
-        setCaseNfcStatus(null);
-      }
-    } catch {
-      setCaseNfcStatus(null);
-    }
-  }, []);
 
   // Open Case Detail by Household ID
   const openCaseDetailByHousehold = (
     householdId: string,
-    initialTab: CaseDetailTab = "overview",
+    initialTab: string = "overview",
     requestContext: AshaAssistanceRequest | null = null
   ) => {
     const matchingCase = cases.find((c) => c.householdId === householdId);
@@ -516,89 +464,6 @@ export default function AshaWorkspacePage() {
       openCaseDetail(matchingCase.id, initialTab, requestContext);
     } else {
       setErrorMessage("Case for this household not found in your assigned caseload.");
-    }
-  };
-
-  const closeCaseDetail = () => {
-    setSelectedCaseId(null);
-    setCaseDetail(null);
-    setSelectedRequestContext(null);
-    setCaseNfcStatus(null);
-    setIsNfcModalOpen(false);
-  };
-
-  // Status / Priority Update
-  const handleStatusChange = async (newStatus: CaseStatus) => {
-    if (!selectedCaseId || !caseDetail) return;
-    try {
-      const res = await caseService.updateCase(selectedCaseId, { status: newStatus });
-      if (res.success && res.data) {
-        setCaseDetail((prev) => (prev ? { ...prev, case: res.data.case } : null));
-        await loadCaseload();
-      }
-    } catch {
-      // Error handled quietly
-    }
-  };
-
-  const handlePriorityChange = async (newPriority: CasePriority) => {
-    if (!selectedCaseId || !caseDetail) return;
-    try {
-      const res = await caseService.updateCase(selectedCaseId, { priority: newPriority });
-      if (res.success && res.data) {
-        setCaseDetail((prev) => (prev ? { ...prev, case: res.data.case } : null));
-        await loadCaseload();
-      }
-    } catch {
-      // Error handled quietly
-    }
-  };
-
-  // Add Case Note
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCaseId || !newNoteContent.trim()) return;
-    setIsNoteSubmitting(true);
-    try {
-      const res = await caseService.addNote(selectedCaseId, newNoteContent.trim());
-      if (res.success && res.data) {
-        setNewNoteContent("");
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-      }
-    } catch {
-      // Error handled quietly
-    } finally {
-      setIsNoteSubmitting(false);
-    }
-  };
-
-  // Schedule Follow-Up
-  const handleScheduleFollowUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCaseId || !followUpDate || !followUpReason.trim()) return;
-    setIsFollowUpSubmitting(true);
-    try {
-      const res = await caseService.createFollowUp(selectedCaseId, {
-        dueAt: followUpDate,
-        scheduledAt: followUpDate,
-        reason: followUpReason.trim(),
-      });
-      if (res.success && res.data) {
-        setFollowUpDate("");
-        setFollowUpReason("");
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-        await Promise.all([loadFollowUps(), loadCaseload()]);
-      }
-    } catch {
-      // Error handled quietly
-    } finally {
-      setIsFollowUpSubmitting(false);
     }
   };
 
@@ -627,12 +492,6 @@ export default function AshaWorkspacePage() {
         setCompleteNotes("");
         setSuccessBanner(`Follow-up marked completed: "${completingFollowUp.reason}"`);
         await Promise.all([loadFollowUps(), loadCaseload(), loadAttentionSignals()]);
-        if (selectedCaseId === completingFollowUp.caseId) {
-          const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-          if (freshDetail.success && freshDetail.data) {
-            setCaseDetail(freshDetail.data);
-          }
-        }
       }
     } catch {
       setErrorMessage("Failed to complete follow-up.");
@@ -666,12 +525,6 @@ export default function AshaWorkspacePage() {
         setRescheduleReason("");
         setSuccessBanner(`Follow-up rescheduled to ${new Date(rescheduleDate).toLocaleDateString()}`);
         await Promise.all([loadFollowUps(), loadCaseload()]);
-        if (selectedCaseId === reschedulingFollowUp.caseId) {
-          const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-          if (freshDetail.success && freshDetail.data) {
-            setCaseDetail(freshDetail.data);
-          }
-        }
       }
     } catch {
       setErrorMessage("Failed to reschedule follow-up.");
@@ -702,12 +555,6 @@ export default function AshaWorkspacePage() {
         setCancelReason("");
         setSuccessBanner(`Follow-up cancelled: "${cancellingFollowUp.title || cancellingFollowUp.reason}"`);
         await Promise.all([loadFollowUps(), loadCaseload(), loadAttentionSignals()]);
-        if (selectedCaseId === cancellingFollowUp.caseId) {
-          const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-          if (freshDetail.success && freshDetail.data) {
-            setCaseDetail(freshDetail.data);
-          }
-        }
       }
     } catch {
       setErrorMessage("Failed to cancel follow-up.");
@@ -718,49 +565,26 @@ export default function AshaWorkspacePage() {
 
   // Trigger Outbound Voice Reminder / Assistance Call (Phase 11)
   const handleOpenVoiceCallModal = (followUp?: CaseFollowUp, targetCase?: AshaCase) => {
-    const targetCaseId = followUp?.caseId || targetCase?.id || selectedCaseId || "";
-    const name = targetCase?.headOfHouseholdName || caseDetail?.household?.headOfHouseholdName || "Beneficiary";
-    const phone = caseDetail?.household?.contactPhone
-      ? `+91 ${caseDetail.household.contactPhone.replace(/\D/g, "").slice(-10).replace(/(\d{3})\d{4}(\d{3})/, "$1****$2")}`
-      : "+91 98*** **210";
+    const targetCaseId = followUp?.caseId || targetCase?.id || "";
+    const name = targetCase?.headOfHouseholdName || "Beneficiary";
+    const phone = "+91 98*** **210";
 
     setCallModalTarget({
       caseId: targetCaseId,
       citizenName: name,
-      headOfHousehold: targetCase?.headOfHouseholdName || caseDetail?.household?.headOfHouseholdName,
-      schemeName: targetCase?.schemeName || caseDetail?.case?.schemeName || "Government Health Scheme",
+      headOfHousehold: targetCase?.headOfHouseholdName,
+      schemeName: targetCase?.schemeName || "Government Health Scheme",
       contactPhoneMasked: phone,
       followUpId: followUp?.id,
       defaultReason: followUp
         ? `Doorstep visit reminder: ${followUp.title || followUp.reason}`
-        : `Outreach for ${targetCase?.schemeName || caseDetail?.case?.schemeName || "health scheme"} follow-up`,
+        : `Outreach for ${targetCase?.schemeName || "health scheme"} follow-up`,
     });
     setIsAshaCallModalOpen(true);
   };
 
   const handleTriggerVoiceCall = async (followUp: CaseFollowUp) => {
     handleOpenVoiceCallModal(followUp);
-  };
-
-  // Quick Complete from Case Drawer
-  const handleCompleteFollowUp = async (followUpId: string) => {
-    if (!selectedCaseId) return;
-    try {
-      const res = await caseService.completeFollowUp(
-        selectedCaseId,
-        followUpId,
-        "Completed during direct field check-in"
-      );
-      if (res.success) {
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-        await Promise.all([loadFollowUps(), loadCaseload()]);
-      }
-    } catch {
-      // Error handled quietly
-    }
   };
 
   // Accept Assistance Request -> Opens & Initializes Scheme Case Workflow
@@ -773,8 +597,7 @@ export default function AshaWorkspacePage() {
         await loadAssistanceRequests();
         await loadCaseload();
         if (res.data.caseId) {
-          openCaseDetail(res.data.caseId);
-          setDetailTab("journey");
+          openCaseDetail(res.data.caseId, "journey");
         }
       }
     } catch {
@@ -799,80 +622,6 @@ export default function AshaWorkspacePage() {
       // Quiet fail
     } finally {
       setIsUpdatingAssistance(null);
-    }
-  };
-
-  // Complete Task in Case Drawer
-  const handleCompleteTask = async (taskId: string, notes?: string) => {
-    if (!selectedCaseId) return;
-    try {
-      const res = await caseService.completeTask(selectedCaseId, taskId, notes);
-      if (res.success) {
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-        await Promise.all([
-          loadCaseload(),
-          loadFollowUps(),
-          loadAttentionSignals(),
-          loadAssistanceRequests(),
-        ]);
-      } else {
-        setErrorMessage((res as any).error?.message || "Failed to complete task.");
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to complete task.");
-    }
-  };
-
-  // Update Task Status
-  const handleUpdateTaskStatus = async (taskId: string, status: CaseTaskStatus) => {
-    if (!selectedCaseId) return;
-    try {
-      const res = await caseService.updateTask(selectedCaseId, taskId, { status });
-      if (res.success) {
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-        await Promise.all([
-          loadCaseload(),
-          loadFollowUps(),
-          loadAttentionSignals(),
-          loadAssistanceRequests(),
-        ]);
-      } else {
-        setErrorMessage((res as any).error?.message || "Failed to update task status.");
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to update task status.");
-    }
-  };
-
-  // Add Custom Task to Case
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCaseId || !newTaskTitle.trim()) return;
-    setIsTaskSubmitting(true);
-    try {
-      const res = await caseService.createTask(selectedCaseId, {
-        title: newTaskTitle.trim(),
-        description: newTaskDesc.trim() || newTaskTitle.trim(),
-        type: "CUSTOM_FIELD_TASK",
-      });
-      if (res.success) {
-        setNewTaskTitle("");
-        setNewTaskDesc("");
-        const freshDetail = await caseService.getCaseDetail(selectedCaseId);
-        if (freshDetail.success && freshDetail.data) {
-          setCaseDetail(freshDetail.data);
-        }
-      }
-    } catch {
-      // Quiet fail
-    } finally {
-      setIsTaskSubmitting(false);
     }
   };
 
@@ -1820,7 +1569,7 @@ export default function AshaWorkspacePage() {
 
                                     if (targetCaseId) {
                                       // 2. Select initial tab based on category and scheme matching
-                                      let targetTab: CaseDetailTab = "overview";
+                                      let targetTab = "overview";
                                       if (
                                         req.category === "SCHEME_ENROLLMENT" &&
                                         req.schemeId &&
@@ -1828,7 +1577,7 @@ export default function AshaWorkspacePage() {
                                       ) {
                                         targetTab = "journey";
                                       } else if (req.category === "FOLLOW_UP") {
-                                        targetTab = "followups";
+                                        targetTab = "tasks";
                                       } else if (req.category === "DOCUMENT_HELP") {
                                         targetTab = "overview";
                                       }
@@ -2656,981 +2405,6 @@ export default function AshaWorkspacePage() {
         )}
 
         {/* ============================================================ */}
-        {/* CASE DETAIL DRAWER / MODAL */}
-        {/* ============================================================ */}
-        {selectedCaseId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/40 backdrop-blur-xs">
-            <div className="w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden animate-in slide-in-from-right duration-200">
-              {/* Header */}
-              <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-slate-900">
-                      {caseDetail ? caseDetail.household.headOfHouseholdName : t("common.loading")}
-                    </h2>
-                    {caseDetail && (
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          caseDetail.case.priority === "URGENT"
-                            ? "bg-red-100 text-red-800"
-                            : caseDetail.case.priority === "HIGH"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-slate-200 text-slate-700"
-                        }`}
-                      >
-                        {caseDetail.case.priority === "URGENT" ? t("forms.priorityUrgent") : caseDetail.case.priority === "HIGH" ? t("forms.priorityHigh") : t("forms.priorityNormal")}
-                      </span>
-                    )}
-                  </div>
-                  {caseDetail && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      {t("common.code")}: <span className="font-mono text-slate-700">{caseDetail.case.id}</span> • {caseDetail.household.district}, {caseDetail.household.state} • {caseDetail.household.incomeCategory}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsNfcModalOpen(true);
-                    }}
-                    className="text-xs font-semibold flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
-                    title={caseNfcStatus?.hasActiveNfc ? "Manage Household NFC Card" : "Register Household NFC Card"}
-                  >
-                    <Radio className="w-3.5 h-3.5 text-teal-700" />
-                    <span>
-                      {caseNfcStatus?.hasActiveNfc
-                        ? `NFC (v${caseNfcStatus.record?.version})`
-                        : "Register NFC"}
-                    </span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsAssistantOpen(true)}
-                    className="text-xs font-semibold flex items-center gap-1 border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
-                  >
-                    <Bot className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>{t("assistant.badge")}</span>
-                  </Button>
-                  <button
-                    onClick={closeCaseDetail}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Status & Priority Controls Bar */}
-              {caseDetail && (
-                <div className="px-6 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-600">{t("forms.relationship")}:</span>
-                    <select
-                      value={caseDetail.case.status}
-                      onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
-                      className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
-                    >
-                      <option value="NEW">New</option>
-                      <option value="ACTIVE">{t("common.active")}</option>
-                      <option value="NEEDS_ATTENTION">{t("status.action_required")}</option>
-                      <option value="FOLLOW_UP">{t("navigation.followUps")}</option>
-                      <option value="RESOLVED">{t("status.resolved")}</option>
-                      <option value="CLOSED">{t("status.completed")}</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-600">{t("status.urgent")}:</span>
-                    <select
-                      value={caseDetail.case.priority}
-                      onChange={(e) => handlePriorityChange(e.target.value as CasePriority)}
-                      className="py-1 px-2 rounded border border-slate-300 bg-white font-medium text-slate-800 text-xs"
-                    >
-                      <option value="LOW">{t("forms.priorityLow")}</option>
-                      <option value="NORMAL">{t("forms.priorityNormal")}</option>
-                      <option value="HIGH">{t("forms.priorityHigh")}</option>
-                      <option value="URGENT">{t("forms.priorityUrgent")}</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Request Context Banner (when opened from an Assistance Request) */}
-              {selectedRequestContext && (
-                <div className="px-6 py-2.5 bg-teal-50/90 border-b border-teal-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-[10px] uppercase px-2 py-0.5 rounded bg-teal-800 text-white tracking-wider">
-                      {selectedRequestContext.category.replace(/_/g, " ")}
-                    </span>
-                    {selectedRequestContext.schemeName && (
-                      <span className="font-bold text-teal-950">
-                        {selectedRequestContext.schemeName}
-                      </span>
-                    )}
-                    {selectedRequestContext.beneficiaryName && (
-                      <span className="text-teal-800 flex items-center gap-1 font-medium">
-                        • <UserCheck className="w-3.5 h-3.5 text-teal-700 inline" />
-                        <span>{selectedRequestContext.beneficiaryName}</span>
-                        {selectedRequestContext.beneficiaryRelationship && (
-                          <span className="text-teal-600 text-[11px]">
-                            ({selectedRequestContext.beneficiaryRelationship}
-                            {selectedRequestContext.beneficiaryAge
-                              ? `, ${selectedRequestContext.beneficiaryAge}y`
-                              : ""}
-                            )
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-teal-700">
-                    <span className="font-mono">Req #{selectedRequestContext.id.slice(-6)}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 font-bold uppercase text-[10px]">
-                      {selectedRequestContext.status}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Sub-Tabs */}
-              <div className="flex border-b border-slate-200 bg-white px-6 text-xs font-semibold overflow-x-auto">
-                <button
-                  onClick={() => setDetailTab("journey")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                    detailTab === "journey"
-                      ? "border-teal-700 text-teal-900 font-bold bg-teal-50/50"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <CheckSquare className="w-3.5 h-3.5 text-teal-700" />
-                  <span>{t("asha.activeJourney")}</span>
-                </button>
-                <button
-                  onClick={() => setDetailTab("overview")}
-                  className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
-                    detailTab === "overview"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {t("citizen.householdInfo")}
-                </button>
-                <button
-                  onClick={() => setDetailTab("gaps")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    detailTab === "gaps"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <span>{t("asha.attentionRequired")}</span>
-                </button>
-                <button
-                  onClick={() => setDetailTab("schemes")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    detailTab === "schemes"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <span>{t("citizen.healthBenefits")}</span>
-                </button>
-                <button
-                  onClick={() => setDetailTab("notes")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    detailTab === "notes"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <span>{t("forms.notes")}</span>
-                </button>
-                <button
-                  onClick={() => setDetailTab("followups")}
-                  className={`py-3 px-3 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    detailTab === "followups"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <span>{t("asha.dueFollowUps")}</span>
-                </button>
-                <button
-                  onClick={() => setDetailTab("history")}
-                  className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
-                    detailTab === "history"
-                      ? "border-emerald-600 text-emerald-800 font-bold"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {t("admin.auditTrail")}
-                </button>
-              </div>
-
-              {/* Drawer Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {isDetailLoading || !caseDetail ? (
-                  <div className="py-16 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mb-3" />
-                    <p className="text-sm text-slate-500">{t("common.loading")}</p>
-                  </div>
-                ) : (
-                  <div>
-                    {/* TAB 0: SCHEME JOURNEY & FIELD TASKS */}
-                    {detailTab === "journey" && (
-                      <div>
-                        {/* Selected Request Scheme Mismatch Callout */}
-                        {selectedRequestContext?.schemeId &&
-                          caseDetail.case.schemeId &&
-                          selectedRequestContext.schemeId !== caseDetail.case.schemeId && (
-                            <div className="p-3.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1">
-                              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
-                                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
-                                <span>Active Case Scheme vs. Selected Request</span>
-                              </div>
-                              <p className="text-amber-800 leading-relaxed">
-                                This master household case currently tracks the active journey for{" "}
-                                <strong>{caseDetail.case.schemeName || caseDetail.case.schemeId}</strong>.
-                                The selected assistance request is for{" "}
-                                <strong>{selectedRequestContext.schemeName || selectedRequestContext.schemeId}</strong>
-                                {selectedRequestContext.beneficiaryName
-                                  ? ` (Beneficiary: ${selectedRequestContext.beneficiaryName})`
-                                  : ""}
-                                . The milestones and checklist below belong to the case&apos;s active scheme.
-                              </p>
-                            </div>
-                          )}
-
-                        {/* Selected Request Non-Scheme Category Callout */}
-                        {selectedRequestContext && !selectedRequestContext.schemeId && (
-                          <div className="p-3 mb-5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                            <span className="font-bold text-slate-800">
-                              Selected Request: {selectedRequestContext.category.replace(/_/g, " ")}
-                            </span>
-                            <p className="text-slate-600">
-                              This request does not track a specific scheme milestone journey. Refer to the Household Info or Notes tabs.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* 1. When Scheme Assistance is NOT Started */}
-                        {!caseDetail.case.schemeId ||
-                        caseDetail.case.status === "NEW" ||
-                        !caseDetail.tasks ||
-                        caseDetail.tasks.length === 0 ? (
-                          <div className="space-y-6">
-                            {/* Not Started Hero Banner */}
-                            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase bg-slate-200 text-slate-700 tracking-wider">
-                                  {t("common.pending")}
-                                </span>
-                                <span className="text-xs text-slate-500 font-mono">
-                                  {t("common.code")}: {caseDetail.case.id}
-                                </span>
-                              </div>
-                              <h3 className="text-base font-bold text-slate-900">
-                                {t("asha.workspaceDesc")}
-                              </h3>
-                              <p className="text-xs text-slate-600 leading-relaxed">
-                                {t("citizen.stepGuideTitle")}
-                              </p>
-                            </div>
-
-                            {/* Actionable Healthcare Opportunities */}
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                <ShieldCheck className="w-4 h-4 text-teal-700" />
-                                <span>{t("citizen.healthBenefits")}</span>
-                              </h4>
-
-                              {(() => {
-                                const actionableSchemes = (
-                                  caseDetail.eligibilityResults || []
-                                ).filter(
-                                  (r) =>
-                                    r.status === "ELIGIBLE" ||
-                                    (r.schemeId === "jsy" &&
-                                      caseDetail.members.some(
-                                        (m) => m.maternalStatus === "pregnant"
-                                      ))
-                                );
-
-                                if (actionableSchemes.length === 0) {
-                                  return (
-                                    <div className="p-6 rounded-xl border border-slate-200 bg-white text-center space-y-2 text-xs text-slate-500">
-                                      <HelpCircle className="w-8 h-8 text-slate-300 mx-auto" />
-                                      <p className="font-semibold text-slate-700">
-                                        {t("citizen.noSchemesMessage")}
-                                      </p>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="space-y-3">
-                                    {actionableSchemes.map((scheme) => {
-                                      const targetMember =
-                                        scheme.schemeId === "ab-pmjay"
-                                          ? caseDetail.members.find((m) => m.age >= 70)
-                                          : scheme.schemeId === "jsy"
-                                          ? caseDetail.members.find(
-                                              (m) => m.maternalStatus === "pregnant"
-                                            ) ||
-                                            caseDetail.members.find(
-                                              (m) => m.gender === "female" && m.age >= 18
-                                            )
-                                          : undefined;
-
-                                      const isInitiating =
-                                        initiatingSchemeId ===
-                                        `${caseDetail.case.id}_${scheme.schemeId}`;
-
-                                      return (
-                                        <div
-                                          key={scheme.schemeId}
-                                          className="p-4 rounded-xl border border-teal-200 bg-teal-50/30 space-y-3 text-xs"
-                                        >
-                                          <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                              <div className="flex items-center gap-2">
-                                                <h5 className="font-bold text-slate-900 text-sm">
-                                                  {scheme.schemeName}
-                                                </h5>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                                                  {scheme.status}
-                                                </span>
-                                              </div>
-                                              <p className="text-slate-600 mt-1">
-                                                {scheme.benefitSummary}
-                                              </p>
-                                            </div>
-                                          </div>
-
-                                          {targetMember && (
-                                            <div className="p-2.5 rounded-lg bg-white border border-teal-100 flex items-center justify-between text-xs">
-                                              <div>
-                                                <span className="text-[10px] font-semibold text-slate-400 uppercase block">
-                                                  {t("citizen.headOfHousehold")}
-                                                </span>
-                                                <span className="font-bold text-slate-900">
-                                                  {targetMember.fullName} (
-                                                  {targetMember.relationship}, Age{" "}
-                                                  {targetMember.age}
-                                                  {targetMember.maternalStatus === "pregnant"
-                                                    ? ` • ${t("citizen.pregnantTag")}`
-                                                    : ""}
-                                                  )
-                                                </span>
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          <div className="pt-2 border-t border-teal-100/80 flex items-center justify-between">
-                                            <Button
-                                              variant="primary"
-                                              size="sm"
-                                              disabled={isInitiating}
-                                              onClick={() =>
-                                                handleInitiateScheme(
-                                                  caseDetail.case.id,
-                                                  scheme.schemeId,
-                                                  targetMember?.id
-                                                )
-                                              }
-                                              className="text-xs font-bold py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 shadow-2xs cursor-pointer ml-auto"
-                                            >
-                                              <Send className="w-3.5 h-3.5" />
-                                              <span>
-                                                {isInitiating ? t("common.submitting") : t("citizen.requestAssistanceBtn")}
-                                              </span>
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        ) : (
-                          /* 2. When Scheme Assistance IS Active or Completed */
-                          <div className="space-y-6">
-                            {/* Scheme & Beneficiary Summary Card */}
-                            <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:p-5 space-y-3">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-100 pb-3">
-                                <div>
-                                  <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
-                                    {t("citizen.healthBenefits")}:
-                                  </span>
-                                  <h3 className="text-base font-bold text-teal-950">
-                                    {caseDetail.case.schemeName ||
-                                      (caseDetail.case.schemeId === "ab-pmjay"
-                                        ? "Ayushman Bharat — PM-JAY (Senior 70+)"
-                                        : caseDetail.case.schemeId === "jsy"
-                                        ? "Janani Suraksha Yojana (JSY)"
-                                        : caseDetail.case.schemeId)}
-                                  </h3>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleOpenVoiceCallModal(undefined, caseDetail.case)}
-                                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer py-1 px-3"
-                                  >
-                                    <PhoneCall className="w-3.5 h-3.5" />
-                                    <span>{t("citizen.voiceCallBtn")}</span>
-                                  </Button>
-                                  <span
-                                    className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto flex items-center gap-1.5 ${
-                                      ["RESOLVED", "CLOSED"].includes(caseDetail.case.status)
-                                        ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                                        : "bg-blue-100 text-blue-900 border-blue-300"
-                                    }`}
-                                  >
-                                    {["RESOLVED", "CLOSED"].includes(caseDetail.case.status) ? (
-                                      <>
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                                        <span>✓ {t("status.resolved")}</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                                        <span>{t("forms.relationship")}: {caseDetail.case.status}</span>
-                                      </>
-                                    )}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                                <div className="bg-white p-3 rounded-lg border border-teal-100">
-                                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    {t("citizen.headOfHousehold")}
-                                  </span>
-                                  <span className="font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
-                                    <UserCheck className="w-3.5 h-3.5 text-teal-700" />
-                                    <span>
-                                      {caseDetail.case.beneficiaryName ||
-                                        caseDetail.household.headOfHouseholdName}
-                                    </span>
-                                  </span>
-                                </div>
-                                <div className="bg-white p-3 rounded-lg border border-teal-100">
-                                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    {t("citizen.headOfHousehold")}
-                                  </span>
-                                  <span className="font-semibold text-slate-800 mt-0.5 block">
-                                    {caseDetail.household.headOfHouseholdName}
-                                  </span>
-                                </div>
-                                <div className="bg-white p-3 rounded-lg border border-teal-100">
-                                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                                    {t("citizen.locationDetails")}
-                                  </span>
-                                  <span className="text-slate-800 mt-0.5 block">
-                                    {caseDetail.household.district}, {caseDetail.household.state}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Scheme Journey Milestones */}
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-teal-700" />
-                                <span>{t("citizen.stepGuideTitle")}</span>
-                              </h4>
-
-                              {caseDetail.journeySteps && caseDetail.journeySteps.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                                  {caseDetail.journeySteps.map((step, sIdx) => {
-                                    const isDone =
-                                      step.status === "COMPLETED" ||
-                                      ["RESOLVED", "CLOSED"].includes(caseDetail.case.status);
-                                    const isCurrent =
-                                      step.status === "CURRENT" &&
-                                      !["RESOLVED", "CLOSED"].includes(caseDetail.case.status);
-
-                                    return (
-                                      <div
-                                        key={step.stepId || sIdx}
-                                        className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between ${
-                                          isDone
-                                            ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold"
-                                            : isCurrent
-                                            ? "bg-blue-50 border-blue-400 text-blue-950 font-bold ring-2 ring-blue-300/70"
-                                            : "bg-slate-50 border-slate-200 text-slate-500"
-                                        }`}
-                                      >
-                                        <div>
-                                          <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-[10px] font-mono uppercase font-bold text-slate-400">
-                                              Step {sIdx + 1}
-                                            </span>
-                                            {isDone ? (
-                                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                            ) : isCurrent ? (
-                                              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-                                            ) : (
-                                              <span className="w-2.5 h-2.5 rounded-full border border-slate-300" />
-                                            )}
-                                          </div>
-                                          <h5 className="font-bold text-xs">{step.title}</h5>
-                                          <p className="text-[11px] font-normal text-slate-600 mt-1 line-clamp-2">
-                                            {step.description}
-                                          </p>
-                                        </div>
-                                        {isDone && (
-                                          <span className="text-[10px] text-emerald-700 mt-2 font-mono">
-                                            ✓ {t("status.completed")}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : null}
-                            </div>
-
-                            {/* Interactive Field Tasks Checklist */}
-                            <div className="space-y-4 pt-2">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                                <div>
-                                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                    <CheckSquare className="w-4 h-4 text-teal-700" />
-                                    <span>{t("asha.activeJourney")}</span>
-                                  </h4>
-                                </div>
-                              </div>
-
-                              {/* Task List */}
-                              {caseDetail.tasks && caseDetail.tasks.length > 0 ? (
-                                <div className="space-y-2.5">
-                                  {caseDetail.tasks.map((task, tIdx) => {
-                                    const isDone = task.status === "COMPLETED";
-                                    const isBlocked = task.status === "BLOCKED";
-                                    const isInProgress = task.status === "IN_PROGRESS";
-
-                                    return (
-                                      <div
-                                        key={task.id}
-                                        className={`p-4 rounded-xl border transition-all space-y-2 ${
-                                          isDone
-                                            ? "bg-emerald-50/40 border-emerald-200 text-slate-700"
-                                            : isBlocked
-                                            ? "bg-rose-50/40 border-rose-200"
-                                            : isInProgress
-                                            ? "bg-blue-50/40 border-blue-200 ring-1 ring-blue-300/50"
-                                            : "bg-white border-slate-200 shadow-2xs"
-                                        }`}
-                                      >
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                          <div className="flex items-start gap-2.5">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                !isDone && handleCompleteTask(task.id)
-                                              }
-                                              disabled={isDone}
-                                              className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                                                isDone
-                                                  ? "bg-emerald-600 border-emerald-600 text-white cursor-default"
-                                                  : "border-slate-300 hover:border-emerald-600 hover:bg-emerald-50 text-transparent hover:text-emerald-700 cursor-pointer"
-                                              }`}
-                                            >
-                                              <Check className="w-3.5 h-3.5" />
-                                            </button>
-
-                                            <div className="space-y-0.5">
-                                              <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-xs sm:text-sm text-slate-900">
-                                                  {tIdx + 1}. {task.title}
-                                                </span>
-                                              </div>
-                                              <p className="text-xs text-slate-600 leading-relaxed">
-                                                {task.description}
-                                              </p>
-                                            </div>
-                                          </div>
-
-                                          {/* Quick Status Buttons */}
-                                          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
-                                            {!isDone ? (
-                                              <Button
-                                                variant="primary"
-                                                size="sm"
-                                                onClick={() => handleCompleteTask(task.id)}
-                                                className="text-[11px] py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 cursor-pointer"
-                                              >
-                                                <Check className="w-3 h-3" /> {t("status.completed")}
-                                              </Button>
-                                            ) : (
-                                              <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> {t("status.completed")}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* TAB 1: HOUSEHOLD OVERVIEW */}
-                    {detailTab === "overview" && (
-                      <div className="space-y-5">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
-                          <div>
-                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              {t("citizen.incomeCategory")}
-                            </span>
-                            <span className="font-bold text-slate-900">
-                              {caseDetail.household.incomeCategory}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              {t("citizen.rationCardNumber")}
-                            </span>
-                            <span className="font-mono text-slate-800">
-                              {caseDetail.household.rationCardNumber || "N/A"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              {t("citizen.locationDetails")}
-                            </span>
-                            <span className="text-slate-900">
-                              {caseDetail.household.district}, {caseDetail.household.state}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                              {t("citizen.contactPhone")}
-                            </span>
-                            <span className="text-slate-900">
-                              {caseDetail.household.contactPhone || "Not Provided"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Household NFC Card Access Section */}
-                        <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                          <div className="flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
-                              <Radio className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-900">Household NFC Smart Card</h4>
-                                {caseNfcStatus?.hasActiveNfc ? (
-                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px] flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Active v{caseNfcStatus.record?.version}
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-bold rounded-full text-[10px]">
-                                    Not Registered
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-slate-500 mt-0.5 text-[11px]">
-                                {caseNfcStatus?.hasActiveNfc
-                                  ? `Physical card is linked to this household. Activated on ${new Date(caseNfcStatus.record?.createdAt || "").toLocaleDateString()}.`
-                                  : "Provision a physical NDEF tag to grant the family tap-to-access scheme details."}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setIsNfcModalOpen(true);
-                            }}
-                            className="text-xs font-semibold shrink-0 bg-white border-teal-300 text-teal-800 hover:bg-teal-100/50 cursor-pointer"
-                          >
-                            <Radio className="w-3.5 h-3.5 mr-1" />
-                            {caseNfcStatus?.hasActiveNfc ? "Manage NFC" : "Register NFC"}
-                          </Button>
-                        </div>
-
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900 mb-2.5">
-                            {t("citizen.familyMembers")} ({caseDetail.members.length})
-                          </h4>
-                          <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-                            {caseDetail.members.map((m) => (
-                              <div
-                                key={m.id}
-                                className="p-3 bg-white flex items-center justify-between"
-                              >
-                                <div>
-                                  <span className="font-bold text-slate-900">{m.fullName}</span>
-                                  <span className="text-slate-500 ml-2">
-                                    {m.relationship} • {m.age} yrs • {m.gender}
-                                  </span>
-                                </div>
-                                <div className="flex gap-1.5">
-                                  {m.age >= 70 && (
-                                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 font-bold rounded text-[10px]">
-                                      {t("citizen.seniorCitizenTag")}
-                                    </span>
-                                  )}
-                                  {m.maternalStatus === "pregnant" && (
-                                    <span className="px-2 py-0.5 bg-purple-50 text-purple-800 font-bold rounded text-[10px]">
-                                      {t("citizen.pregnantTag")}
-                                    </span>
-                                  )}
-                                  {m.disabilityStatus && (
-                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-800 font-bold rounded text-[10px]">
-                                      {t("citizen.disabilityTag")}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* TAB 2: HEALTHCARE GAPS */}
-                    {detailTab === "gaps" && (
-                      <div className="space-y-4">
-                        {caseDetail.guidance.gaps.length === 0 ? (
-                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500">
-                            <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-2" />
-                            <span>
-                              {t("status.completed")}
-                            </span>
-                          </div>
-                        ) : (
-                          caseDetail.guidance.gaps.map((g, idx) => {
-                            const isAssistanceCompleted =
-                              (g.schemeId &&
-                                g.schemeId === caseDetail.case.schemeId &&
-                                ["RESOLVED", "CLOSED"].includes(caseDetail.case.status)) ||
-                              Boolean(
-                                caseDetail.assistanceRequests?.some(
-                                  (r) =>
-                                    r.schemeId === g.schemeId &&
-                                    ["RESOLVED", "CLOSED"].includes(r.status)
-                                )
-                              );
-
-                            const isAssistanceInProgress =
-                              !isAssistanceCompleted &&
-                              ((g.schemeId &&
-                                g.schemeId === caseDetail.case.schemeId &&
-                                !["RESOLVED", "CLOSED", "CITIZEN_DECLINED"].includes(
-                                  caseDetail.case.status
-                                )) ||
-                                Boolean(
-                                  caseDetail.assistanceRequests?.some(
-                                    (r) =>
-                                      r.schemeId === g.schemeId &&
-                                      !["RESOLVED", "CLOSED", "DECLINED"].includes(r.status)
-                                  )
-                                ));
-
-                            const targetMember =
-                              g.schemeId === "ab-pmjay"
-                                ? caseDetail.members.find((m) => m.age >= 70)
-                                : g.schemeId === "jsy"
-                                ? caseDetail.members.find((m) => m.maternalStatus === "pregnant") ||
-                                  caseDetail.members.find((m) => m.gender === "female" && m.age >= 18)
-                                : undefined;
-
-                            return (
-                              <div
-                                key={g.id || idx}
-                                className={`p-4 rounded-xl border space-y-2 text-xs transition-all ${
-                                  isAssistanceCompleted
-                                    ? "bg-emerald-50/40 border-emerald-300 text-slate-800"
-                                    : isAssistanceInProgress
-                                    ? "bg-blue-50/40 border-blue-300 text-slate-800"
-                                    : g.priority === "REQUIRED"
-                                    ? "bg-rose-50/50 border-rose-200 text-rose-950"
-                                    : g.priority === "IMPORTANT"
-                                    ? "bg-amber-50/50 border-amber-200 text-amber-950"
-                                    : "bg-slate-50 border-slate-200 text-slate-800"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 bg-white rounded border border-slate-200">
-                                    {g.type.replace(/_/g, " ")}
-                                  </span>
-                                  {isAssistanceCompleted ? (
-                                    <span className="font-bold text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-200 flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                      <span>{t("status.completed")}</span>
-                                    </span>
-                                  ) : isAssistanceInProgress ? (
-                                    <span className="font-bold text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded border border-blue-200">
-                                      ● {t("common.active")}
-                                    </span>
-                                  ) : (
-                                    <span className="font-bold text-[10px]">{g.priority}</span>
-                                  )}
-                                </div>
-                                <p className="font-bold text-sm text-slate-900">
-                                  {g.title || g.description}
-                                </p>
-                                <p className="text-slate-600">{g.description}</p>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-
-                    {/* TAB 3: ELIGIBLE SCHEMES */}
-                    {detailTab === "schemes" && (
-                      <div className="space-y-3">
-                        {caseDetail.eligibilityResults?.map((r) => {
-                          return (
-                            <div
-                              key={r.schemeId}
-                              className="p-4 rounded-xl border space-y-2.5 text-xs bg-emerald-50/30 border-emerald-200"
-                            >
-                              <div className="flex items-center justify-between">
-                                <h5 className="font-bold text-slate-900 text-sm">{r.schemeName}</h5>
-                                <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800">
-                                  {r.status}
-                                </span>
-                              </div>
-                              <p className="text-slate-600">{r.benefitSummary}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* TAB 4: CASE NOTES */}
-                    {detailTab === "notes" && (
-                      <div className="space-y-4">
-                        <form onSubmit={handleAddNote} className="space-y-2">
-                          <textarea
-                            rows={3}
-                            placeholder="Add a field note (e.g. Visited household. Verified maternal card...)"
-                            value={newNoteContent}
-                            onChange={(e) => setNewNoteContent(e.target.value)}
-                            className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden"
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              type="submit"
-                              variant="primary"
-                              size="sm"
-                              disabled={isNoteSubmitting || !newNoteContent.trim()}
-                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
-                            >
-                              {isNoteSubmitting ? t("common.submitting") : t("common.confirm")}
-                            </Button>
-                          </div>
-                        </form>
-
-                        <div className="space-y-2.5 pt-2">
-                          {caseDetail.notes.length === 0 ? (
-                            <p className="text-xs text-slate-400 text-center py-6">{t("forms.notes")}</p>
-                          ) : (
-                            caseDetail.notes.map((n) => (
-                              <div key={n.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
-                                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                                  <span className="font-bold text-slate-700">{n.authorName}</span>
-                                  <span>{new Date(n.createdAt).toLocaleString()}</span>
-                                </div>
-                                <p className="text-slate-800">{n.content}</p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* TAB 5: FOLLOW-UPS */}
-                    {detailTab === "followups" && (
-                      <div className="space-y-4">
-                        <form onSubmit={handleScheduleFollowUp} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                          <h5 className="font-bold text-xs text-slate-900">{t("asha.dueFollowUps")}</h5>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("forms.dateOfBirth")}</label>
-                              <input
-                                type="date"
-                                value={followUpDate}
-                                onChange={(e) => setFollowUpDate(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("forms.notes")}</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Check PM-JAY e-Card generation status"
-                                value={followUpReason}
-                                onChange={(e) => setFollowUpReason(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end">
-                            <Button
-                              type="submit"
-                              variant="primary"
-                              size="sm"
-                              disabled={isFollowUpSubmitting || !followUpDate || !followUpReason.trim()}
-                              className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
-                            >
-                              {isFollowUpSubmitting ? t("common.submitting") : t("common.confirm")}
-                            </Button>
-                          </div>
-                        </form>
-                      </div>
-                    )}
-
-                    {/* TAB 6: AUDIT TRAIL */}
-                    {detailTab === "history" && (
-                      <div className="space-y-2.5">
-                        {caseDetail.activities.length === 0 ? (
-                          <p className="text-xs text-slate-400 text-center py-6">{t("admin.auditTrail")}</p>
-                        ) : (
-                          caseDetail.activities.map((a) => (
-                            <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <span className="font-bold text-slate-700">{a.actorName} ({a.actorRole})</span>
-                                <span>{new Date(a.timestamp).toLocaleString()}</span>
-                              </div>
-                              <p className="text-slate-800">{a.description}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-
-
-        {/* ============================================================ */}
         {/* COMPLETE FOLLOW-UP MODAL (PHASE 10) */}
         {/* ============================================================ */}
         {completingFollowUp && (
@@ -3896,34 +2670,13 @@ export default function AshaWorkspacePage() {
             followUpId={callModalTarget.followUpId}
             defaultReason={callModalTarget.defaultReason}
             onCallComplete={() => {
-              if (selectedCaseId) {
-                caseService.getCaseDetail(selectedCaseId).then((res) => {
-                  if (res.success && res.data) setCaseDetail(res.data);
-                });
-              }
               loadFollowUps();
               loadCaseload();
             }}
           />
         )}
 
-        {/* ASHA NFC Provisioning & Management Modal */}
-        {isNfcModalOpen && caseDetail && (
-          <AshaNfcModal
-            isOpen={isNfcModalOpen}
-            onClose={() => setIsNfcModalOpen(false)}
-            householdId={caseDetail.household.id}
-            headOfHouseholdName={caseDetail.household.headOfHouseholdName}
-            village={caseDetail.household.village}
-            district={caseDetail.household.district}
-            state={caseDetail.household.state}
-            onNfcStatusChanged={() => {
-              if (caseDetail.household.id) {
-                fetchNfcStatus(caseDetail.household.id);
-              }
-            }}
-          />
-        )}
+
       </AuthenticatedShell>
     </ProtectedRoute>
   );
