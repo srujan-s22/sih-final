@@ -71,6 +71,62 @@ export class HouseholdRepository extends BaseFirestoreRepository<Household> {
   }
 
   /**
+   * Atomically creates a household and its initial members using Firestore batch.
+   * In unit test mode, enforces atomic rollback if any member creation fails.
+   */
+  public async createHouseholdWithMembers(
+    household: Household,
+    initialMembers: Member[] = []
+  ): Promise<{ household: Household; members: Member[] }> {
+    if (this.isUnitTestMode()) {
+      if (this.memoryHouseholds.has(household.id)) {
+        throw new Error("Household already exists.");
+      }
+      this.memoryHouseholds.set(household.id, { ...household });
+      try {
+        let memberMap = this.memoryMembers.get(household.id);
+        if (!memberMap) {
+          memberMap = new Map();
+          this.memoryMembers.set(household.id, memberMap);
+        }
+        const savedMembers: Member[] = [];
+        for (const m of initialMembers) {
+          memberMap.set(m.id, { ...m });
+          savedMembers.push({ ...m });
+        }
+        return {
+          household: { ...household, members: savedMembers },
+          members: savedMembers,
+        };
+      } catch (err) {
+        this.memoryHouseholds.delete(household.id);
+        this.memoryMembers.delete(household.id);
+        throw err;
+      }
+    }
+
+    const firestore = this.getCollection().firestore;
+    const batch = firestore.batch();
+    const hhRef = this.getCollection().doc(household.id);
+
+    batch.set(hhRef, household);
+
+    const savedMembers: Member[] = [];
+    for (const member of initialMembers) {
+      const memberRef = hhRef.collection("members").doc(member.id);
+      batch.set(memberRef, member);
+      savedMembers.push(member);
+    }
+
+    await batch.commit();
+
+    return {
+      household: { ...household, members: savedMembers },
+      members: savedMembers,
+    };
+  }
+
+  /**
    * Updates an existing household document
    */
   public async updateHousehold(

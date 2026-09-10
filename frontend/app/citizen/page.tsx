@@ -124,11 +124,13 @@ export default function CitizenPage() {
     headOfHouseholdName: "",
     rationCardNumber: "",
     incomeCategory: "BPL",
-    state: "",
+    state: "Karnataka",
     district: "",
     village: "",
     pincode: "",
     contactPhone: "",
+    headAge: 40,
+    headGender: "male",
   });
   const [householdSubmitting, setHouseholdSubmitting] = useState(false);
   const [householdFormError, setHouseholdFormError] = useState<string | null>(null);
@@ -309,13 +311,16 @@ export default function CitizenPage() {
         }
       } else {
         const res = await householdService.createHousehold(householdForm);
-        if (res.success) {
+        if (res.success && res.data) {
           setHousehold(res.data.household);
+          if (res.data.members && res.data.members.length > 0) {
+            setMembers(res.data.members);
+          }
           setIsHouseholdModalOpen(false);
-          setSuccessMessage("Household profile created successfully.");
+          setSuccessMessage("Household profile and head member created and linked successfully.");
           await loadEligibility();
         } else {
-          setHouseholdFormError(res.error.message);
+          setHouseholdFormError(res.success ? null : res.error.message);
         }
       }
     } catch {
@@ -566,7 +571,9 @@ export default function CitizenPage() {
       <AuthenticatedShell
         role="CITIZEN"
         title={
-          activeTab === "household"
+          !household
+            ? "First-Time Household Setup"
+            : activeTab === "household"
             ? t("navigation.household")
             : activeTab === "family"
             ? t("navigation.family")
@@ -579,7 +586,9 @@ export default function CitizenPage() {
             : t("citizen.welcome", { name: userProfile?.displayName || "Citizen" })
         }
         description={
-          activeTab === "household"
+          !household
+            ? "Complete your household profile to discover government healthcare schemes, request ASHA support, and receive benefits."
+            : activeTab === "household"
             ? t("citizen.healthBenefitsDesc")
             : activeTab === "family"
             ? t("citizen.familyMembersDesc")
@@ -591,8 +600,8 @@ export default function CitizenPage() {
             ? t("citizen.portalSubtitle")
             : t("citizen.portalSubtitle")
         }
-        navTabs={navTabs}
-        activeTab={activeTab}
+        navTabs={household ? navTabs : []}
+        activeTab={household ? activeTab : "onboarding"}
         onTabChange={(tabId) => setActiveTab(tabId)}
         actions={
           <div className="flex items-center gap-2">
@@ -606,31 +615,27 @@ export default function CitizenPage() {
               <span>{t("citizen.healthcareAssistantBtn")}</span>
             </Button>
             {household && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadEligibility}
-                disabled={isEvaluating}
-                className="text-xs cursor-pointer"
-              >
-                {isEvaluating ? t("common.submitting") : t("citizen.recheckEligibilityBtn")}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadEligibility}
+                  disabled={isEvaluating}
+                  className="text-xs cursor-pointer"
+                >
+                  {isEvaluating ? t("common.submitting") : t("citizen.recheckEligibilityBtn")}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleOpenAddMember}
+                  className="text-xs font-semibold cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t("citizen.addMemberBtn")}</span>
+                </Button>
+              </>
             )}
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                if (!household) {
-                  setHouseholdFormError(null);
-                  setIsHouseholdModalOpen(true);
-                } else {
-                  handleOpenAddMember();
-                }
-              }}
-              className="text-xs font-semibold cursor-pointer"
-            >
-              {!household ? t("citizen.setUpHouseholdBtn") : t("citizen.addMemberBtn")}
-            </Button>
           </div>
         }
       >
@@ -669,6 +674,182 @@ export default function CitizenPage() {
         {isLoading ? (
           <div className="py-16">
             <LoadingState message="Loading your household and healthcare records..." />
+          </div>
+        ) : !household ? (
+          /* ============================================================ */
+          /* DEDICATED FIRST-TIME CITIZEN ONBOARDING VIEW */
+          /* ============================================================ */
+          <div className="max-w-3xl mx-auto py-2 sm:py-4">
+            <div className="bg-white rounded-2xl border border-teal-200/80 shadow-md p-6 sm:p-8 space-y-6">
+              {/* Welcome Header */}
+              <div className="flex items-start gap-4 pb-5 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-6 h-6 text-teal-600" />
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200 mb-1.5">
+                    <span>First-Time Citizen Setup</span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    Welcome to SwasthyaSetu — Register Your Household
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                    Please complete your household profile. This one-time setup automatically links your household to your account, evaluates eligible government healthcare schemes, and connects you with your local ASHA worker.
+                  </p>
+                </div>
+              </div>
+
+              {householdFormError && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs sm:text-sm text-rose-800 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <p className="font-medium">{householdFormError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleHouseholdSubmit} className="space-y-6">
+                {/* Section 1: Head of Household & Contact */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <User className="w-4 h-4 text-teal-600" />
+                    <span>1. Head of Household & Contact Details</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label={t("citizen.headOfHousehold") + " *"}
+                      required
+                      value={householdForm.headOfHouseholdName}
+                      onChange={(e) =>
+                        setHouseholdForm({ ...householdForm, headOfHouseholdName: e.target.value })
+                      }
+                      placeholder="e.g. Ramesh Kumar"
+                    />
+                    <Input
+                      label={t("citizen.contactPhoneLabel")}
+                      value={householdForm.contactPhone || ""}
+                      onChange={(e) =>
+                        setHouseholdForm({ ...householdForm, contactPhone: e.target.value })
+                      }
+                      placeholder="e.g. 9876543210 (10 digits)"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Head Member Age *"
+                      type="number"
+                      min="0"
+                      max="125"
+                      required
+                      value={householdForm.headAge?.toString() || ""}
+                      onChange={(e) =>
+                        setHouseholdForm({ ...householdForm, headAge: parseInt(e.target.value, 10) || 0 })
+                      }
+                      placeholder="e.g. 42"
+                    />
+                    <Select
+                      label="Head Member Gender *"
+                      value={householdForm.headGender || "male"}
+                      onChange={(e) =>
+                        setHouseholdForm({ ...householdForm, headGender: e.target.value as Gender })
+                      }
+                      options={GENDER_OPTIONS}
+                    />
+                  </div>
+                </div>
+
+                {/* Section 2: Location Details */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-teal-600" />
+                    <span>2. Location & Jurisdiction</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label={t("citizen.stateLabel") + " *"}
+                      required
+                      value={householdForm.state}
+                      onChange={(e) => setHouseholdForm({ ...householdForm, state: e.target.value })}
+                      placeholder="e.g. Karnataka"
+                    />
+                    <Input
+                      label={t("citizen.districtLabel") + " *"}
+                      required
+                      value={householdForm.district}
+                      onChange={(e) => setHouseholdForm({ ...householdForm, district: e.target.value })}
+                      placeholder="e.g. Bengaluru Rural"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label={t("citizen.villageLabel") + " *"}
+                      required
+                      value={householdForm.village}
+                      onChange={(e) => setHouseholdForm({ ...householdForm, village: e.target.value })}
+                      placeholder="e.g. Devanahalli"
+                    />
+                    <Input
+                      label={t("citizen.pincodeLabel") + " *"}
+                      required
+                      value={householdForm.pincode}
+                      onChange={(e) => setHouseholdForm({ ...householdForm, pincode: e.target.value })}
+                      placeholder="e.g. 562110 (6 digits)"
+                    />
+                  </div>
+                </div>
+
+                {/* Section 3: Ration & Economic Details */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-teal-600" />
+                    <span>3. Ration Card & Economic Category</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Select
+                      label={t("citizen.incomeCategory") + " *"}
+                      value={householdForm.incomeCategory}
+                      onChange={(e) =>
+                        setHouseholdForm({
+                          ...householdForm,
+                          incomeCategory: e.target.value as IncomeCategory,
+                        })
+                      }
+                      options={INCOME_OPTIONS}
+                    />
+                    <Input
+                      label={t("citizen.rationCardNumber") + " *"}
+                      required
+                      value={householdForm.rationCardNumber}
+                      onChange={(e) =>
+                        setHouseholdForm({ ...householdForm, rationCardNumber: e.target.value })
+                      }
+                      placeholder="e.g. KA-05-RC-987654"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span>Household and head-of-household member are created together atomically.</span>
+                  </p>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    disabled={householdSubmitting}
+                    className="bg-teal-700 hover:bg-teal-800 text-white font-semibold flex items-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    {householdSubmitting ? (
+                      <span>{t("common.submitting")}...</span>
+                    ) : (
+                      <>
+                        <span>Complete Household Setup</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -2437,11 +2618,11 @@ export default function CitizenPage() {
         {/* MODALS */}
         {/* ============================================================ */}
 
-        {/* Modal: Setup / Edit Household */}
+        {/* Modal: Edit Household */}
         <Modal
           isOpen={isHouseholdModalOpen}
           onClose={() => setIsHouseholdModalOpen(false)}
-          title={household ? t("citizen.editHouseholdBtn") : t("citizen.setUpHouseholdBtn")}
+          title={t("citizen.editHouseholdBtn")}
           description={t("citizen.healthBenefitsDesc")}
         >
           <form onSubmit={handleHouseholdSubmit} className="space-y-5">

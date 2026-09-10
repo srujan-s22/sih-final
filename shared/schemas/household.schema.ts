@@ -12,6 +12,32 @@ export const MaternalStatusSchema = z.enum(["none", "pregnant", "lactating"], {
   errorMap: () => ({ message: "Maternal status must be one of: none, pregnant, lactating" }),
 });
 
+export const CreateMemberSchema = z.object({
+  fullName: z
+    .string({ required_error: "Member full name is required" })
+    .trim()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be under 100 characters"),
+  age: z
+    .number({ required_error: "Age is required" })
+    .int("Age must be an integer")
+    .min(0, "Age must be 0 or greater")
+    .max(125, "Age must be realistic"),
+  gender: GenderSchema,
+  relationship: z
+    .string({ required_error: "Relationship to head of household is required" })
+    .trim()
+    .min(2, "Relationship must be at least 2 characters")
+    .max(50, "Relationship must be under 50 characters"),
+  disabilityStatus: z.boolean().default(false),
+  chronicConditions: z
+    .array(z.string().trim().max(100))
+    .default([]),
+  maternalStatus: MaternalStatusSchema.optional(),
+});
+
+export const UpdateMemberSchema = CreateMemberSchema.partial();
+
 export const CreateHouseholdSchema = z.object({
   headOfHouseholdName: z
     .string({ required_error: "Head of household name is required" })
@@ -49,32 +75,18 @@ export const CreateHouseholdSchema = z.object({
     .regex(/^\d{10}$/, "Phone number must be a valid 10-digit number")
     .optional()
     .or(z.literal("")),
-});
-
-export const UpdateHouseholdSchema = CreateHouseholdSchema.partial();
-
-export const CreateMemberSchema = z.object({
-  fullName: z
-    .string({ required_error: "Member full name is required" })
-    .trim()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must be under 100 characters"),
-  age: z
-    .number({ required_error: "Age is required" })
-    .int("Age must be an integer")
+  headAge: z
+    .number()
+    .int()
     .min(0, "Age must be 0 or greater")
-    .max(125, "Age must be realistic"),
-  gender: GenderSchema,
-  relationship: z
-    .string({ required_error: "Relationship to head of household is required" })
-    .trim()
-    .min(2, "Relationship must be at least 2 characters")
-    .max(50, "Relationship must be under 50 characters"),
-  disabilityStatus: z.boolean().default(false),
-  chronicConditions: z
-    .array(z.string().trim().max(100))
-    .default([]),
-  maternalStatus: MaternalStatusSchema.optional(),
+    .max(125, "Age must be realistic")
+    .optional(),
+  headGender: GenderSchema.optional(),
+  initialMembers: z.array(CreateMemberSchema).optional(),
 });
 
-export const UpdateMemberSchema = CreateMemberSchema.partial();
+export const UpdateHouseholdSchema = CreateHouseholdSchema.omit({
+  headAge: true,
+  headGender: true,
+  initialMembers: true,
+}).partial();

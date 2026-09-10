@@ -471,4 +471,179 @@ describe("Household & Member Domain API (/api/v1/households)", () => {
       expect(res.statusCode).toBe(HTTP_STATUS.UNPROCESSABLE_ENTITY);
     });
   });
+
+  describe("Atomic First-Time Onboarding & 1 Citizen ↔ 1 Household Invariant", () => {
+    it("atomically creates household and initial head member in one operation during onboarding", async () => {
+      await establishConsent(citizen1Token);
+
+      const onboardingPayload = {
+        headOfHouseholdName: "Anand Verma",
+        rationCardNumber: "RC-KA-2026-1122",
+        incomeCategory: "BPL",
+        state: "Karnataka",
+        district: "Bengaluru Urban",
+        village: "Whitefield",
+        pincode: "560066",
+        contactPhone: "9876543210",
+        headAge: 42,
+        headGender: "male",
+      };
+
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/households",
+        headers: { authorization: `Bearer ${citizen1Token}` },
+        payload: onboardingPayload,
+      });
+
+      expect(createRes.statusCode).toBe(HTTP_STATUS.CREATED);
+      const createBody = JSON.parse(createRes.body);
+      expect(createBody.success).toBe(true);
+      expect(createBody.data.isNew).toBe(true);
+      expect(createBody.data.household.id).toBe("hh_citizen101");
+      expect(createBody.data.household.ownerUid).toBe("citizen101");
+      expect(createBody.data.members).toHaveLength(1);
+      expect(createBody.data.members[0].fullName).toBe("Anand Verma");
+      expect(createBody.data.members[0].age).toBe(42);
+      expect(createBody.data.members[0].gender).toBe("male");
+      expect(createBody.data.members[0].relationship).toBe("Head");
+
+      // Verify persistence via GET /households/me
+      const getRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/households/me",
+        headers: { authorization: `Bearer ${citizen1Token}` },
+      });
+
+      expect(getRes.statusCode).toBe(HTTP_STATUS.OK);
+      const getBody = JSON.parse(getRes.body);
+      expect(getBody.data.household.id).toBe("hh_citizen101");
+      expect(getBody.data.members).toHaveLength(1);
+      expect(getBody.data.members[0].fullName).toBe("Anand Verma");
+    });
+
+    it("strictly enforces 1 Citizen ↔ 1 Household invariant and returns 409 Conflict on duplicate attempt", async () => {
+      await establishConsent(citizen1Token);
+
+      const payload = {
+        headOfHouseholdName: "First Attempt",
+        rationCardNumber: "RC-FIRST-111",
+        incomeCategory: "BPL",
+        state: "Karnataka",
+        district: "Bengaluru",
+        village: "Kadugodi",
+        pincode: "560067",
+      };
+
+      // 1. First creation succeeds
+      const firstRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/households",
+        headers: { authorization: `Bearer ${citizen1Token}` },
+        payload,
+      });
+      expect(firstRes.statusCode).toBe(HTTP_STATUS.CREATED);
+
+      // 2. Second creation by same citizen fails with 409 Conflict
+      const secondRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/households",
+        headers: { authorization: `Bearer ${citizen1Token}` },
+        payload: {
+          ...payload,
+          headOfHouseholdName: "Second Attempt",
+        },
+      });
+
+      expect(secondRes.statusCode).toBe(HTTP_STATUS.CONFLICT);
+      const secondBody = JSON.parse(secondRes.body);
+      expect(secondBody.success).toBe(false);
+      expect(secondBody.code).toBe("HOUSEHOLD_ALREADY_EXISTS");
+      expect(secondBody.message).toContain("already registered");
+    });
+
+    it("blocks non-CITIZEN roles (ASHA) from creating households via POST /v1/households with 403", async () => {
+      const ashaToken = "test_token_asha777_asha";
+      await establishConsent(ashaToken);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/households",
+        headers: { authorization: `Bearer ${ashaToken}` },
+        payload: {
+          headOfHouseholdName: "Forbidden Creation",
+          rationCardNumber: "RC-FORBIDDEN-001",
+          incomeCategory: "BPL",
+          state: "Karnataka",
+          district: "Bengaluru",
+          village: "Whitefield",
+          pincode: "560066",
+        },
+      });
+
+      expect(res.statusCode).toBe(HTTP_STATUS.FORBIDDEN);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(false);
+      expect(body.code).toBe("INSUFFICIENT_ROLE");
+    });
+
+    it("ensures atomic rollback: if initial member saving fails, household document is not created", async () => {
+      // Mock an error during member insertion in repository
+      const testHouseholdId = "hh_rollback_test";
+      const faultyHousehold = {
+        id: testHouseholdId,
+        ownerUid: "rollback_citizen",
+        headOfHouseholdName: "Rollback Person",
+        rationCardNumber: "RC-ROLLBACK-001",
+        incomeCategory: "BPL" as const,
+        state: "Karnataka",
+        district: "Bengaluru",
+        village: "Village-1",
+        pincode: "560001",
+        members: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Pass an initialMember that causes an exception when processed
+      // We simulate this by intercepting memberMap.set or testing createHouseholdWithMembers error handling
+      const faultyMembers = [
+        {
+          id: "m_valid_1",
+          householdId: testHouseholdId,
+          fullName: "Valid Member",
+          relationship: "Head",
+          age: 40,
+          gender: "female" as const,
+          disabilityStatus: false,
+          chronicConditions: [],
+          maternalStatus: "none" as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+
+      // Verify that when createHouseholdWithMembers throws during member persistence,
+      // the household document is cleaned up
+      const repo = app.householdRepository;
+      // Intentionally break memoryMembers so setting throws
+      const originalSet = repo["memoryMembers"].set.bind(repo["memoryMembers"]);
+      repo["memoryMembers"].set = () => {
+        throw new Error("Simulated Firestore Batch Commit Failure");
+      };
+
+      try {
+        await repo.createHouseholdWithMembers(faultyHousehold, faultyMembers);
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err.message).toBe("Simulated Firestore Batch Commit Failure");
+      } finally {
+        repo["memoryMembers"].set = originalSet;
+      }
+
+      // Assert household document was rolled back and does not exist
+      const savedHh = await repo.getHouseholdById(testHouseholdId);
+      expect(savedHh).toBeNull();
+    });
+  });
 });

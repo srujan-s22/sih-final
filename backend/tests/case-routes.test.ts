@@ -79,10 +79,73 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
     expect(summaryRes.json().data.totalAssigned).toBe(0);
   });
 
-  it("4. performs field registration, creates case, and retrieves case detail", async () => {
+  const seedAssignedCase = async (
+    householdId: string,
+    headName: string,
+    ashaUid: string,
+    state = "Karnataka",
+    district = "Bengaluru",
+  ) => {
+    const { household } = await app.householdRepository.createHouseholdWithMembers(
+      {
+        id: householdId,
+        ownerUid: `citizen_owner_${householdId}`,
+        headOfHouseholdName: headName,
+        rationCardNumber: `RC-${householdId}`,
+        incomeCategory: "BPL",
+        state,
+        district,
+        village: "Bengaluru Central",
+        pincode: "560001",
+        members: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      [
+        {
+          id: `m_${householdId}_head`,
+          householdId,
+          fullName: headName,
+          relationship: "Head",
+          age: 40,
+          gender: "female",
+          disabilityStatus: false,
+          chronicConditions: [],
+          maternalStatus: "none",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]
+    );
+
+    const now = new Date().toISOString();
+    const caseId = `case_${householdId}`;
+    const ashaCase = await app.caseRepository.createCase({
+      id: caseId,
+      householdId: household.id,
+      assignedAshaUid: ashaUid,
+      headOfHouseholdName: household.headOfHouseholdName,
+      district: household.district,
+      state: household.state,
+      incomeCategory: household.incomeCategory,
+      memberCount: 1,
+      status: "ACTIVE",
+      priority: "NORMAL",
+      detectedGapsCount: 0,
+      eligibleSchemesCount: 0,
+      lastContactAt: null,
+      nextFollowUpAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { household, case: ashaCase };
+  };
+
+  it("4. rejects ASHA field registration with 403 FORBIDDEN_ROLE and retrieves case detail for assigned case", async () => {
     await establishConsent(ashaToken);
 
-    // Field Registration
+    // Field Registration attempt by ASHA is rejected with 403 FORBIDDEN_ROLE
     const regRes = await app.inject({
       method: "POST",
       url: "/api/v1/asha/cases",
@@ -100,10 +163,14 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
       },
     });
 
-    expect(regRes.statusCode).toBe(HTTP_STATUS.CREATED);
+    expect(regRes.statusCode).toBe(HTTP_STATUS.FORBIDDEN);
     const regBody = regRes.json();
-    expect(regBody.success).toBe(true);
-    const createdCaseId = regBody.data.case.id;
+    expect(regBody.success).toBe(false);
+    expect(regBody.code).toBe("FORBIDDEN_ROLE");
+
+    // Seed assigned case via citizen creation and assignment model
+    const { case: createdCase } = await seedAssignedCase("hh_9901", "Lakshmi Devi", "asha901");
+    const createdCaseId = createdCase.id;
 
     // Retrieve Case Detail
     const detailRes = await app.inject({
@@ -122,24 +189,9 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
     await establishConsent(ashaToken);
     await establishConsent(otherAshaToken);
 
-    // ASHA 1 registers case
-    const regRes = await app.inject({
-      method: "POST",
-      url: "/api/v1/asha/cases",
-      headers: { authorization: `Bearer ${ashaToken}` },
-      payload: {
-        headOfHouseholdName: "Private Household",
-        rationCardNumber: "RC-KA-9902",
-        headAge: 45,
-        headGender: "male",
-        incomeCategory: "BPL",
-        state: "Karnataka",
-        district: "Bengaluru",
-        village: "Bengaluru South",
-        pincode: "560001",
-      },
-    });
-    const caseId = regRes.json().data.case.id;
+    // Seed case assigned to ASHA 1 (asha901)
+    const { case: asha1Case } = await seedAssignedCase("hh_9902", "Private Household", "asha901");
+    const caseId = asha1Case.id;
 
     // ASHA 2 tries to access ASHA 1's case
     const forbiddenRes = await app.inject({
@@ -154,24 +206,9 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
   it("6. updates case status, adds note, schedules follow-up, and retrieves activities", async () => {
     await establishConsent(ashaToken);
 
-    // Create case
-    const regRes = await app.inject({
-      method: "POST",
-      url: "/api/v1/asha/cases",
-      headers: { authorization: `Bearer ${ashaToken}` },
-      payload: {
-        headOfHouseholdName: "Raju Kumar",
-        rationCardNumber: "RC-KA-9903",
-        headAge: 38,
-        headGender: "male",
-        incomeCategory: "BPL",
-        state: "Karnataka",
-        district: "Bengaluru",
-        village: "Bengaluru North",
-        pincode: "560001",
-      },
-    });
-    const caseId = regRes.json().data.case.id;
+    // Seed case assigned to asha901
+    const { case: seededCase } = await seedAssignedCase("hh_9903", "Raju Kumar", "asha901");
+    const caseId = seededCase.id;
 
     // 1. Update status to NEEDS_ATTENTION
     const patchRes = await app.inject({
@@ -230,24 +267,9 @@ describe("Phase 9: Case Management API Endpoints (/api/v1/asha/cases)", () => {
     await establishConsent(adminToken);
     await establishConsent(ashaToken);
 
-    // Create case
-    const regRes = await app.inject({
-      method: "POST",
-      url: "/api/v1/asha/cases",
-      headers: { authorization: `Bearer ${ashaToken}` },
-      payload: {
-        headOfHouseholdName: "Sunitha Rao",
-        rationCardNumber: "RC-KA-9904",
-        headAge: 29,
-        headGender: "female",
-        incomeCategory: "BPL",
-        state: "Karnataka",
-        district: "Bengaluru",
-        village: "Bengaluru Central",
-        pincode: "560001",
-      },
-    });
-    const householdId = regRes.json().data.household.id;
+    // Seed assigned case
+    const { household } = await seedAssignedCase("hh_9904", "Sunitha Rao", "asha901");
+    const householdId = household.id;
 
     // Seed target ASHA worker in userRepository
     await app.userRepository.createUserProfile({

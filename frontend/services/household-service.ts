@@ -22,8 +22,8 @@ export const householdService = {
    */
   async createHousehold(
     data: CreateHouseholdInput
-  ): Promise<ApiResult<{ household: Household; isNew: boolean }>> {
-    return apiClient.post<{ household: Household; isNew: boolean }>("/api/v1/households", data);
+  ): Promise<ApiResult<{ household: Household; members?: Member[]; isNew: boolean }>> {
+    return apiClient.post<{ household: Household; members?: Member[]; isNew: boolean }>("/api/v1/households", data);
   },
 
   /**

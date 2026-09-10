@@ -10,7 +10,6 @@ import {
   CasePriority,
   CaseDetailResponse,
   CaseSummaryResponse,
-  FieldRegistrationInput,
   AshaAttentionSignalsResponse,
   InitiateSchemeAssistanceInput,
   InitiateSchemeAssistanceResponse,
@@ -272,18 +271,6 @@ export class CaseServiceClient {
   ): Promise<ApiResult<{ activities: CaseActivity[] }>> {
     return apiClient.get<{ activities: CaseActivity[] }>(
       `/api/v1/asha/cases/${encodeURIComponent(caseId)}/activities`
-    );
-  }
-
-  /**
-   * Assisted field registration of household and auto-assigned case
-   */
-  public async createFieldRegistration(
-    input: FieldRegistrationInput
-  ): Promise<ApiResult<{ case: AshaCase; household: Household }>> {
-    return apiClient.post<{ case: AshaCase; household: Household }>(
-      "/api/v1/asha/cases",
-      input
     );
   }
 

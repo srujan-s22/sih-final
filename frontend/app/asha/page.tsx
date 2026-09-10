@@ -62,7 +62,6 @@ import {
   CaseTask,
   CaseTaskStatus,
   SchemeJourneyStep,
-  FieldRegistrationInput,
   AshaAttentionSignal,
 } from "@shared/types/case";
 import { AshaConnectionRequest } from "@shared/types/connection";
@@ -170,24 +169,7 @@ export default function AshaWorkspacePage() {
     defaultReason?: string;
   } | null>(null);
 
-  // Field Registration Modal
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [registerSubmitting, setRegisterSubmitting] = useState(false);
-  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
-  const [registerError, setRegisterError] = useState<string | null>(null);
 
-  const [registerForm, setRegisterForm] = useState<FieldRegistrationInput>({
-    headOfHouseholdName: "",
-    headAge: 35,
-    headGender: "female",
-    incomeCategory: "BPL",
-    state: "Karnataka",
-    district: "Bengaluru Rural",
-    village: "",
-    pincode: "560001",
-    contactPhone: "",
-    rationCardNumber: "",
-  });
 
   // Phase 8 Assistant Integration
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -420,7 +402,7 @@ export default function AshaWorkspacePage() {
     try {
       const res = await connectionService.acceptConnectionRequest(requestId);
       if (res.success) {
-        setRegisterSuccess("Household connection accepted and added to your caseload.");
+        setSuccessBanner("Household connection accepted and added to your caseload.");
         await Promise.all([loadCaseload(), loadPendingRequests()]);
       } else {
         setErrorMessage((res as any).error?.message || "Failed to accept connection request.");
@@ -435,7 +417,7 @@ export default function AshaWorkspacePage() {
     try {
       const res = await connectionService.rejectConnectionRequest(requestId);
       if (res.success) {
-        setRegisterSuccess("Connection request declined.");
+        setSuccessBanner("Connection request declined.");
         await loadPendingRequests();
       } else {
         setErrorMessage((res as any).error?.message || "Failed to reject connection request.");
@@ -459,7 +441,7 @@ export default function AshaWorkspacePage() {
       });
 
       if (res.success) {
-        setRegisterSuccess(`Assistance request updated to '${newStatus}'.`);
+        setSuccessBanner(`Assistance request updated to '${newStatus}'.`);
         await Promise.all([loadAssistanceRequests(), loadCaseload()]);
       } else {
         setErrorMessage(res.error?.message || "Failed to update assistance request.");
@@ -894,27 +876,7 @@ export default function AshaWorkspacePage() {
     }
   };
 
-  // Handle Field Registration
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRegisterError(null);
-    setRegisterSubmitting(true);
-    try {
-      const res = await caseService.createFieldRegistration(registerForm);
-      if (res.success && res.data) {
-        setIsRegisterModalOpen(false);
-        setRegisterSuccess(`Case registered for ${res.data.household.headOfHouseholdName}`);
-        await loadCaseload();
-        openCaseDetail(res.data.case.id);
-      } else {
-        setRegisterError(res.success ? null : (res as any).error?.message || "Failed to register household case in field.");
-      }
-    } catch {
-      setRegisterError("Failed to register household case in field.");
-    } finally {
-      setRegisterSubmitting(false);
-    }
-  };
+
 
   // --- Single Source of Truth: Unified Selectors & State Derivations ---
   const totalAssignedHouseholds = cases.length;
@@ -1056,36 +1018,10 @@ export default function AshaWorkspacePage() {
               <Bot className="w-3.5 h-3.5 text-emerald-700" />
               <span>{t("citizen.healthcareAssistantBtn")}</span>
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setRegisterError(null);
-                setIsRegisterModalOpen(true);
-              }}
-              className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t("asha.registerHousehold")}</span>
-            </Button>
           </div>
         }
       >
-        {/* Success Alert */}
-        {registerSuccess && (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <p className="font-semibold">{registerSuccess}</p>
-            </div>
-            <button
-              onClick={() => setRegisterSuccess(null)}
-              className="text-emerald-700 hover:text-emerald-900 font-bold text-xs ml-4 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+
 
         {/* Error Alert */}
         {errorMessage && (
@@ -1233,17 +1169,6 @@ export default function AshaWorkspacePage() {
                       className="text-xs font-semibold bg-white border-rose-200 text-rose-900 hover:bg-rose-50 cursor-pointer"
                     >
                       <Clock className="w-3.5 h-3.5 mr-1 text-rose-700" /> {t("asha.dueFollowUps")} ({actionableFollowUpBadge})
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setRegisterError(null);
-                        setIsRegisterModalOpen(true);
-                      }}
-                      className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 mr-1" /> {t("asha.registerHousehold")}
                     </Button>
                   </div>
                 </div>
@@ -1516,18 +1441,6 @@ export default function AshaWorkspacePage() {
                       {t("asha.workspaceDesc")}
                     </p>
                   </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setRegisterError(null);
-                      setIsRegisterModalOpen(true);
-                    }}
-                    className="text-xs font-semibold flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white self-start sm:self-auto shadow-2xs cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>{t("asha.registerHousehold")}</span>
-                  </Button>
                 </div>
 
                 {/* Search & Filter Controls */}
@@ -3715,106 +3628,7 @@ export default function AshaWorkspacePage() {
           </div>
         )}
 
-        {/* ============================================================ */}
-        {/* FIELD REGISTRATION MODAL */}
-        {/* ============================================================ */}
-        {isRegisterModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-emerald-700" />
-                  <span>{t("asha.registerHousehold")}</span>
-                </h3>
-                <button onClick={() => setIsRegisterModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              {registerError && (
-                <div className="p-3 bg-red-50 text-red-800 rounded-lg text-xs border border-red-200">{registerError}</div>
-              )}
-
-              <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">{t("citizen.headOfHousehold")} *</label>
-                  <input
-                    type="text"
-                    required
-                    value={registerForm.headOfHouseholdName}
-                    onChange={(e) => setRegisterForm({ ...registerForm, headOfHouseholdName: e.target.value })}
-                    className="w-full p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-600 focus:outline-hidden"
-                    placeholder="e.g. Ramesh Kumar"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.incomeCategory")} *</label>
-                    <select
-                      value={registerForm.incomeCategory}
-                      onChange={(e) => setRegisterForm({ ...registerForm, incomeCategory: e.target.value as IncomeCategory })}
-                      className="w-full p-2 rounded-lg border border-slate-200 bg-white"
-                    >
-                      <option value="BPL">BPL (Below Poverty Line)</option>
-                      <option value="AAY">AAY (Antyodaya)</option>
-                      <option value="APL">APL (Above Poverty Line)</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.rationCardNumber")}</label>
-                    <input
-                      type="text"
-                      value={registerForm.rationCardNumber || ""}
-                      onChange={(e) => setRegisterForm({ ...registerForm, rationCardNumber: e.target.value })}
-                      className="w-full p-2 rounded-lg border border-slate-200"
-                      placeholder="e.g. RC-KA-99128"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.district")} *</label>
-                    <input
-                      type="text"
-                      required
-                      value={registerForm.district}
-                      onChange={(e) => setRegisterForm({ ...registerForm, district: e.target.value })}
-                      className="w-full p-2 rounded-lg border border-slate-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-slate-700 block mb-1">{t("citizen.village")} *</label>
-                    <input
-                      type="text"
-                      required
-                      value={registerForm.village}
-                      onChange={(e) => setRegisterForm({ ...registerForm, village: e.target.value })}
-                      className="w-full p-2 rounded-lg border border-slate-200"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setIsRegisterModalOpen(false)} className="cursor-pointer">
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    disabled={registerSubmitting}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold cursor-pointer"
-                  >
-                    {registerSubmitting ? t("common.submitting") : t("common.confirm")}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* ============================================================ */}
         {/* COMPLETE FOLLOW-UP MODAL (PHASE 10) */}

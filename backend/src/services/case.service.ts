@@ -1046,93 +1046,14 @@ export class CaseService {
    * Auto-creates the household, member, and assigned AshaCase.
    */
   public async createFieldEnrollmentCase(
-    input: FieldRegistrationInput,
-    ashaProfile: UserProfile
+    _input: FieldRegistrationInput,
+    _ashaProfile: UserProfile
   ): Promise<{ case: AshaCase; household: Household }> {
-    if (ashaProfile.role !== "ASHA" && ashaProfile.role !== "ADMIN") {
-      throw new CaseServiceError(
-        "Only ASHA workers and Administrators can perform field case registrations.",
-        HTTP_STATUS.FORBIDDEN,
-        "FORBIDDEN_ROLE"
-      );
-    }
-
-    const now = new Date().toISOString();
-
-    // 1. Create Household
-    const householdId = `hh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const household: Household = {
-      id: householdId,
-      ownerUid: ashaProfile.uid, // Managed under registering staff
-      headOfHouseholdName: input.headOfHouseholdName.trim(),
-      rationCardNumber: input.rationCardNumber ? input.rationCardNumber.trim() : `RC-PENDING-${Date.now()}`,
-      incomeCategory: input.incomeCategory,
-      state: input.state.trim(),
-      district: input.district.trim(),
-      village: input.village ? input.village.trim() : "Rural Area",
-      pincode: input.pincode.trim(),
-      contactPhone: input.contactPhone?.trim(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const savedHousehold = await this.householdRepo.createHousehold(household);
-
-    // 2. Add Head of Household Member if provided
-    let memberCount = 1;
-    if (input.headAge && input.headGender) {
-      const memberId = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      await this.householdRepo.createMember(householdId, {
-        id: memberId,
-        householdId,
-        fullName: input.headOfHouseholdName.trim(),
-        age: input.headAge,
-        gender: input.headGender,
-        relationship: "Self / Head",
-        disabilityStatus: false,
-        maternalStatus: "none",
-        chronicConditions: [],
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // 3. Create Assigned AshaCase
-    const caseId = `case_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const newCase: AshaCase = {
-      id: caseId,
-      householdId,
-      assignedAshaUid: ashaProfile.uid,
-      headOfHouseholdName: savedHousehold.headOfHouseholdName,
-      district: savedHousehold.district,
-      state: savedHousehold.state,
-      incomeCategory: savedHousehold.incomeCategory,
-      memberCount,
-      status: "NEW",
-      priority: "NORMAL",
-      detectedGapsCount: 0,
-      eligibleSchemesCount: 0,
-      lastContactAt: now,
-      nextFollowUpAt: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const savedCase = await this.caseRepo.createCase(newCase);
-
-    // 4. Record Initial Audit Activity
-    await this.caseRepo.createActivity(caseId, {
-      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      caseId,
-      actorUid: ashaProfile.uid,
-      actorRole: ashaProfile.role,
-      actorName: ashaProfile.displayName || "ASHA Worker",
-      type: "CASE_CREATED",
-      description: `Case registered in field for ${savedHousehold.headOfHouseholdName}`,
-      timestamp: now,
-    });
-
-    return { case: savedCase, household: savedHousehold };
+    throw new CaseServiceError(
+      "ASHA healthcare workers can no longer register households directly. Households must be created by Citizens during onboarding and assigned to ASHA workers.",
+      HTTP_STATUS.FORBIDDEN,
+      "FORBIDDEN_ROLE"
+    );
   }
 
   /**

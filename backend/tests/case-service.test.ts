@@ -9,6 +9,7 @@ import { EligibilityService } from "../src/services/eligibility/eligibility.serv
 import { GuidanceService } from "../src/services/guidance/guidance.service.js";
 import { seedSchemeRegistry } from "../src/services/eligibility/scheme-seed.js";
 import { UserProfile } from "../../shared/types/auth.js";
+import { HTTP_STATUS } from "../src/config/constants.js";
 
 describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
   let caseRepo: CaseRepository;
@@ -116,34 +117,27 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
     expect(summary.resolvedCount).toBe(0);
   });
 
-  it("2. allows ASHA worker to perform field registration and creates an assigned case", async () => {
-    const regResult = await caseService.createFieldEnrollmentCase(
-      {
-        headOfHouseholdName: "Manjula Gowda",
-        headAge: 32,
-        headGender: "female",
-        incomeCategory: "BPL",
-        state: "Karnataka",
-        district: "Bengaluru Rural",
-        village: "Channasandra",
-        pincode: "560067",
-      },
-      ashaProfileA
+  it("2. strictly rejects ASHA worker from performing field registration with 403 FORBIDDEN_ROLE", async () => {
+    await expect(
+      caseService.createFieldEnrollmentCase(
+        {
+          headOfHouseholdName: "Manjula Gowda",
+          headAge: 32,
+          headGender: "female",
+          incomeCategory: "BPL",
+          state: "Karnataka",
+          district: "Bengaluru Rural",
+          village: "Channasandra",
+          pincode: "560067",
+        },
+        ashaProfileA
+      )
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "FORBIDDEN_ROLE",
+        statusCode: HTTP_STATUS.FORBIDDEN,
+      })
     );
-
-    expect(regResult.case.assignedAshaUid).toBe(ashaProfileA.uid);
-    expect(regResult.case.headOfHouseholdName).toBe("Manjula Gowda");
-    expect(regResult.case.status).toBe("NEW");
-
-    // Case is now in ASHA A's caseload
-    const cases = await caseService.listAshaCases(ashaProfileA.uid);
-    expect(cases).toHaveLength(1);
-    expect(cases[0].id).toBe(regResult.case.id);
-
-    // Initial activity was logged
-    const activities = await caseService.getCaseActivities(regResult.case.id, ashaProfileA);
-    expect(activities).toHaveLength(1);
-    expect(activities[0].type).toBe("CASE_CREATED");
   });
 
   it("3. allows assigned ASHA worker to retrieve full case details with deterministic eligibility and gaps", async () => {
@@ -429,11 +423,9 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
     expect(reassignedCase.assignedAshaUid).toBe(ashaProfileB.uid);
   });
 
-  it("10. Field Registration ignores spoofed assignedAshaUid and enforces caller's authenticated UID", async () => {
+  it("10. Field Registration is completely disabled with FORBIDDEN_ROLE", async () => {
     const maliciousPayload: any = {
-      headOfHouseholdName: "Spoof Test Family",
-      headAge: 40,
-      headGender: "male",
+      headOfHouseholdName: "Spoofed Household",
       incomeCategory: "BPL",
       state: "Karnataka",
       district: "Bengaluru",
@@ -442,11 +434,14 @@ describe("Phase 9: CaseService & Authorization (RBAC / IDOR) Tests", () => {
       assignedAshaUid: "evil-asha-attacker-999", // Client attempts to hijack assignment
     };
 
-    const regResult = await caseService.createFieldEnrollmentCase(maliciousPayload, ashaProfileA);
-
-    // Invariant: Assignment must strictly match the authenticated ASHA worker
-    expect(regResult.case.assignedAshaUid).toBe(ashaProfileA.uid);
-    expect(regResult.case.assignedAshaUid).not.toBe("evil-asha-attacker-999");
+    await expect(
+      caseService.createFieldEnrollmentCase(maliciousPayload, ashaProfileA)
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "FORBIDDEN_ROLE",
+        statusCode: HTTP_STATUS.FORBIDDEN,
+      })
+    );
   });
 
   it("11. Citizen is strictly rejected from performing field registrations", async () => {

@@ -693,35 +693,24 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * POST /api/v1/asha/cases
-   * Assisted Field Registration: Registers household in field & auto-creates assigned case
+   * Deprecated/Disabled: ASHA workers can no longer register households directly.
+   * All households must be created by Citizens and assigned to ASHA workers.
    */
   fastify.post(
     "/v1/asha/cases",
     { preHandler: [requireAuth, requireConsent] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const parseResult = CreateHouseholdSchema.safeParse(request.body);
-        if (!parseResult.success) {
-          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
-            success: false,
-            code: "VALIDATION_ERROR",
-            message: parseResult.error.errors[0]?.message || "Invalid household registration payload.",
-            errors: parseResult.error.errors,
-          });
-        }
+      request.log.warn({
+        correlationId: request.correlationId,
+        actorUid: request.user?.uid,
+        event: "DEPRECATED_ASHA_HOUSEHOLD_CREATION_ATTEMPT",
+      });
 
-        const result = await fastify.caseService.createFieldEnrollmentCase(
-          parseResult.data,
-          request.userProfile!
-        );
-
-        return reply.status(HTTP_STATUS.CREATED).send({
-          success: true,
-          data: result,
-        });
-      } catch (err) {
-        return handleCaseError(err, reply);
-      }
+      return reply.status(HTTP_STATUS.FORBIDDEN).send({
+        success: false,
+        code: "FORBIDDEN_ROLE",
+        message: "ASHA healthcare workers can no longer register households directly. Households must be created by Citizens during onboarding and assigned to ASHA workers.",
+      });
     }
   );
 

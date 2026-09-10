@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { requireAuth, requireConsent } from "../plugins/guards.js";
+import { requireAuth, requireConsent, requireRole } from "../plugins/guards.js";
 import {
   CreateHouseholdSchema,
   UpdateHouseholdSchema,
@@ -7,15 +7,17 @@ import {
   UpdateMemberSchema,
 } from "../../../shared/schemas/household.schema.js";
 import { HTTP_STATUS } from "../config/constants.js";
+import { HouseholdServiceError } from "../services/household.service.js";
 
 export const householdRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /api/v1/households
-   * Creates or returns existing household for the authenticated citizen.
+   * Creates household and optional initial members atomically for the authenticated citizen.
+   * STRICT 1:1 INVARIANT: Only CITIZEN role allowed; rejects duplicates with 409 CONFLICT.
    */
   fastify.post(
     "/v1/households",
-    { preHandler: [requireAuth, requireConsent] },
+    { preHandler: [requireAuth, requireConsent, requireRole(["CITIZEN"])] },
     async (request, reply) => {
       const parseResult = CreateHouseholdSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -34,17 +36,28 @@ export const householdRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const result = await fastify.householdService.getOrCreateHousehold(
+        const result = await fastify.householdService.createHousehold(
           request.user!.uid,
           parseResult.data
         );
 
-        return reply.status(result.isNew ? HTTP_STATUS.CREATED : HTTP_STATUS.OK).send({
+        return reply.status(HTTP_STATUS.CREATED).send({
           success: true,
           data: result,
           correlation_id: request.correlationId,
         });
       } catch (err: unknown) {
+        if (err instanceof HouseholdServiceError) {
+          return reply.status(err.statusCode).send({
+            success: false,
+            error: err.code,
+            message: err.message,
+            code: err.code,
+            correlation_id: request.correlationId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
         const message = err instanceof Error ? err.message : "Failed to create household.";
         return reply.status(HTTP_STATUS.BAD_REQUEST).send({
           success: false,

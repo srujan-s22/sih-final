@@ -7,6 +7,19 @@ import {
   UpdateMemberInput,
 } from "../../../shared/types/household.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
+import { HTTP_STATUS } from "../config/constants.js";
+
+export class HouseholdServiceError extends Error {
+  public statusCode: number;
+  public code: string;
+
+  constructor(message: string, statusCode: number, code: string) {
+    super(message);
+    this.name = "HouseholdServiceError";
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 export class HouseholdService {
   private householdRepo: HouseholdRepository;
@@ -16,20 +29,21 @@ export class HouseholdService {
   }
 
   /**
-   * Idempotently gets or creates the authenticated citizen's household.
+   * Atomically creates the authenticated citizen's household and initial member(s).
    * STRICT SECURITY RULE: ownerUid is extracted exclusively from verified token context.
+   * STRICT 1:1 INVARIANT: Rejects with 409 Conflict if a household already exists for this citizen account.
    */
-  public async getOrCreateHousehold(
+  public async createHousehold(
     ownerUid: string,
     input: CreateHouseholdInput
-  ): Promise<{ household: Household; isNew: boolean }> {
+  ): Promise<{ household: Household; members: Member[]; isNew: boolean }> {
     const existing = await this.householdRepo.getHouseholdByOwnerUid(ownerUid);
     if (existing) {
-      const members = await this.householdRepo.getMembers(existing.id);
-      return {
-        household: { ...existing, members },
-        isNew: false,
-      };
+      throw new HouseholdServiceError(
+        "A household profile is already registered for this citizen account. Duplicate household creation is not allowed.",
+        HTTP_STATUS.CONFLICT,
+        "HOUSEHOLD_ALREADY_EXISTS"
+      );
     }
 
     const now = new Date().toISOString();
@@ -37,25 +51,89 @@ export class HouseholdService {
 
     const newHousehold: Household = {
       id: householdId,
-      ownerUid, // Server-enforced ownership
-      headOfHouseholdName: input.headOfHouseholdName,
-      rationCardNumber: input.rationCardNumber,
+      ownerUid, // Server-enforced ownership derived from authentic token UID
+      headOfHouseholdName: input.headOfHouseholdName.trim(),
+      rationCardNumber: input.rationCardNumber.trim(),
       incomeCategory: input.incomeCategory,
-      state: input.state,
-      district: input.district,
-      village: input.village,
-      pincode: input.pincode,
-      ...(input.contactPhone ? { contactPhone: input.contactPhone } : {}),
+      state: input.state.trim(),
+      district: input.district.trim(),
+      village: input.village.trim(),
+      pincode: input.pincode.trim(),
+      ...(input.contactPhone ? { contactPhone: input.contactPhone.trim() } : {}),
       members: [],
       createdAt: now,
       updatedAt: now,
     };
 
-    const created = await this.householdRepo.createHousehold(newHousehold);
+    // Stage initial members for atomic batch write
+    const initialMembers: Member[] = [];
+
+    if (input.initialMembers && input.initialMembers.length > 0) {
+      for (let i = 0; i < input.initialMembers.length; i++) {
+        const m = input.initialMembers[i];
+        initialMembers.push({
+          id: `mem_${ownerUid}_${i + 1}`,
+          householdId,
+          fullName: m.fullName.trim(),
+          age: m.age,
+          gender: m.gender,
+          relationship: m.relationship.trim(),
+          disabilityStatus: Boolean(m.disabilityStatus),
+          chronicConditions: Array.isArray(m.chronicConditions) ? m.chronicConditions : [],
+          maternalStatus: m.maternalStatus || "none",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    } else if (input.headAge !== undefined && input.headGender !== undefined) {
+      // Automatic Head-of-Household member creation during atomic onboarding
+      initialMembers.push({
+        id: `mem_${ownerUid}_head`,
+        householdId,
+        fullName: input.headOfHouseholdName.trim(),
+        age: input.headAge,
+        gender: input.headGender,
+        relationship: "Head",
+        disabilityStatus: false,
+        chronicConditions: [],
+        maternalStatus: "none",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Atomic transaction / batch write
+    const result = await this.householdRepo.createHouseholdWithMembers(
+      newHousehold,
+      initialMembers
+    );
+
     return {
-      household: created,
+      household: result.household,
+      members: result.members,
       isNew: true,
     };
+  }
+
+  /**
+   * Idempotently gets or creates the authenticated citizen's household.
+   * Deprecated for external onboarding: use createHousehold() to enforce 1:1 invariant.
+   */
+  public async getOrCreateHousehold(
+    ownerUid: string,
+    input: CreateHouseholdInput
+  ): Promise<{ household: Household; members: Member[]; isNew: boolean }> {
+    const existing = await this.householdRepo.getHouseholdByOwnerUid(ownerUid);
+    if (existing) {
+      const members = await this.householdRepo.getMembers(existing.id);
+      return {
+        household: { ...existing, members },
+        members,
+        isNew: false,
+      };
+    }
+
+    return this.createHousehold(ownerUid, input);
   }
 
   /**

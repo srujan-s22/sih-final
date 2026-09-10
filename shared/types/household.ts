@@ -41,9 +41,12 @@ export interface CreateHouseholdInput {
   village: string;
   pincode: string;
   contactPhone?: string;
+  headAge?: number;
+  headGender?: Gender;
+  initialMembers?: CreateMemberInput[];
 }
 
-export type UpdateHouseholdInput = Partial<CreateHouseholdInput>;
+export type UpdateHouseholdInput = Partial<Omit<CreateHouseholdInput, "initialMembers" | "headAge" | "headGender">>;
 
 export interface CreateMemberInput {
   fullName: string;
