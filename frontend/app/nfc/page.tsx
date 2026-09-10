@@ -23,15 +23,17 @@ import {
   Info,
   Volume2,
   Square,
+  WifiOff,
 } from "lucide-react";
 
 import { parseNfcCredential, ParseNfcCredentialResult, NfcCredential } from "@/lib/nfc/nfc-parser";
+import { buildHouseholdSpeechText, getSpeechSynthesisLang } from "@/lib/nfc/nfc-audio";
 
 function NfcResolverContent() {
   const searchParams = useSearchParams();
   const { t, language, setLanguage, languages } = useTranslation();
 
-  // Parse NFC credential on initial mount with strict validation & duplicate detection
+  // Parse NFC credential on initial mount with strict validation & duplicate parameter detection
   const [parseResult] = useState<ParseNfcCredentialResult>(() =>
     parseNfcCredential(searchParams)
   );
@@ -45,6 +47,9 @@ function NfcResolverContent() {
   const [data, setData] = useState<NfcResolveResponse | null>(null);
   const [error, setError] = useState<string | null>(
     parseResult.status === "MALFORMED" ? t("nfc.invalidCardDesc") : null
+  );
+  const [errorType, setErrorType] = useState<"invalid" | "network" | null>(
+    parseResult.status === "MALFORMED" ? "invalid" : null
   );
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
@@ -97,6 +102,7 @@ function NfcResolverContent() {
 
     setLoading(true);
     setError(null);
+    setErrorType(null);
 
     try {
       const res = await nfcService.resolvePublicNfc(
@@ -114,15 +120,23 @@ function NfcResolverContent() {
         if (res.error?.code === "REQUEST_ABORTED") {
           return;
         }
-        if (res.error?.code === "RATE_LIMIT_EXCEEDED") {
-          setError(res.error.message || t("nfc.invalidCardDesc"));
+
+        // Section 25: Differentiate network connection issues from invalid NFC credentials
+        if (
+          res.error?.code === "NETWORK_UNREACHABLE" ||
+          res.error?.code === "RATE_LIMIT_EXCEEDED"
+        ) {
+          setErrorType("network");
+          setError(res.error.message || t("nfc.networkErrorDesc"));
         } else {
+          setErrorType("invalid");
           setError(t("nfc.invalidCardDesc"));
         }
       }
     } catch {
       if (!isMountedRef.current) return;
-      setError(t("nfc.invalidCardDesc"));
+      setErrorType("network");
+      setError(t("nfc.networkErrorDesc"));
     } finally {
       inFlightRef.current = false;
       if (isMountedRef.current) {
@@ -137,9 +151,9 @@ function NfcResolverContent() {
     }
   }, [parseResult.status, resolveCredential]);
 
-  // Accessible Audio Playback (Issue 11 & 12):
-  // Reads strictly visible, approved public information in the selected language.
-  // Never reads raw tokens, household IDs, version numbers, or internal fields.
+  // Accessible Audio Playback (Sections 11, 12, 39):
+  // User-triggered only, reads strictly visible approved public information in the selected language.
+  // Never reads raw tokens, version numbers, internal IDs, or sensitive data.
   const handleToggleAudio = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
@@ -151,38 +165,12 @@ function NfcResolverContent() {
 
     if (!data) return;
 
-    // Construct spoken text solely from approved public content
-    const locationStr = [
-      data.household.region.village,
-      data.household.region.district,
-      data.household.region.state,
-    ]
-      .filter(Boolean)
-      .join(", ");
-
-    let speechText = `${data.household.displayName}. ${locationStr}. `;
-
-    if (data.schemes.length > 0) {
-      speechText += `${t("nfc.schemesTitle")}: `;
-      data.schemes.forEach((scheme, index) => {
-        speechText += `${index + 1}. ${scheme.name}. ${scheme.benefit}. ${scheme.nextSteps}. `;
-      });
-    }
-
-    if (data.asha) {
-      speechText += `${t("nfc.ashaSectionTitle")}: ${data.asha.displayName}, ${data.asha.serviceArea}. `;
-    }
+    const speechText = buildHouseholdSpeechText(data, language);
+    if (!speechText) return;
 
     const utterance = new SpeechSynthesisUtterance(speechText);
-
-    // Language mapping
-    const langMap: Record<string, string> = {
-      en: "en-IN",
-      kn: "kn-IN",
-      hi: "hi-IN",
-    };
-    utterance.lang = langMap[language] || "en-IN";
-    utterance.rate = 0.95;
+    utterance.lang = getSpeechSynthesisLang(language);
+    utterance.rate = 0.92; // Slightly measured rate for clear rural/low-literacy comprehension
 
     utterance.onend = () => {
       setIsPlayingAudio(false);
@@ -197,27 +185,36 @@ function NfcResolverContent() {
     setIsPlayingAudio(true);
   };
 
+  // Language switch handler: stops audio narration immediately and updates language without re-resolving
+  const handleLanguageChange = (langCode: "en" | "kn" | "hi") => {
+    if (isPlayingAudio && typeof window !== "undefined") {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+    }
+    setLanguage(langCode);
+  };
+
   // Helper for eligibility status badge
   const getStatusBadge = (status: NfcPublicSchemeSummary["eligibilityStatus"]) => {
     switch (status) {
       case "ELIGIBLE":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
             <span>{t("nfc.statusEligible")}</span>
           </span>
         );
       case "ACTION_REQUIRED":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            <Clock className="w-3 h-3 text-amber-600" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
             <span>{t("nfc.statusActionRequired")}</span>
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
-            <Info className="w-3 h-3 text-sky-600" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-900 border border-sky-300">
+            <Info className="w-3.5 h-3.5 text-sky-700 shrink-0" />
             <span>{t("nfc.statusCheckRequired")}</span>
           </span>
         );
@@ -243,7 +240,7 @@ function NfcResolverContent() {
             </div>
           </div>
 
-          {/* Quick 1-tap Language Switcher with Accessible Touch Targets */}
+          {/* Quick 1-tap Language Switcher with Accessible Touch Targets (min 36px) */}
           <div
             className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs"
             role="group"
@@ -254,14 +251,9 @@ function NfcResolverContent() {
                 key={lang.code}
                 id={`lang-select-${lang.code}`}
                 type="button"
-                onClick={() => {
-                  setLanguage(lang.code);
-                  if (isPlayingAudio && typeof window !== "undefined") {
-                    window.speechSynthesis.cancel();
-                    setIsPlayingAudio(false);
-                  }
-                }}
-                className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                onClick={() => handleLanguageChange(lang.code)}
+                aria-pressed={language === lang.code}
+                className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-teal-800 ${
                   language === lang.code
                     ? "bg-teal-800 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
@@ -273,11 +265,11 @@ function NfcResolverContent() {
           </div>
         </header>
 
-        {/* STATE 1: NO NFC CREDENTIAL IN URL */}
+        {/* STATE A: NO NFC CREDENTIAL IN URL */}
         {parseResult.status === "EMPTY" && !data ? (
           <section
             id="nfc-no-params"
-            className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-center space-y-5 shadow-xs"
+            className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-center space-y-6 shadow-xs"
           >
             <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-teal-100 animate-ping opacity-60" />
@@ -287,7 +279,7 @@ function NfcResolverContent() {
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                 {t("nfc.noParamsTitle")}
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
@@ -295,22 +287,46 @@ function NfcResolverContent() {
               </p>
             </div>
 
-            <div className="p-3.5 bg-teal-50/70 border border-teal-200 rounded-xl text-xs text-teal-950 text-left space-y-1.5">
-              <div className="flex items-center gap-1.5 font-bold text-teal-900">
+            {/* Simple 3-step visual instruction for low literacy users */}
+            <div className="p-4 bg-teal-50/80 border border-teal-200 rounded-xl text-xs text-teal-950 text-left space-y-2.5">
+              <div className="flex items-center gap-2 font-bold text-teal-900 text-sm">
                 <Radio className="w-4 h-4 text-teal-700 shrink-0" />
-                <span>How to Tap Your Card:</span>
+                <span>{t("nfc.howItWorks")}:</span>
               </div>
-              <ol className="list-decimal list-inside space-y-1 text-slate-700 text-[11px] leading-relaxed pl-1">
-                <li>Ensure NFC is turned ON in your phone settings.</li>
-                <li>Hold your SwasthyaSetu physical card steady against the back of your phone.</li>
-                <li>Tap the link that opens to view your family healthcare entitlements.</li>
+              <ol className="space-y-2 text-slate-700 text-xs leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-800 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <span>{t("nfc.howItWorksStep1")}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-800 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <span>{t("nfc.howItWorksStep2")}</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-800 text-white font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                    3
+                  </span>
+                  <span>{t("nfc.howItWorksStep3")}</span>
+                </li>
               </ol>
             </div>
 
-            <div className="pt-2">
+            {/* Secondary Citizen Portal Access */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col items-center gap-2">
+              <Link
+                href="/auth/sign-in"
+                className="w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] gap-2 px-6 py-2.5 text-xs font-semibold text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition-colors cursor-pointer"
+              >
+                <span>{t("nfc.loginForMore")}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-800 hover:text-teal-950 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 pt-1"
               >
                 <span>{t("nfc.backToHome")}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -318,7 +334,7 @@ function NfcResolverContent() {
             </div>
           </section>
         ) : loading ? (
-          /* STATE 2: LOADING / SCANNING */
+          /* STATE B: LOADING / CHECKING HOUSEHOLD */
           <section
             id="nfc-loading"
             className="rounded-2xl border border-slate-200 bg-white p-8 sm:p-12 text-center space-y-4 shadow-xs"
@@ -331,8 +347,8 @@ function NfcResolverContent() {
             </div>
 
             <div className="space-y-1.5">
-              <h2 className="text-base font-bold text-slate-900">
-                {t("nfc.scanningCard")}
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                {t("nfc.checkingHousehold")}
               </h2>
               <p className="text-xs text-slate-500">
                 SwasthyaSetu Secure Verification
@@ -340,18 +356,24 @@ function NfcResolverContent() {
             </div>
           </section>
         ) : error ? (
-          /* STATE 3: ERROR / CARD REVOKED OR INVALID */
+          /* STATE E / STATE F: ERROR (INVALID CARD OR NETWORK FAILURE) */
           <section
             id="nfc-error"
             className="rounded-2xl border border-red-200 bg-white p-6 sm:p-8 text-center space-y-4 shadow-xs"
           >
             <div className="w-14 h-14 rounded-full bg-red-100 text-red-700 flex items-center justify-center mx-auto shadow-2xs">
-              <AlertCircle className="w-8 h-8" />
+              {errorType === "network" ? (
+                <WifiOff className="w-8 h-8" />
+              ) : (
+                <AlertCircle className="w-8 h-8" />
+              )}
             </div>
 
             <div className="space-y-1.5">
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                {t("nfc.invalidCardTitle")}
+                {errorType === "network"
+                  ? t("nfc.networkErrorTitle")
+                  : t("nfc.invalidCardTitle")}
               </h2>
               <p className="text-xs text-red-800 max-w-sm mx-auto leading-relaxed">
                 {error}
@@ -363,7 +385,7 @@ function NfcResolverContent() {
                 <button
                   type="button"
                   onClick={resolveCredential}
-                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-5 py-2.5 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-900 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-6 py-2.5 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-900 rounded-lg shadow-2xs transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>{t("nfc.tryAgain")}</span>
@@ -371,7 +393,7 @@ function NfcResolverContent() {
               ) : (
                 <Link
                   href="/"
-                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-5 py-2.5 text-xs font-semibold text-teal-800 hover:text-teal-950 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-6 py-2.5 text-xs font-semibold text-teal-800 hover:text-teal-950 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
                   <span>{t("nfc.backToHome")}</span>
@@ -380,9 +402,9 @@ function NfcResolverContent() {
             </div>
           </section>
         ) : data ? (
-          /* STATE 4: SUCCESS - VERY SIMPLE MULTILINGUAL HOUSEHOLD VIEW */
-          <div id="nfc-household-view" className="space-y-4">
-            {/* Physical Card Digital Replica with Neutral Product Language (Issue 1) */}
+          /* STATE C & D: SUCCESS - VERY SIMPLE MULTILINGUAL HOUSEHOLD VIEW */
+          <div id="nfc-household-view" className="space-y-5">
+            {/* Household Identity Card */}
             <article
               id="nfc-card-replica"
               className="rounded-2xl bg-gradient-to-br from-teal-900 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-lg relative overflow-hidden space-y-4"
@@ -399,13 +421,13 @@ function NfcResolverContent() {
                   <span>{t("nfc.verifiedBadge")}</span>
                 </span>
 
-                {/* Accessible Audio Readout Button (Issue 11 & 12) */}
+                {/* Accessible Audio Readout Button (Sections 11 & 12) */}
                 {isSpeechSupported && (
                   <button
                     type="button"
                     onClick={handleToggleAudio}
                     aria-label={isPlayingAudio ? t("nfc.stopListening") : t("nfc.listen")}
-                    className={`min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                    className={`min-h-[38px] inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
                       isPlayingAudio
                         ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md animate-pulse"
                         : "bg-teal-950/60 text-teal-100 hover:bg-teal-950 border-teal-600/50"
@@ -413,12 +435,12 @@ function NfcResolverContent() {
                   >
                     {isPlayingAudio ? (
                       <>
-                        <Square className="w-3 h-3 fill-current" />
+                        <Square className="w-3.5 h-3.5 fill-current" />
                         <span>{t("nfc.stopListening")}</span>
                       </>
                     ) : (
                       <>
-                        <Volume2 className="w-3.5 h-3.5" />
+                        <Volume2 className="w-4 h-4" />
                         <span>{t("nfc.listen")}</span>
                       </>
                     )}
@@ -428,7 +450,7 @@ function NfcResolverContent() {
 
               {/* Household Name & Location */}
               <div className="relative z-10 space-y-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-teal-200/90 block">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-200/90 block">
                   {t("nfc.householdLabel")}
                 </span>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
@@ -457,58 +479,71 @@ function NfcResolverContent() {
               </div>
             </article>
 
-            {/* Eligible Healthcare Schemes List */}
-            <section id="nfc-schemes" className="space-y-2.5">
+            {/* PRIMARY SECTION: "YOUR HEALTH BENEFITS" */}
+            <section id="nfc-schemes" className="space-y-3">
               <div className="flex items-baseline justify-between px-1">
                 <div>
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                    {t("nfc.schemesTitle")}
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    {t("nfc.yourBenefitsTitle")}
                   </h2>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs text-slate-500">
                     {t("nfc.schemesSubtitle")}
                   </p>
                 </div>
-                <span className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
                   {data.schemes.length} Available
                 </span>
               </div>
 
+              {/* STATE D: ZERO ELIGIBLE SCHEMES */}
               {data.schemes.length === 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-500 text-xs">
-                  {t("nfc.noSchemes")}
+                <div
+                  id="nfc-no-schemes-card"
+                  className="bg-white rounded-xl border border-slate-200 p-6 sm:p-7 text-center space-y-3 shadow-2xs"
+                >
+                  <div className="w-12 h-12 rounded-full bg-sky-50 text-sky-700 flex items-center justify-center mx-auto border border-sky-200">
+                    <Info className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      {t("nfc.noSchemesTitle")}
+                    </h3>
+                    <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                      {t("nfc.noSchemesDesc")}
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                /* SCHEME BENEFIT CARDS */
+                <div className="space-y-3.5">
                   {data.schemes.map((scheme) => (
                     <article
                       key={scheme.schemeId}
-                      className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 transition-shadow hover:shadow-xs"
+                      className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3.5 transition-shadow hover:shadow-xs"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
-                            {scheme.name}
-                          </h3>
-                        </div>
+                        <h3 className="text-base font-bold text-slate-900 leading-snug">
+                          {scheme.name}
+                        </h3>
                         {getStatusBadge(scheme.eligibilityStatus)}
                       </div>
 
-                      {/* Benefits */}
+                      {/* Benefit: "What you can get" */}
                       <div className="space-y-1 text-xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                           {t("nfc.keyBenefits")}
                         </span>
-                        <p className="text-slate-700 font-medium leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        <p className="text-slate-800 text-xs sm:text-sm font-medium leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
                           {scheme.benefit}
                         </p>
                       </div>
 
-                      {/* Next Steps / How to avail */}
+                      {/* Next Steps: "What to do next" */}
                       <div className="space-y-1 text-xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 block">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-teal-900 block">
                           {t("nfc.nextSteps")}
                         </span>
-                        <p className="text-slate-600 text-[11px] leading-relaxed">
+                        <p className="text-slate-700 text-xs leading-relaxed bg-teal-50/50 p-3 rounded-lg border border-teal-100">
                           {scheme.nextSteps}
                         </p>
                       </div>
@@ -524,52 +559,57 @@ function NfcResolverContent() {
                 id="nfc-asha-info"
                 className="bg-white rounded-xl border border-teal-200/80 p-4 sm:p-5 shadow-2xs space-y-3"
               >
-                <div className="flex items-center gap-2 text-teal-900 font-bold text-sm">
-                  <UserCheck className="w-4 h-4 text-teal-700 shrink-0" />
+                <div className="flex items-center gap-2 text-teal-900 font-bold text-sm sm:text-base">
+                  <UserCheck className="w-5 h-5 text-teal-700 shrink-0" />
                   <h2>{t("nfc.ashaSectionTitle")}</h2>
                 </div>
 
-                <div className="bg-teal-50/60 rounded-xl p-3.5 border border-teal-100 space-y-2">
+                <div className="bg-teal-50/60 rounded-xl p-3.5 sm:p-4 border border-teal-100 space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-bold text-slate-900 text-sm block">
+                      <span className="font-bold text-slate-900 text-sm sm:text-base block">
                         {data.asha.displayName}
                       </span>
-                      <span className="text-xs text-slate-600 block">
+                      <span className="text-xs text-slate-600 block pt-0.5">
                         {t("nfc.serviceArea")}: <strong>{data.asha.serviceArea}</strong>
                       </span>
                     </div>
-                    <span className="font-mono text-[10px] bg-white text-teal-900 px-2 py-0.5 rounded border border-teal-200">
+                    <span className="font-mono text-[10px] bg-white text-teal-900 px-2 py-1 rounded border border-teal-200 font-semibold">
                       {data.asha.code}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-teal-900/80 leading-relaxed pt-1 border-t border-teal-200/60">
+                  <p className="text-xs text-teal-950/90 leading-relaxed pt-1.5 border-t border-teal-200/60">
                     {t("nfc.ashaNotice")}
                   </p>
                 </div>
               </section>
             )}
 
-            {/* Privacy Guarantee Banner */}
+            {/* Privacy Guarantee & Public vs Authenticated Notice (Sections 20, 21, 22) */}
             <aside
               id="nfc-privacy-guarantee"
-              className="rounded-xl border border-slate-200 bg-slate-100/70 p-3.5 flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed"
+              className="rounded-xl border border-slate-200 bg-slate-100/80 p-4 space-y-3 text-xs text-slate-600 leading-relaxed"
             >
-              <Lock className="w-4 h-4 text-teal-800 shrink-0 mt-0.5" />
-              <span>{t("nfc.privacyNotice")}</span>
-            </aside>
+              <div className="flex items-start gap-2.5">
+                <Lock className="w-4 h-4 text-teal-800 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium text-slate-700">{t("nfc.privacyNotice")}</p>
+                  <p className="text-slate-500 text-[11px]">{t("nfc.publicVsAuthDesc")}</p>
+                </div>
+              </div>
 
-            {/* Citizen Full Portal Link (routes to /auth/sign-in) */}
-            <div className="pt-2 text-center">
-              <Link
-                href="/auth/sign-in"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-800 hover:text-teal-950 transition-colors min-h-[44px] px-3 py-2"
-              >
-                <span>{t("nfc.loginForMore")}</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+              {/* Citizen Full Portal Link (Secondary action) */}
+              <div className="pt-2 border-t border-slate-200/80 flex justify-center">
+                <Link
+                  href="/auth/sign-in"
+                  className="w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] gap-2 px-6 py-2.5 text-xs font-bold text-teal-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-2xs transition-colors cursor-pointer"
+                >
+                  <span>{t("nfc.loginForMore")}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </aside>
           </div>
         ) : null}
       </div>
