@@ -136,6 +136,7 @@ function AshaNfcModalInner({
   const [revokeReason, setRevokeReason] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isRotationFlow, setIsRotationFlow] = useState(false);
+  const [isRetryingWrite, setIsRetryingWrite] = useState(false);
 
   // In-memory one-time token & URL ref (NEVER stored in persistent browser storage)
   const currentTokenRef = useRef<string | null>(null);
@@ -151,6 +152,7 @@ function AshaNfcModalInner({
     pendingNfcIdRef.current = null;
     isRotationRef.current = false;
     setIsRotationFlow(false);
+    setIsRetryingWrite(false);
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -165,6 +167,7 @@ function AshaNfcModalInner({
     setSuccessMessage(null);
     setRevokeReason("");
     setCopied(false);
+    setIsRetryingWrite(false);
     onClose();
   };
 
@@ -229,12 +232,16 @@ function AshaNfcModalInner({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    setIsRetryingWrite(false);
     setStep("WAITING_FOR_TAP");
     setErrorMessage(null);
 
     // If Web NFC is supported by the browser, initiate write listener
     if (isNfcWritingSupported()) {
-      const result = await writeNfcTag(nfcUrl, controller.signal);
+      const result = await writeNfcTag(nfcUrl, {
+        signal: controller.signal,
+        onRetry: () => setIsRetryingWrite(true),
+      });
       if (result.success) {
         // If this is a rotation, atomically activate the pending card and revoke the old card
         if (isRotationRef.current && pendingNfcIdRef.current) {
@@ -736,10 +743,17 @@ function AshaNfcModalInner({
                   </p>
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-900 text-xs font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />
-                  <span>Waiting for tag... (Version {nfcVersion})</span>
-                </div>
+                {isRetryingWrite ? (
+                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-300 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
+                    <span>Communication interrupted — retrying write, please keep card still...</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-900 text-xs font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />
+                    <span>Waiting for tag... (Version {nfcVersion})</span>
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <Button

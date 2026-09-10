@@ -107,12 +107,21 @@ export function buildNfcUrl(
 }
 
 /**
+ * Options for Web NFC physical tag writing.
+ */
+export interface WriteNfcOptions {
+  signal?: AbortSignal;
+  onRetry?: (attempt: number) => void;
+}
+
+/**
  * Writes an NDEF URL record to a physical NFC tag via the Web NFC API.
- * Handles DOMException variants and abort signals with actionable user feedback.
+ * Handles DOMException variants, retries transient NetworkErrors exactly once after a 250ms delay,
+ * and provides actionable user feedback without leaking sensitive tokens.
  */
 export async function writeNfcTag(
   nfcUrl: string,
-  abortSignal?: AbortSignal
+  optionsOrSignal?: AbortSignal | WriteNfcOptions
 ): Promise<{ success: boolean; error?: string }> {
   if (!isNfcWritingSupported()) {
     return {
@@ -122,7 +131,16 @@ export async function writeNfcTag(
     };
   }
 
-  try {
+  const signal =
+    optionsOrSignal instanceof AbortSignal
+      ? optionsOrSignal
+      : optionsOrSignal?.signal;
+  const onRetry =
+    !(optionsOrSignal instanceof AbortSignal)
+      ? optionsOrSignal?.onRetry
+      : undefined;
+
+  const executeWrite = async () => {
     const NDEFReaderClass = (window as any).NDEFReader;
     const ndef = new NDEFReaderClass();
 
@@ -135,10 +153,38 @@ export async function writeNfcTag(
           },
         ],
       },
-      { signal: abortSignal }
+      {
+        overwrite: true,
+        signal,
+      }
     );
+  };
 
-    return { success: true };
+  try {
+    try {
+      await executeWrite();
+      return { success: true };
+    } catch (firstErr: unknown) {
+      // If a transient NetworkError occurs (e.g. initial RF contact blip or Android Tag Dispatcher collision)
+      // and the operation was not aborted by user, retry exactly once after a 250ms stabilization delay.
+      if (
+        firstErr instanceof Error &&
+        firstErr.name === "NetworkError" &&
+        !signal?.aborted
+      ) {
+        onRetry?.(1);
+
+        await new Promise((resolve) => setTimeout(resolve, 250));
+
+        if (signal?.aborted) {
+          return { success: false, error: "NFC write operation was cancelled." };
+        }
+
+        await executeWrite();
+        return { success: true };
+      }
+      throw firstErr;
+    }
   } catch (err: unknown) {
     if (err instanceof Error) {
       if (err.name === "AbortError") {
@@ -159,10 +205,16 @@ export async function writeNfcTag(
         };
       }
       if (err.name === "NetworkError") {
+        const rawMsg = typeof err.message === "string" ? err.message.trim() : "";
+        // Sanitize: ensure no tokens, query strings, or URLs leak in error messages
+        const safeDetail =
+          rawMsg && !rawMsg.includes("/nfc") && !rawMsg.includes("hh_") && !rawMsg.includes("?")
+            ? ` (${rawMsg})`
+            : "";
         return {
           success: false,
           error:
-            "NFC card moved away too quickly. Please bring the card closer and hold it steady against the back of your phone.",
+            `NFC communication was interrupted${safeDetail}. Please hold the NFC card flat and steady against the back of your phone near the NFC antenna, and try again.`,
         };
       }
       if (err.name === "InvalidStateError") {

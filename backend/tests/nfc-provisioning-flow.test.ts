@@ -197,7 +197,7 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       expect(result.error).toContain("not supported");
     });
 
-    it("successfully writes NDEF URI record when supported hardware is present", async () => {
+    it("successfully writes NDEF URI record with overwrite: true when supported hardware is present", async () => {
       const writeMock = vi.fn().mockResolvedValue(undefined);
       getGlobal().window = {
         NDEFReader: class MockNDEFReader {
@@ -218,22 +218,80 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
             },
           ],
         },
-        expect.any(Object)
+        expect.objectContaining({ overwrite: true })
       );
     });
 
-    it("handles AbortError gracefully when user cancels or moves card away", async () => {
-      const abortError = new Error("The operation was aborted");
-      abortError.name = "AbortError";
+    it("retries transient NetworkError exactly once and succeeds on second attempt", async () => {
+      const netError = new Error("Transfer failed");
+      netError.name = "NetworkError";
+
+      const writeMock = vi
+        .fn()
+        .mockRejectedValueOnce(netError)
+        .mockResolvedValueOnce(undefined);
 
       getGlobal().window = {
         NDEFReader: class MockNDEFReader {
-          write = vi.fn().mockRejectedValue(abortError);
+          write = writeMock;
         },
       };
 
-      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2");
+      const onRetryMock = vi.fn();
+      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2", {
+        onRetry: onRetryMock,
+      });
+
+      expect(result.success).toBe(true);
+      expect(writeMock).toHaveBeenCalledTimes(2);
+      expect(onRetryMock).toHaveBeenCalledWith(1);
+    });
+
+    it("fails with informative guidance when second retry also encounters NetworkError", async () => {
+      const netError = new Error("Connection lost");
+      netError.name = "NetworkError";
+
+      const writeMock = vi.fn().mockRejectedValue(netError);
+
+      getGlobal().window = {
+        NDEFReader: class MockNDEFReader {
+          write = writeMock;
+        },
+      };
+
+      const onRetryMock = vi.fn();
+      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2", {
+        onRetry: onRetryMock,
+      });
+
       expect(result.success).toBe(false);
+      expect(writeMock).toHaveBeenCalledTimes(2);
+      expect(onRetryMock).toHaveBeenCalledWith(1);
+      expect(result.error).toContain("NFC communication was interrupted (Connection lost)");
+      expect(result.error).toContain("hold the NFC card flat and steady");
+      expect(result.error).not.toContain("moved away too quickly");
+    });
+
+    it("does not retry when AbortError is encountered", async () => {
+      const abortError = new Error("The operation was aborted");
+      abortError.name = "AbortError";
+
+      const writeMock = vi.fn().mockRejectedValue(abortError);
+
+      getGlobal().window = {
+        NDEFReader: class MockNDEFReader {
+          write = writeMock;
+        },
+      };
+
+      const onRetryMock = vi.fn();
+      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2", {
+        onRetry: onRetryMock,
+      });
+
+      expect(result.success).toBe(false);
+      expect(writeMock).toHaveBeenCalledTimes(1);
+      expect(onRetryMock).not.toHaveBeenCalled();
       expect(result.error).toContain("cancelled");
     });
 
@@ -241,29 +299,45 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       const permError = new Error("Permission denied");
       permError.name = "NotAllowedError";
 
+      const writeMock = vi.fn().mockRejectedValue(permError);
+
       getGlobal().window = {
         NDEFReader: class MockNDEFReader {
-          write = vi.fn().mockRejectedValue(permError);
+          write = writeMock;
         },
       };
 
-      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2");
+      const onRetryMock = vi.fn();
+      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2", {
+        onRetry: onRetryMock,
+      });
+
       expect(result.success).toBe(false);
+      expect(writeMock).toHaveBeenCalledTimes(1);
+      expect(onRetryMock).not.toHaveBeenCalled();
       expect(result.error).toContain("permission was denied");
     });
 
-    it("handles read-only tag error with actionable message", async () => {
+    it("does not retry on read-only tag error (InvalidStateError)", async () => {
       const roError = new Error("NFC tag is read only");
       roError.name = "InvalidStateError";
 
+      const writeMock = vi.fn().mockRejectedValue(roError);
+
       getGlobal().window = {
         NDEFReader: class MockNDEFReader {
-          write = vi.fn().mockRejectedValue(roError);
+          write = writeMock;
         },
       };
 
-      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2");
+      const onRetryMock = vi.fn();
+      const result = await writeNfcTag("https://swasthyasetu.gov.in/nfc?hh=1&t=2", {
+        onRetry: onRetryMock,
+      });
+
       expect(result.success).toBe(false);
+      expect(writeMock).toHaveBeenCalledTimes(1);
+      expect(onRetryMock).not.toHaveBeenCalled();
       expect(result.error).toContain("read-only");
     });
   });
