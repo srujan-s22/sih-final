@@ -176,8 +176,8 @@ EXOTEL_ACCOUNT_SID=sabotage1
 EXOTEL_API_KEY=<server-secret>
 EXOTEL_API_TOKEN=<server-secret>
 EXOTEL_BASE_URL=https://api.exotel.com
-EXOTEL_VIRTUAL_NUMBER=08047283240
-EXOTEL_CALLER_ID=08047283240
+EXOTEL_VIRTUAL_NUMBER=08047288814
+EXOTEL_CALLER_ID=08047288814
 
 # Sarvam Indic AI (SERVER-SIDE ONLY)
 SARVAM_API_KEY=<server-secret>
@@ -223,6 +223,6 @@ npm test --prefix backend
    - In Exotel Flow Designer $\longrightarrow$ **Stream Applet** $\longrightarrow$ **Where do you want to send the audio stream?**
    - Enter: `wss://<your-tunnel-domain>/api/v1/voice/stream`
 4. **Dial Helpline**:
-   - Call `08047283240` from your mobile phone.
+   - Call `08047288814` from your mobile phone.
    - Speak after the greeting: *"Mujhe Ayushman Bharat scheme ke baare mein jankari chahiye."*
    - Observe live STT transcription $\to$ AI response synthesis $\to$ audio playback on the phone line!

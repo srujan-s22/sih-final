@@ -9,7 +9,7 @@
  * - Indian currency (₹5,00,000 -> 5 lakh rupees / 5 लाख रुपये / 5 ಲಕ್ಷ ರೂಪಾಯಿ)
  * - Ages (70+ -> 70 years and above / 70 वर्ष से अधिक / 70 ವರ್ಷಕ್ಕಿಂತ ಹೆಚ್ಚು)
  * - Member counts (4 members -> 4 सदस्य / 4 ಸದಸ್ಯರು)
- * - Phone numbers (08047283240 -> digit sequence with pauses for clear TTS pronunciation)
+ * - Phone numbers (08047288814 -> digit sequence with pauses for clear TTS pronunciation)
  * - Identifiers & PIN codes (RC-876567890 -> spaced letters & digits)
  * - Proper nouns & scheme abbreviations (PM-JAY, JSY, NFC)
  *
@@ -144,7 +144,7 @@ export function normalizeMemberCount(text: string, language: string): string {
  * This prevents speech synthesis engines from reading a 10/11 digit telephone
  * number as a large multi-billion integer.
  *
- * e.g. "08047283240" -> "0, 8, 0, 4, 7, 2, 8, 3, 2, 4, 0"
+ * e.g. "08047288814" -> "0, 8, 0, 4, 7, 2, 8, 8, 8, 1, 4"
  */
 export function normalizePhoneNumberForSpeech(phone: string): string {
   if (!phone) return "";

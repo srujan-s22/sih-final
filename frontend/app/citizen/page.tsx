@@ -1355,10 +1355,10 @@ export default function CitizenPage() {
                               {voiceConfig?.isTollFree ? "Toll-Free Helpline" : "Helpline Number"}
                             </span>
                             <a
-                              href={`tel:${voiceConfig?.virtualNumber || "+918047283240"}`}
+                              href={`tel:${voiceConfig?.virtualNumber || "+918047288814"}`}
                               className="font-mono text-xs sm:text-sm font-bold text-slate-900 tracking-wider hover:text-teal-800 transition-colors"
                             >
-                              {voiceConfig?.displayHelplineText || "08047283240"}
+                              {voiceConfig?.displayHelplineText || "08047288814"}
                             </a>
                           </div>
                         </div>

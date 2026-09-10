@@ -10,7 +10,7 @@
  *     ✓ household.region (village, district, state)
  *     ✓ schemes[].name, benefit (localized when available)
  *     ✓ asha.displayName, serviceArea
- *     ✓ public helpline (08047283240)
+ *     ✓ public helpline (08047288814)
  * - FORBIDDEN: Raw objects, bearer tokens, token hashes, UIDs, member rosters,
  *   diagnoses, income, private household phone numbers MUST NEVER enter speech synthesis.
  *
@@ -21,6 +21,7 @@
  */
 
 import { NfcResolveResponse, NfcPublicSchemeSummary } from "@shared/types/nfc";
+import { CANONICAL_HELPLINE_DISPLAY } from "@shared/types/voice";
 import { normalizeSpeechText } from "./speech-normalizer";
 
 /**
@@ -284,7 +285,7 @@ export function buildHouseholdSpeechText(
       rawSpeech += `आपकी आशा कार्यकर्ता ${asha.displayName} हैं, सेवा क्षेत्र: ${area}। `;
     }
 
-    rawSpeech += `सहायता के लिए स्वास्थ्य हेल्पलाइन 08047283240 पर कॉल करें।`;
+    rawSpeech += `सहायता के लिए स्वास्थ्य हेल्पलाइन ${CANONICAL_HELPLINE_DISPLAY} पर कॉल करें।`;
   } else if (language === "kn") {
     // Kannada narration
     rawSpeech = `${household.displayName} ಅವರ ಕುಟುಂಬಕ್ಕೆ ಆರೋಗ್ಯ ಸೌಲಭ್ಯಗಳು. `;
@@ -307,7 +308,7 @@ export function buildHouseholdSpeechText(
       rawSpeech += `ನಿಮ್ಮ ಆಶಾ ಕಾರ್ಯಕರ್ತೆ ${asha.displayName}, ಸೇವಾ ವ್ಯಾಪ್ತಿ: ${area}. `;
     }
 
-    rawSpeech += `ಸಹಾಯಕ್ಕಾಗಿ ಆರೋಗ್ಯ ಸಹಾಯವಾಣಿ 08047283240 ಗೆ ಕರೆ ಮಾಡಿ.`;
+    rawSpeech += `ಸಹಾಯಕ್ಕಾಗಿ ಆರೋಗ್ಯ ಸಹಾಯವಾಣಿ ${CANONICAL_HELPLINE_DISPLAY} ಗೆ ಕರೆ ಮಾಡಿ.`;
   } else {
     // English default
     rawSpeech = `Health benefits for ${household.displayName}. `;
@@ -329,7 +330,7 @@ export function buildHouseholdSpeechText(
       rawSpeech += `Your ASHA worker is ${asha.displayName}, serving ${asha.serviceArea}. `;
     }
 
-    rawSpeech += `For assistance, call healthcare helpline at 08047283240.`;
+    rawSpeech += `For assistance, call healthcare helpline at ${CANONICAL_HELPLINE_DISPLAY}.`;
   }
 
   // Pass through deterministic normalization pipeline (currency, ages, phone numbers, proper nouns)

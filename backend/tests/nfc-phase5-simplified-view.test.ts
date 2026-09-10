@@ -558,8 +558,8 @@ describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () 
     });
 
     it("normalizes telephone numbers into distinct spoken digit sequences with pauses", () => {
-      const phoneDigits = normalizePhoneNumberForSpeech("08047283240");
-      expect(phoneDigits).toBe("0, 8, 0, 4, 7, 2, 8, 3, 2, 4, 0");
+      const phoneDigits = normalizePhoneNumberForSpeech("08047288814");
+      expect(phoneDigits).toBe("0, 8, 0, 4, 7, 2, 8, 8, 8, 1, 4");
     });
 
     it("normalizes identifiers and PIN codes to prevent giant integer pronunciation", () => {
@@ -657,9 +657,9 @@ describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () 
     });
 
     // 4. EXOTEL REGISTERED HELPLINE CTA & PRIVACY VERIFICATION
-    it("uses canonical Exotel helpline 08047283240 / +918047283240 and NEVER exposes household phone", () => {
-      expect(CANONICAL_HELPLINE_DISPLAY).toBe("08047283240");
-      expect(CANONICAL_HELPLINE_E164).toBe("+918047283240");
+    it("uses canonical Exotel helpline 08047288814 / +918047288814 and NEVER exposes household phone", () => {
+      expect(CANONICAL_HELPLINE_DISPLAY).toBe("08047288814");
+      expect(CANONICAL_HELPLINE_E164).toBe("+918047288814");
 
       const mockDataWithPrivatePhone = {
         household: {
@@ -672,7 +672,7 @@ describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () 
 
       const speechEn = buildHouseholdSpeechText(mockDataWithPrivatePhone, "en");
       // Spoken closing mentions public helpline in digit cadence
-      expect(speechEn).toContain("0, 8, 0, 4, 7, 2, 8, 3, 2, 4, 0");
+      expect(speechEn).toContain("0, 8, 0, 4, 7, 2, 8, 8, 8, 1, 4");
 
       // Household private phone MUST NOT appear in speech
       expect(speechEn).not.toContain("9876543210");

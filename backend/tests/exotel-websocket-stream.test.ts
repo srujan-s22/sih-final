@@ -265,7 +265,7 @@ describe("Phase 11 — Real-Time Exotel WebSocket Voice Streaming", () => {
         payload: {
           CallSid: "call_test_rest_01",
           From: "+919876543210",
-          To: "08047283240",
+          To: "08047288814",
         },
       });
 
