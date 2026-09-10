@@ -63,16 +63,22 @@ export function AshaNfcModal({
   const [copied, setCopied] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
+  const [isRotationFlow, setIsRotationFlow] = useState(false);
 
   // In-memory one-time token & URL ref (NEVER stored in persistent browser storage)
   const currentTokenRef = useRef<string | null>(null);
   const currentUrlRef = useRef<string | null>(null);
+  const pendingNfcIdRef = useRef<string | null>(null);
+  const isRotationRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Cleanup helper
   const clearSensitiveMemory = () => {
     currentTokenRef.current = null;
     currentUrlRef.current = null;
+    pendingNfcIdRef.current = null;
+    isRotationRef.current = false;
+    setIsRotationFlow(false);
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -132,7 +138,7 @@ export function AshaNfcModal({
   }, [isOpen, householdId]);
 
   // Trigger physical NFC write via Web NFC API
-  const startPhysicalWrite = async (nfcUrl: string) => {
+  const startPhysicalWrite = async (nfcUrl: string, targetVersion: number) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -146,14 +152,48 @@ export function AshaNfcModal({
     if (isNfcWritingSupported()) {
       const result = await writeNfcTag(nfcUrl, controller.signal);
       if (result.success) {
+        // If this is a rotation, atomically activate the pending card and revoke the old card
+        if (isRotationRef.current && pendingNfcIdRef.current) {
+          try {
+            const confirmRes = await nfcService.confirmRotateNfc(
+              householdId,
+              pendingNfcIdRef.current,
+              targetVersion,
+              revokeReason || "REPLACEMENT_CONFIRMED"
+            );
+            if (!confirmRes.success) {
+              setErrorMessage(
+                confirmRes.error.message ||
+                  "Card was written physically, but failed to activate replacement on server."
+              );
+              setStep("ERROR");
+              return;
+            }
+          } catch {
+            setErrorMessage(
+              "Card was written physically, but server activation failed. Your previous card remains active."
+            );
+            setStep("ERROR");
+            return;
+          }
+        }
+
         clearSensitiveMemory();
-        setSuccessMessage("The NFC tag was successfully written and linked.");
+        setSuccessMessage(
+          isRotationRef.current
+            ? "The replacement NFC card was successfully written and activated. The previous card is now deactivated."
+            : "The NFC tag was successfully written and linked."
+        );
         setStep("SUCCESS");
         onNfcStatusChanged?.();
       } else {
         // Only set error if not intentionally cancelled
         if (result.error !== "NFC write operation was cancelled.") {
-          setErrorMessage(result.error || "Failed to write NFC tag.");
+          setErrorMessage(
+            isRotationRef.current
+              ? `Could not write the new NFC card: ${result.error || "Write failed"}. Your existing NFC card is still active.`
+              : result.error || "Failed to write NFC tag."
+          );
           setStep("ERROR");
         }
       }
@@ -165,6 +205,9 @@ export function AshaNfcModal({
     setStep("GENERATING_CREDENTIAL");
     setLoading(true);
     setErrorMessage(null);
+    isRotationRef.current = false;
+    setIsRotationFlow(false);
+    pendingNfcIdRef.current = null;
 
     try {
       const res = await nfcService.provisionNfc(householdId);
@@ -174,11 +217,11 @@ export function AshaNfcModal({
 
         // Store one-time raw token in memory only
         currentTokenRef.current = token;
-        const nfcUrl = buildNfcUrl(householdId, token);
+        const nfcUrl = buildNfcUrl(householdId, token, undefined, version);
         currentUrlRef.current = nfcUrl;
 
         setLoading(false);
-        await startPhysicalWrite(nfcUrl);
+        await startPhysicalWrite(nfcUrl, version);
       } else {
         setErrorMessage(
           res.error.message || "Failed to generate NFC credential on server."
@@ -198,6 +241,8 @@ export function AshaNfcModal({
     setStep("GENERATING_CREDENTIAL");
     setLoading(true);
     setErrorMessage(null);
+    isRotationRef.current = true;
+    setIsRotationFlow(true);
 
     try {
       const res = await nfcService.rotateNfc(
@@ -207,13 +252,14 @@ export function AshaNfcModal({
       if (res.success) {
         const { token, version } = res.data;
         setNfcVersion(version);
+        pendingNfcIdRef.current = `nfc_${householdId}_v${version}`;
 
         currentTokenRef.current = token;
-        const nfcUrl = buildNfcUrl(householdId, token);
+        const nfcUrl = buildNfcUrl(householdId, token, undefined, version);
         currentUrlRef.current = nfcUrl;
 
         setLoading(false);
-        await startPhysicalWrite(nfcUrl);
+        await startPhysicalWrite(nfcUrl, version);
       } else {
         setErrorMessage(
           res.error.message || "Failed to rotate NFC credential."
@@ -261,9 +307,18 @@ export function AshaNfcModal({
       abortControllerRef.current = null;
     }
 
-    // Revoke newly provisioned credential so household is not locked with active unwritten card
     try {
-      await nfcService.revokeNfc(householdId, "WRITE_CANCELLED_OR_FAILED");
+      if (isRotationRef.current) {
+        // Cancel pending replacement so existing active card stays completely valid!
+        await nfcService.cancelRotateNfc(
+          householdId,
+          pendingNfcIdRef.current || undefined,
+          "WRITE_CANCELLED_OR_FAILED"
+        );
+      } else {
+        // Initial provision cancellation revokes the unwritten credential
+        await nfcService.revokeNfc(householdId, "WRITE_CANCELLED_OR_FAILED");
+      }
     } catch {
       // Best-effort cleanup
     }
@@ -275,7 +330,7 @@ export function AshaNfcModal({
   // Retry write using the current in-memory token
   const handleRetryWrite = async () => {
     if (currentUrlRef.current) {
-      await startPhysicalWrite(currentUrlRef.current);
+      await startPhysicalWrite(currentUrlRef.current, nfcVersion);
     } else {
       // If token was lost, restart from status overview
       setStep("STATUS_OVERVIEW");
@@ -283,9 +338,25 @@ export function AshaNfcModal({
   };
 
   // Fallback demo simulation
-  const handleSimulateDemoWrite = () => {
+  const handleSimulateDemoWrite = async () => {
+    if (isRotationRef.current && pendingNfcIdRef.current) {
+      try {
+        await nfcService.confirmRotateNfc(
+          householdId,
+          pendingNfcIdRef.current,
+          nfcVersion,
+          revokeReason || "REPLACEMENT_DEMO_CONFIRMED"
+        );
+      } catch {
+        // Best-effort confirmation in demo mode
+      }
+    }
     clearSensitiveMemory();
-    setSuccessMessage("Tag write simulated successfully (Demo Mode).");
+    setSuccessMessage(
+      isRotationRef.current
+        ? "Replacement tag write simulated successfully. Previous card deactivated (Demo Mode)."
+        : "Tag write simulated successfully (Demo Mode)."
+    );
     setStep("SUCCESS");
     onNfcStatusChanged?.();
   };
@@ -357,6 +428,15 @@ export function AshaNfcModal({
                     Active
                   </span>
                 </div>
+
+                {statusData.pendingReplacement && (
+                  <div className="text-[11px] text-amber-800 bg-amber-100/60 border border-amber-300/80 rounded-lg p-2.5 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      A replacement (Version {statusData.pendingReplacement.version}) was previously started but not confirmed. The current card remains active.
+                    </span>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-emerald-200 flex items-center justify-between gap-2">
                   <Button
@@ -453,9 +533,8 @@ export function AshaNfcModal({
                 <span>Replace Existing NFC Card</span>
               </h4>
               <p className="text-amber-900 leading-relaxed">
-                Replacing the NFC card will <strong>immediately deactivate</strong> the
-                previous physical card and issue a new credential (Version{" "}
-                {(statusData?.record?.version || 1) + 1}).
+                Your current NFC card will <strong>remain active</strong> until the new card is successfully written.
+                Once confirmed, the new card (Version {(statusData?.record?.version || 1) + 1}) will activate and the previous card will be deactivated.
               </p>
               <div className="pt-2">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
@@ -725,7 +804,7 @@ export function AshaNfcModal({
                 size="sm"
                 onClick={handleCancelWrite}
               >
-                Cancel
+                {isRotationFlow ? "Cancel Replacement" : "Cancel"}
               </Button>
               {currentUrlRef.current && (
                 <Button

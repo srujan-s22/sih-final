@@ -3,6 +3,8 @@ import {
   NfcProvisionResponse,
   NfcRevokeResponse,
   HouseholdNfcStatusResponse,
+  NfcConfirmRotationResponse,
+  NfcCancelRotationResponse,
 } from "@shared/types/nfc";
 import { ApiResult } from "@shared/types/api";
 
@@ -32,8 +34,8 @@ export class NfcServiceClient {
   }
 
   /**
-   * Rotates an existing household NFC credential (e.g. lost/damaged card).
-   * Atomically invalidates old credential and returns a new raw token.
+   * Initiates rotation for an existing household NFC credential (e.g. lost/damaged card).
+   * Generates a pending credential without invalidating the active card until confirmed.
    */
   public async rotateNfc(
     householdId: string,
@@ -42,6 +44,37 @@ export class NfcServiceClient {
     return apiClient.post<NfcProvisionResponse>(
       `/api/v1/asha/households/${encodeURIComponent(householdId)}/nfc/rotate`,
       reason ? { reason } : {}
+    );
+  }
+
+  /**
+   * Confirms successful physical NFC card write during rotation.
+   * Atomically invalidates old active credential and activates the pending credential.
+   */
+  public async confirmRotateNfc(
+    householdId: string,
+    nfcId: string,
+    version: number,
+    reason?: string
+  ): Promise<ApiResult<NfcConfirmRotationResponse>> {
+    return apiClient.post<NfcConfirmRotationResponse>(
+      `/api/v1/asha/households/${encodeURIComponent(householdId)}/nfc/rotate/confirm`,
+      { nfcId, version, reason }
+    );
+  }
+
+  /**
+   * Cancels a pending rotation when physical write fails or ASHA leaves the workflow.
+   * Ensures the existing active credential remains completely valid.
+   */
+  public async cancelRotateNfc(
+    householdId: string,
+    nfcId?: string,
+    reason?: string
+  ): Promise<ApiResult<NfcCancelRotationResponse>> {
+    return apiClient.post<NfcCancelRotationResponse>(
+      `/api/v1/asha/households/${encodeURIComponent(householdId)}/nfc/rotate/cancel`,
+      { nfcId, reason }
     );
   }
 

@@ -5,6 +5,8 @@ import {
   NfcProvisionParamsSchema,
   NfcRevokeSchema,
   NfcResolveSchema,
+  NfcConfirmRotationSchema,
+  NfcCancelRotationSchema,
 } from "../../../shared/schemas/nfc.schema.js";
 import { NfcServiceError } from "../services/nfc.service.js";
 
@@ -158,6 +160,118 @@ export const nfcRoutes: FastifyPluginAsync = async (fastify) => {
           paramResult.data.householdId,
           request.userProfile!,
           reason
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        return handleNfcError(err, reply, correlationId);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/households/:householdId/nfc/rotate/confirm
+   * Confirms successful physical NFC card write during rotation.
+   * Atomically invalidates the old active card and activates the pending credential.
+   * Guard: ASHA (assigned to household) or Admin.
+   */
+  fastify.post<{ Params: { householdId: string } }>(
+    "/v1/asha/households/:householdId/nfc/rotate/confirm",
+    { preHandler: [requireRole(["ASHA", "ADMIN"]), requireConsent] },
+    async (request, reply) => {
+      const correlationId = request.correlationId || "nfc-rotate-confirm-ctx";
+
+      const paramResult = NfcProvisionParamsSchema.safeParse(request.params);
+      if (!paramResult.success) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+          success: false,
+          code: "VALIDATION_FAILED",
+          error: "ValidationError",
+          message: paramResult.error.errors[0]?.message || "Invalid household parameter.",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const bodyResult = NfcConfirmRotationSchema.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+          success: false,
+          code: "VALIDATION_FAILED",
+          error: "ValidationError",
+          message: bodyResult.error.errors[0]?.message || "Invalid rotation confirmation payload.",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      try {
+        const result = await fastify.nfcService.confirmRotateNfc(
+          paramResult.data.householdId,
+          bodyResult.data.nfcId,
+          bodyResult.data.version,
+          request.userProfile!,
+          bodyResult.data.reason
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        return handleNfcError(err, reply, correlationId);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/households/:householdId/nfc/rotate/cancel
+   * Cancels a pending NFC card rotation if physical write fails or ASHA leaves the workflow.
+   * Guard: ASHA (assigned to household) or Admin.
+   */
+  fastify.post<{ Params: { householdId: string } }>(
+    "/v1/asha/households/:householdId/nfc/rotate/cancel",
+    { preHandler: [requireRole(["ASHA", "ADMIN"]), requireConsent] },
+    async (request, reply) => {
+      const correlationId = request.correlationId || "nfc-rotate-cancel-ctx";
+
+      const paramResult = NfcProvisionParamsSchema.safeParse(request.params);
+      if (!paramResult.success) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+          success: false,
+          code: "VALIDATION_FAILED",
+          error: "ValidationError",
+          message: paramResult.error.errors[0]?.message || "Invalid household parameter.",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const bodyResult = NfcCancelRotationSchema.safeParse(request.body || {});
+      if (!bodyResult.success) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+          success: false,
+          code: "VALIDATION_FAILED",
+          error: "ValidationError",
+          message: bodyResult.error.errors[0]?.message || "Invalid rotation cancellation payload.",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      try {
+        const result = await fastify.nfcService.cancelRotateNfc(
+          paramResult.data.householdId,
+          bodyResult.data.nfcId,
+          request.userProfile!,
+          bodyResult.data.reason
         );
 
         return reply.status(HTTP_STATUS.OK).send({

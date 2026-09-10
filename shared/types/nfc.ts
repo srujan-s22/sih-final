@@ -1,10 +1,10 @@
 /**
  * ==============================================================================
- * SWASTHYASETU NFC DOMAIN CONTRACTS (PHASE 1)
+ * SWASTHYASETU NFC DOMAIN CONTRACTS (PHASE 1 & PHASE 2 HARDENING)
  * ==============================================================================
  */
 
-export type NfcCardStatus = "ACTIVE" | "REVOKED";
+export type NfcCardStatus = "ACTIVE" | "PENDING_WRITE" | "REVOKED";
 
 /**
  * Server-side stored NFC credential entity in /household_nfc/{nfcId}
@@ -26,7 +26,7 @@ export interface HouseholdNfcRecord {
 }
 
 /**
- * Payload returned to authorized staff (ASHA/Admin) upon initial tag provisioning or rotation.
+ * Payload returned to authorized staff (ASHA/Admin) upon initial tag provisioning or rotation initiation.
  * The raw token is returned ONCE immediately after generation so the phone can write it to the physical tag.
  */
 export interface NfcProvisionResponse {
@@ -44,6 +44,28 @@ export interface NfcRevokeResponse {
   householdId: string;
   status: "REVOKED";
   revokedAt: string;
+}
+
+/**
+ * Response for confirming successful physical write of a rotated NFC tag
+ */
+export interface NfcConfirmRotationResponse {
+  success: boolean;
+  householdId: string;
+  nfcId: string;
+  version: number;
+  status: "ACTIVE";
+  activatedAt: string;
+}
+
+/**
+ * Response for cancelling an in-progress rotation
+ */
+export interface NfcCancelRotationResponse {
+  success: boolean;
+  householdId: string;
+  cancelledNfcId?: string;
+  activeVersion: number;
 }
 
 /**
@@ -104,5 +126,10 @@ export interface HouseholdNfcStatusResponse {
     createdAt: string;
     updatedAt: string;
     revokedAt?: string | null;
+  } | null;
+  pendingReplacement?: {
+    id: string;
+    version: number;
+    createdAt: string;
   } | null;
 }

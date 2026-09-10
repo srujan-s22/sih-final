@@ -201,4 +201,245 @@ export class NfcRepository extends BaseFirestoreRepository<HouseholdNfcRecord> {
       return results.sort((a, b) => b.version - a.version);
     }
   }
+
+  /**
+   * Retrieves any currently PENDING_WRITE replacement credential for a household.
+   */
+  public async getPendingByHouseholdId(
+    householdId: string
+  ): Promise<HouseholdNfcRecord | null> {
+    if (this.isUnitTestMode()) {
+      for (const record of this.memoryStore.values()) {
+        if (record.householdId === householdId && record.status === "PENDING_WRITE") {
+          return { ...record };
+        }
+      }
+      return null;
+    }
+
+    try {
+      const snapshot = await this.getCollection()
+        .where("householdId", "==", householdId)
+        .where("status", "==", "PENDING_WRITE")
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) return null;
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...(doc.data() as Omit<HouseholdNfcRecord, "id">) };
+    } catch {
+      for (const record of this.memoryStore.values()) {
+        if (record.householdId === householdId && record.status === "PENDING_WRITE") {
+          return { ...record };
+        }
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Atomically activates a pending replacement credential while revoking the previous active credential.
+   * Enforces compare-and-set invariant: nfcId must be PENDING_WRITE and match expectedVersion.
+   */
+  public async activatePendingRotation(
+    householdId: string,
+    nfcId: string,
+    expectedVersion: number,
+    actorUid: string,
+    reason?: string
+  ): Promise<{ activatedRecord: HouseholdNfcRecord; revokedOldRecord: HouseholdNfcRecord | null }> {
+    const now = new Date().toISOString();
+
+    if (this.isUnitTestMode()) {
+      const pendingRecord = this.memoryStore.get(nfcId);
+      if (
+        !pendingRecord ||
+        pendingRecord.householdId !== householdId ||
+        pendingRecord.status !== "PENDING_WRITE" ||
+        pendingRecord.version !== expectedVersion
+      ) {
+        throw new Error("Pending replacement credential state is invalid or already updated.");
+      }
+
+      // Find any active credential to revoke
+      let revokedOld: HouseholdNfcRecord | null = null;
+      for (const record of this.memoryStore.values()) {
+        if (record.householdId === householdId && record.status === "ACTIVE" && record.id !== nfcId) {
+          const updatedOld: HouseholdNfcRecord = {
+            ...record,
+            status: "REVOKED",
+            revokedAt: now,
+            revokedBy: actorUid,
+            revocationReason: reason || "ROTATED_REPLACEMENT",
+            updatedAt: now,
+            updatedBy: actorUid,
+          };
+          this.memoryStore.set(record.id, updatedOld);
+          revokedOld = updatedOld;
+        }
+      }
+
+      // Activate pending
+      const activated: HouseholdNfcRecord = {
+        ...pendingRecord,
+        status: "ACTIVE",
+        updatedAt: now,
+        updatedBy: actorUid,
+      };
+      this.memoryStore.set(nfcId, activated);
+
+      return { activatedRecord: activated, revokedOldRecord: revokedOld };
+    }
+
+    try {
+      let revokedOldRecord: HouseholdNfcRecord | null = null;
+      let activatedRecord: HouseholdNfcRecord | null = null;
+
+      await this.firestore!.runTransaction(async (transaction) => {
+        const docRef = this.getCollection().doc(nfcId);
+        const docSnap = await transaction.get(docRef);
+
+        if (!docSnap.exists) {
+          throw new Error("Pending replacement credential not found.");
+        }
+
+        const data = docSnap.data() as HouseholdNfcRecord;
+        if (
+          data.householdId !== householdId ||
+          data.status !== "PENDING_WRITE" ||
+          data.version !== expectedVersion
+        ) {
+          throw new Error("Pending replacement credential state is invalid or already updated.");
+        }
+
+        // Query active credential to revoke
+        const activeQuery = this.getCollection()
+          .where("householdId", "==", householdId)
+          .where("status", "==", "ACTIVE")
+          .limit(1);
+
+        const activeSnap = await transaction.get(activeQuery);
+        if (!activeSnap.empty) {
+          const oldDoc = activeSnap.docs[0];
+          if (oldDoc.id !== nfcId) {
+            const oldData = oldDoc.data() as HouseholdNfcRecord;
+            const updatedOld: HouseholdNfcRecord = {
+              ...oldData,
+              status: "REVOKED",
+              revokedAt: now,
+              revokedBy: actorUid,
+              revocationReason: reason || "ROTATED_REPLACEMENT",
+              updatedAt: now,
+              updatedBy: actorUid,
+            };
+            transaction.update(oldDoc.ref, updatedOld as any);
+            revokedOldRecord = updatedOld;
+            this.memoryStore.set(oldDoc.id, updatedOld);
+          }
+        }
+
+        const updatedPending: HouseholdNfcRecord = {
+          ...data,
+          status: "ACTIVE",
+          updatedAt: now,
+          updatedBy: actorUid,
+        };
+        transaction.update(docRef, updatedPending as any);
+        activatedRecord = updatedPending;
+        this.memoryStore.set(nfcId, updatedPending);
+      });
+
+      return {
+        activatedRecord: activatedRecord!,
+        revokedOldRecord,
+      };
+    } catch (err: unknown) {
+      if (
+        err instanceof Error &&
+        (err.message.includes("Pending replacement credential") ||
+          err.message.includes("state is invalid"))
+      ) {
+        throw err;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Cancels any pending rotation for a household, marking the pending record REVOKED
+   * while leaving the previous active credential completely intact.
+   */
+  public async cancelPendingRotation(
+    householdId: string,
+    nfcId?: string,
+    actorUid?: string,
+    reason?: string
+  ): Promise<HouseholdNfcRecord | null> {
+    const now = new Date().toISOString();
+
+    if (this.isUnitTestMode()) {
+      let target: HouseholdNfcRecord | null = null;
+      if (nfcId) {
+        const record = this.memoryStore.get(nfcId);
+        if (record && record.householdId === householdId && record.status === "PENDING_WRITE") {
+          target = record;
+        }
+      } else {
+        for (const record of this.memoryStore.values()) {
+          if (record.householdId === householdId && record.status === "PENDING_WRITE") {
+            target = record;
+            break;
+          }
+        }
+      }
+
+      if (!target) return null;
+
+      const cancelled: HouseholdNfcRecord = {
+        ...target,
+        status: "REVOKED",
+        revokedAt: now,
+        revokedBy: actorUid || null,
+        revocationReason: reason || "REPLACEMENT_CANCELLED_OR_FAILED",
+        updatedAt: now,
+        updatedBy: actorUid || target.updatedBy || "system",
+      };
+      this.memoryStore.set(target.id, cancelled);
+      return cancelled;
+    }
+
+    try {
+      let targetId = nfcId;
+      if (!targetId) {
+        const pending = await this.getPendingByHouseholdId(householdId);
+        if (!pending) return null;
+        targetId = pending.id;
+      }
+
+      const docRef = this.getCollection().doc(targetId);
+      const doc = await docRef.get();
+      if (!doc.exists) return null;
+
+      const data = doc.data() as HouseholdNfcRecord;
+      if (data.householdId !== householdId || data.status !== "PENDING_WRITE") {
+        return null;
+      }
+
+      const cancelled: HouseholdNfcRecord = {
+        ...data,
+        status: "REVOKED",
+        revokedAt: now,
+        revokedBy: actorUid || null,
+        revocationReason: reason || "REPLACEMENT_CANCELLED_OR_FAILED",
+        updatedAt: now,
+        updatedBy: actorUid || data.updatedBy || "system",
+      };
+
+      await docRef.set(cancelled, { merge: true });
+      this.memoryStore.set(targetId, cancelled);
+      return cancelled;
+    } catch {
+      return null;
+    }
+  }
 }

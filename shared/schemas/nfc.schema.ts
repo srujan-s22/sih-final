@@ -24,6 +24,43 @@ export const NfcRevokeSchema = z.object({
 });
 
 /**
+ * Zod schema for confirming successful physical NFC card write during rotation
+ */
+export const NfcConfirmRotationSchema = z.object({
+  nfcId: z
+    .string({ required_error: "NFC ID is required" })
+    .trim()
+    .min(5, "NFC ID must be at least 5 characters")
+    .max(120, "NFC ID must be under 120 characters"),
+  version: z
+    .number({ required_error: "Credential version is required" })
+    .int()
+    .positive("Version must be a positive integer"),
+  reason: z
+    .string()
+    .trim()
+    .max(200, "Reason must be under 200 characters")
+    .optional(),
+});
+
+/**
+ * Zod schema for cancelling an in-progress rotation attempt
+ */
+export const NfcCancelRotationSchema = z.object({
+  nfcId: z
+    .string()
+    .trim()
+    .min(5, "NFC ID must be at least 5 characters")
+    .max(120, "NFC ID must be under 120 characters")
+    .optional(),
+  reason: z
+    .string()
+    .trim()
+    .max(200, "Reason must be under 200 characters")
+    .optional(),
+});
+
+/**
  * Zod schema for public NFC resolution
  */
 export const NfcResolveSchema = z.object({
@@ -41,4 +78,6 @@ export const NfcResolveSchema = z.object({
 
 export type NfcProvisionParamsInput = z.infer<typeof NfcProvisionParamsSchema>;
 export type NfcRevokeInput = z.infer<typeof NfcRevokeSchema>;
+export type NfcConfirmRotationInput = z.infer<typeof NfcConfirmRotationSchema>;
+export type NfcCancelRotationInput = z.infer<typeof NfcCancelRotationSchema>;
 export type NfcResolveInput = z.infer<typeof NfcResolveSchema>;

@@ -407,7 +407,22 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       expect(rotBody.data.version).toBe(2);
       expect(rotBody.data.token).not.toBe(oldToken);
 
-      // 3. Old token is now rejected upon public resolution
+      // 3. Confirm rotation after physical write
+      const confirmRes = await app.inject({
+        method: "POST",
+        url: `/api/v1/asha/households/${assignedHouseholdId}/nfc/rotate/confirm`,
+        headers: {
+          authorization: `Bearer ${ashaAuthorizedToken}`,
+        },
+        payload: {
+          nfcId: `nfc_${assignedHouseholdId}_v2`,
+          version: 2,
+          reason: "Replacement confirmed",
+        },
+      });
+      expect(confirmRes.statusCode).toBe(HTTP_STATUS.OK);
+
+      // 4. Old token is now rejected upon public resolution
       const oldResolveRes = await app.inject({
         method: "POST",
         url: "/api/v1/nfc/resolve",
@@ -418,7 +433,7 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       });
       expect(oldResolveRes.statusCode).toBe(HTTP_STATUS.UNAUTHORIZED);
 
-      // 4. New token succeeds
+      // 5. New token succeeds
       const newResolveRes = await app.inject({
         method: "POST",
         url: "/api/v1/nfc/resolve",

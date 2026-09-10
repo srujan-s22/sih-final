@@ -343,7 +343,20 @@ describe("Phase 1: Secure NFC Backend Foundation", () => {
       expect(version2).toBe(2);
       expect(token2).not.toBe(token1);
 
-      // 3. Old token1 MUST fail
+      // 3. Confirm physical write completion
+      const confirmRes = await app.inject({
+        method: "POST",
+        url: `/api/v1/asha/households/${householdId}/nfc/rotate/confirm`,
+        headers: { authorization: `Bearer ${asha1Token}` },
+        payload: {
+          nfcId: `nfc_${householdId}_v2`,
+          version: 2,
+          reason: "Replacement card written",
+        },
+      });
+      expect(confirmRes.statusCode).toBe(HTTP_STATUS.OK);
+
+      // 4. Old token1 MUST fail
       const oldResolveRes = await app.inject({
         method: "POST",
         url: "/api/v1/nfc/resolve",
@@ -354,7 +367,7 @@ describe("Phase 1: Secure NFC Backend Foundation", () => {
       });
       expect(oldResolveRes.statusCode).toBe(HTTP_STATUS.UNAUTHORIZED);
 
-      // 4. New token2 MUST succeed
+      // 5. New token2 MUST succeed
       const newResolveRes = await app.inject({
         method: "POST",
         url: "/api/v1/nfc/resolve",

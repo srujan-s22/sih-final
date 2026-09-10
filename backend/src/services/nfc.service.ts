@@ -4,6 +4,8 @@ import {
   HouseholdNfcRecord,
   NfcProvisionResponse,
   NfcRevokeResponse,
+  NfcConfirmRotationResponse,
+  NfcCancelRotationResponse,
   NfcResolveResponse,
   HouseholdNfcStatusResponse,
   NfcPublicSchemeSummary,
@@ -178,8 +180,9 @@ export class NfcService {
   }
 
   /**
-   * Securely rotates an existing household NFC credential (e.g. lost/damaged card).
-   * Atomically invalidates the old credential and provisions a new one.
+   * Initiates rotation for an existing household NFC credential (e.g. lost/damaged card).
+   * HARDENED LIFECYCLE: Creates a PENDING_WRITE credential for the new version,
+   * keeping the current ACTIVE credential 100% valid and operational until physical write confirmation.
    */
   public async rotateNfc(
     householdId: string,
@@ -197,35 +200,40 @@ export class NfcService {
       );
     }
 
-    // 1. Revoke existing active credential if present
+    // Must have an active credential to rotate
     const existingActive = await this.nfcRepo.getActiveByHouseholdId(householdId);
-    const now = new Date().toISOString();
-    if (existingActive) {
-      await this.nfcRepo.updateNfcRecord(existingActive.id, {
-        status: "REVOKED",
-        revokedAt: now,
-        revokedBy: actorProfile.uid,
-        revocationReason: reason || "ROTATION_REPLACEMENT",
-        updatedAt: now,
-        updatedBy: actorProfile.uid,
-      });
+    if (!existingActive) {
+      throw new NfcServiceError(
+        "No active NFC credential found for this household. Use initial registration instead.",
+        HTTP_STATUS.NOT_FOUND,
+        "NO_ACTIVE_NFC"
+      );
     }
 
-    // 2. Increment version
+    // Clean up any stale or abandoned PENDING_WRITE record for this household
+    await this.nfcRepo.cancelPendingRotation(
+      householdId,
+      undefined,
+      actorProfile.uid,
+      "SUPERSEDED_BY_NEW_ROTATION"
+    );
+
+    // Calculate next version
     const historical = await this.nfcRepo.listByHouseholdId(householdId);
     const version = historical.length > 0 ? Math.max(...historical.map((r) => r.version)) + 1 : 1;
 
-    // 3. Generate new secure random token and hash
+    // Generate secure random token and hash
     const rawToken = this.generateSecureToken();
     const tokenHash = hashSecret(rawToken);
     const nfcId = `nfc_${householdId}_v${version}`;
+    const now = new Date().toISOString();
 
-    const newRecord: HouseholdNfcRecord = {
+    const pendingRecord: HouseholdNfcRecord = {
       id: nfcId,
       householdId,
       tokenHash,
       version,
-      status: "ACTIVE",
+      status: "PENDING_WRITE",
       createdAt: now,
       createdBy: actorProfile.uid,
       updatedAt: now,
@@ -235,13 +243,96 @@ export class NfcService {
       revocationReason: null,
     };
 
-    await this.nfcRepo.createNfcRecord(newRecord);
+    await this.nfcRepo.createNfcRecord(pendingRecord);
 
     return {
       householdId,
       nfcId,
       token: rawToken,
       version,
+    };
+  }
+
+  /**
+   * Confirms successful physical NFC card write during rotation.
+   * Atomically invalidates previous active card and activates the pending credential.
+   */
+  public async confirmRotateNfc(
+    householdId: string,
+    nfcId: string,
+    version: number,
+    actorProfile: UserProfile,
+    reason?: string
+  ): Promise<NfcConfirmRotationResponse> {
+    await this.verifyHouseholdAuthorization(householdId, actorProfile);
+
+    const household = await this.householdRepo.getHouseholdById(householdId);
+    if (!household) {
+      throw new NfcServiceError(
+        "Household record not found.",
+        HTTP_STATUS.NOT_FOUND,
+        "HOUSEHOLD_NOT_FOUND"
+      );
+    }
+
+    try {
+      const { activatedRecord } = await this.nfcRepo.activatePendingRotation(
+        householdId,
+        nfcId,
+        version,
+        actorProfile.uid,
+        reason
+      );
+
+      return {
+        success: true,
+        householdId,
+        nfcId: activatedRecord.id,
+        version: activatedRecord.version,
+        status: "ACTIVE",
+        activatedAt: activatedRecord.updatedAt,
+      };
+    } catch (err: unknown) {
+      if (
+        err instanceof Error &&
+        (err.message.includes("state is invalid") || err.message.includes("not found"))
+      ) {
+        throw new NfcServiceError(
+          "Pending replacement credential state is invalid or already updated.",
+          HTTP_STATUS.CONFLICT,
+          "STALE_REPLACEMENT_CREDENTIAL"
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Cancels a pending rotation when physical write fails or ASHA leaves the workflow.
+   * Ensures the existing active credential remains completely valid.
+   */
+  public async cancelRotateNfc(
+    householdId: string,
+    nfcId: string | undefined,
+    actorProfile: UserProfile,
+    reason?: string
+  ): Promise<NfcCancelRotationResponse> {
+    await this.verifyHouseholdAuthorization(householdId, actorProfile);
+
+    await this.nfcRepo.cancelPendingRotation(
+      householdId,
+      nfcId,
+      actorProfile.uid,
+      reason || "REPLACEMENT_CANCELLED_OR_FAILED"
+    );
+
+    const activeRecord = await this.nfcRepo.getActiveByHouseholdId(householdId);
+
+    return {
+      success: true,
+      householdId,
+      cancelledNfcId: nfcId,
+      activeVersion: activeRecord ? activeRecord.version : 0,
     };
   }
 
@@ -293,10 +384,19 @@ export class NfcService {
     await this.verifyHouseholdAuthorization(householdId, actorProfile);
 
     const activeRecord = await this.nfcRepo.getActiveByHouseholdId(householdId);
+    const pending = await this.nfcRepo.getPendingByHouseholdId(householdId);
+
     if (!activeRecord) {
       return {
         hasActiveNfc: false,
         record: null,
+        pendingReplacement: pending
+          ? {
+              id: pending.id,
+              version: pending.version,
+              createdAt: pending.createdAt,
+            }
+          : null,
       };
     }
 
@@ -311,6 +411,13 @@ export class NfcService {
         updatedAt: activeRecord.updatedAt,
         revokedAt: activeRecord.revokedAt,
       },
+      pendingReplacement: pending
+        ? {
+            id: pending.id,
+            version: pending.version,
+            createdAt: pending.createdAt,
+          }
+        : null,
     };
   }
 
