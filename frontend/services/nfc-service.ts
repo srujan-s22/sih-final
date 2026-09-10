@@ -5,10 +5,24 @@ import {
   HouseholdNfcStatusResponse,
   NfcConfirmRotationResponse,
   NfcCancelRotationResponse,
+  NfcResolveResponse,
 } from "@shared/types/nfc";
 import { ApiResult } from "@shared/types/api";
 
 export class NfcServiceClient {
+  /**
+   * Resolves a public NFC card tap.
+   * Public unauthenticated endpoint returning privacy-minimal household context and scheme summaries.
+   */
+  public async resolvePublicNfc(
+    householdId: string,
+    token: string
+  ): Promise<ApiResult<NfcResolveResponse>> {
+    return apiClient.post<NfcResolveResponse>("/api/v1/nfc/resolve", {
+      householdId,
+      token,
+    });
+  }
   /**
    * Retrieves safe status metadata for a household's NFC tag.
    * Only accessible to authorized ASHA workers and Administrators.
