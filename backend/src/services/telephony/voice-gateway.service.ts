@@ -398,18 +398,26 @@ export class VoiceGatewayService {
 
       case "CHECK_SCHEMES": {
         executedAction = "getPublicSchemeInfo";
+        const effectiveSchemeId =
+          nluResult.schemeId ||
+          (nluResult.entities?.pregnancyStatus ? "jsy" : undefined);
+        const effectiveTopic =
+          nluResult.topic ||
+          (nluResult.entities?.pregnancyStatus ? "maternal_care" : undefined);
+
         const knowRes = voiceKnowledgeService.queryKnowledge({
           transcript,
           language: session.language,
           intent: nluResult.intent,
-          topic: nluResult.topic,
-          schemeId: nluResult.schemeId,
+          topic: effectiveTopic,
+          schemeId: effectiveSchemeId,
+          entities: nluResult.entities,
         });
         if (knowRes.found) {
           textResponse = knowRes.text;
-          actionResultData = { schemeId: nluResult.schemeId, topic: knowRes.topic, category: knowRes.category };
+          actionResultData = { schemeId: effectiveSchemeId || knowRes.topic, topic: knowRes.topic, category: knowRes.category };
         } else {
-          const res = await this.voiceActionService.getPublicSchemeInfo(nluResult.schemeId, session);
+          const res = await this.voiceActionService.getPublicSchemeInfo(effectiveSchemeId, session);
           textResponse = res.message;
           actionResultData = res.data;
         }

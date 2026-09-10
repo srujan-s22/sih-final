@@ -155,12 +155,18 @@ export class MultilingualNLU {
       entities.gender = "FEMALE";
     }
 
-    // 3. Pregnancy Status
+    // 3. Pregnancy / Maternal Status
     if (
       clean.includes("pregnant") || clean.includes("pregnancy") ||
+      clean.includes("expecting mother") || clean.includes("expecting mothers") ||
+      clean.includes("expecting") || clean.includes("maternity") || clean.includes("maternal") ||
       clean.includes("garbhwati") || clean.includes("garbhvati") ||
       clean.includes("garbhini") || clean.includes("ಗರ್ಭಿಣಿ") ||
-      clean.includes("ಗರ್ಭಧಾರಣೆ") || clean.includes("गर्भवती") || clean.includes("गर्भावस्था")
+      clean.includes("ಗರ್ಭಧಾರಣೆ") || clean.includes("ತಾಯಂದಿರು") ||
+      clean.includes("ಹೆರಿಗೆ") || clean.includes("herige") ||
+      clean.includes("गर्भवती") || clean.includes("गर्भावस्था") ||
+      clean.includes("प्रसव") || clean.includes("प्रसूति") || clean.includes("मातृत्व") ||
+      clean.includes("prasav") || clean.includes("prasuti") || clean.includes("matritva")
     ) {
       entities.pregnancyStatus = true;
       entities.gender = "FEMALE";
@@ -175,6 +181,19 @@ export class MultilingualNLU {
     ) {
       entities.nursingStatus = true;
       entities.gender = "FEMALE";
+    }
+
+    // Senior citizen / Elderly mentions without numerical age (maps to universal 70+ PM-JAY)
+    const isSeniorMention =
+      clean.includes("senior citizen") || clean.includes("senior") ||
+      clean.includes("elderly") || clean.includes("aged") || clean.includes("old age") ||
+      clean.includes("बुजुर्ग") || clean.includes("वरिष्ठ") || clean.includes("वृद्ध") ||
+      clean.includes("bujurg") || clean.includes("vriddha") || clean.includes("varishth") ||
+      clean.includes("ಹಿರಿಯ ನಾಗರಿಕ") || clean.includes("ಹಿರಿಯರು") || clean.includes("ಹಿರಿಯ") ||
+      clean.includes("ವೃದ್ಧ") || clean.includes("ವೃದ್ಧರು") || clean.includes("hiriyaru");
+
+    if (isSeniorMention && entities.age === undefined) {
+      entities.age = 70;
     }
 
     // 5. Disability Status
@@ -514,16 +533,31 @@ export class MultilingualNLU {
       };
     }
 
-    // 12. Eligibility Query (Personal or Relative)
+    // 12. Eligibility / Cohort Query (Personal, Maternal, Senior, or Relative)
     // Matches: "My grandfather is 71. What schemes can he get?", "71 saal ke dadaji ke liye kya milega?",
     // "ನನ್ನ 71 ವರ್ಷದ ತಾತನಿಗೆ ಏನು ಸಿಗುತ್ತದೆ?", "Can my elderly father get this scheme?"
+    // Also matches maternal/senior cohort inquiries in English, Hindi, Kannada, Hinglish, Kanglish
     const hasEligibilityWords =
       clean.includes("eligible") || clean.includes("eligibility") || clean.includes("patra") ||
       clean.includes("patrata") || clean.includes("yogyata") || clean.includes("milega") ||
-      clean.includes("qualify") || clean.includes("ಅರ್ಹತೆ") ||
-      clean.includes("ಸಿಗುತ್ತಾ") || clean.includes("ಸಿಗುವುದು") || clean.includes("पात्रता") || clean.includes("मिलेगा क्या");
+      clean.includes("qualify") || clean.includes("benefit") || clean.includes("benefits") ||
+      clean.includes("ಅರ್ಹತೆ") || clean.includes("ಸಿಗುತ್ತಾ") || clean.includes("ಸಿಗುವುದು") ||
+      clean.includes("ಸಿಗುವ") || clean.includes("ಸೌಲಭ್ಯ") || clean.includes("ಸೌಲಭ್ಯಗಳು") || clean.includes("ಫಲ") ||
+      clean.includes("ಪಾತ್ರತೆ") || clean.includes("पात्रता") || clean.includes("मिलेगा क्या") ||
+      clean.includes("लाभ") || clean.includes("फायदे");
 
-    if (hasEligibilityWords || entities.age !== undefined || entities.relation || clean.includes("senior") || clean.includes("pregnant")) {
+    const isSeniorInquiry =
+      (entities.age !== undefined && entities.age >= 60) ||
+      clean.includes("senior") || clean.includes("elderly") ||
+      clean.includes("बुजुर्ग") || clean.includes("वरिष्ठ") || clean.includes("हಿರಿಯ");
+
+    const isCohortInquiry =
+      Boolean(entities.pregnancyStatus) ||
+      Boolean(entities.nursingStatus) ||
+      Boolean(entities.disabilityStatus) ||
+      isSeniorInquiry;
+
+    if (hasEligibilityWords || entities.age !== undefined || entities.relation || isCohortInquiry) {
       // Check if relative mentioned without age (prompt for clarification)
       if (entities.relation && entities.age === undefined && !entities.pregnancyStatus) {
         const clarification =
@@ -577,13 +611,14 @@ export class MultilingualNLU {
     if (
       clean.includes("scheme") || clean.includes("yojana") || clean.includes("sarkari") ||
       clean.includes("benefits") || clean.includes("list") || clean.includes("ಯೋಜನೆ") ||
-      clean.includes("ಸರ್ಕಾರಿ") || clean.includes("योजना") || clean.includes("सरकारी")
+      clean.includes("ಸರ್ಕಾರಿ") || clean.includes("योजना") || clean.includes("सरकारी") ||
+      clean.includes("ಸೌಲಭ್ಯ") || clean.includes("लाभ")
     ) {
       return {
         intent: "CHECK_SCHEMES",
         confidence: 0.82,
         entities,
-        schemeId: entities.schemeId,
+        schemeId: entities.schemeId || (entities.pregnancyStatus ? "jsy" : undefined),
         rawTranscript: raw,
         language: resolvedLanguage,
       };

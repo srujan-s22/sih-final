@@ -149,7 +149,10 @@ export const VOICE_KNOWLEDGE_BASE: LocalizedKnowledgeItem[] = [
     category: "CITIZEN_PORTAL",
     topic: "maternal_care",
     keywords: [
-      "pregnant", "nursing mothers", "maternity", "garbhwati", "garbhini", "jsy", "pmmvy", "tayandiru"
+      "pregnant", "nursing mothers", "maternity", "garbhwati", "garbhini", "jsy", "pmmvy", "tayandiru",
+      "expecting mothers", "expecting", "maternal",
+      "गर्भवती", "गर्भावस्था", "प्रसव", "प्रसूति", "मातृत्व",
+      "ಗರ್ಭಿಣಿ", "ಗರ್ಭಿಣಿಯರಿಗೆ", "ಗರ್ಭಿಣಿಯರಿಗಾಗಿ", "ಹೆರಿಗೆ", "ಬಾಣಂತಿ", "ತಾಯಂದಿರು"
     ],
     en: "Pregnant and nursing mothers recorded in your family profile are evaluated for Janani Suraksha Yojana and PMMVY for safe institutional delivery cash assistance, free checkups, and nutritional support.",
     kn: "ಕುಟುಂಬದಲ್ಲಿರುವ ಗರ್ಭಿಣಿಯರು ಮತ್ತು ಬಾಣಂತಿಯರಿಗೆ ಜನನಿ ಸುರಕ್ಷಾ ಯೋಜನೆ ಮತ್ತು ಪಿ.ಎಂ.ಎಂ.ವಿ.ವೈ ಮೂಲಕ ಆಸ್ಪತ್ರೆ ಹೆರಿಗೆ ಧನಸಹಾಯ, ತಪಾಸಣೆ ಮತ್ತು ಪೌಷ್ಟಿಕಾಂಶ ಬೆಂಬಲ ಸಿಗುತ್ತದೆ.",
@@ -271,7 +274,9 @@ export const VOICE_KNOWLEDGE_BASE: LocalizedKnowledgeItem[] = [
     category: "SCHEME",
     topic: "ab-pmjay",
     keywords: [
-      "pmjay", "ab-pmjay", "ayushman", "ayushman bharat", "70 plus", "senior citizen card", "vay vandana", "5 lakh"
+      "pmjay", "ab-pmjay", "ayushman", "ayushman bharat", "70 plus", "senior citizen card", "vay vandana", "5 lakh",
+      "senior", "elderly", "ಆಯುಷ್ಮಾನ್", "ಆಯುಷ್ಮಾನ್ ಭಾರತ್", "ಹಿರಿಯ ನಾಗರಿಕ", "ವಯ ವಂದನಾ", "ಆಯುಷ್ಮಾನ್ ವಯ ವಂದನಾ",
+      "आयुष्मान", "आयुष्मान भारत", "वरिष्ठ नागरिक", "वय वंदना", "आयुष्मान वय वंदना", "बुजुर्ग"
     ],
     en: "SwasthyaSetu covers Ayushman Bharat PM-JAY providing up to ₹5 lakh yearly cashless hospital coverage for secondary and tertiary inpatient care. It features a universal 70+ Senior Citizen pathway for all citizens aged 70 and above, regardless of income, with the Ayushman Vay Vandana Card.",
     kn: "ಸ್ವಾಸ್ಥ್ಯಸೇತು ಆಯುಷ್ಮಾನ್ ಭಾರತ್ PM-JAY ಯೋಜನೆಯು ಆಸ್ಪತ್ರೆ ಚಿಕಿತ್ಸೆಗಾಗಿ ವರ್ಷಕ್ಕೆ 5 ಲಕ್ಷ ರೂಪಾಯಿಗಳವರೆಗೆ ನಗದುರಹಿತ ರಕ್ಷಣೆ ನೀಡುತ್ತದೆ. 70 ವರ್ಷ ಮತ್ತು ಮೇಲ್ಪಟ್ಟ ಎಲ್ಲಾ ಹಿರಿಯ ನಾಗರಿಕರಿಗೆ ಆದಾಯ ಮಿತಿಯಿಲ್ಲದೆ ಆಯುಷ್ಮಾನ್ ವಯ ವಂದನಾ ಕಾರ್ಡ್ ಲಭ್ಯವಿದೆ.",
@@ -282,7 +287,9 @@ export const VOICE_KNOWLEDGE_BASE: LocalizedKnowledgeItem[] = [
     category: "SCHEME",
     topic: "jsy",
     keywords: [
-      "jsy", "janani suraksha", "maternity scheme", "delivery cash", "prasav sahayata", "janani suraksha yojana", "institutional delivery"
+      "jsy", "janani suraksha", "maternity scheme", "delivery cash", "prasav sahayata", "janani suraksha yojana", "institutional delivery",
+      "ಜನನಿ", "ಜನನಿ ಸುರಕ್ಷಾ", "ಜನನಿ ಸುರಕ್ಷಾ ಯೋಜನೆ", "ಹೆರಿಗೆ ಧನಸಹಾಯ", "ಜನನಿ ಯೋಜನೆ",
+      "जननी", "जननी सुरक्षा", "जननी सुरक्षा योजना", "प्रसव सहायता", "संस्थागत प्रसव"
     ],
     en: "Janani Suraksha Yojana (JSY) is a safe motherhood scheme under the National Health Mission. It provides direct cash assistance for institutional delivery among pregnant women delivering in accredited government or private health facilities, along with free antenatal care and ASHA support.",
     kn: "ಜನನಿ ಸುರಕ್ಷಾ ಯೋಜನೆಯು (JSY) ಸುರಕ್ಷಿತ ಹೆರಿಗೆಗಾಗಿ ಧನಸಹಾಯ ನೀಡುವ ಯೋಜನೆಯಾಗಿದೆ. ಸರ್ಕಾರಿ ಅಥವಾ ನೋಂದಾಯಿತ ಆಸ್ಪತ್ರೆಗಳಲ್ಲಿ ಹೆರಿಗೆ ಮಾಡಿಸುವ ಗರ್ಭಿಣಿಯರಿಗೆ ನೇರ ನಗದು ನೆರವು ಮತ್ತು ಆಶಾ ಬೆಂಬಲ ಸಿಗುತ್ತದೆ.",
@@ -293,7 +300,9 @@ export const VOICE_KNOWLEDGE_BASE: LocalizedKnowledgeItem[] = [
     category: "SCHEME",
     topic: "pmmvy",
     keywords: [
-      "pmmvy", "matru vandana", "pradhan mantri matru vandana yojana", "5000", "maternity cash"
+      "pmmvy", "matru vandana", "pradhan mantri matru vandana yojana", "5000", "maternity cash",
+      "ಮಾತೃ ವಂದನಾ", "ಮಾತೃ ವಂದನಾ ಯೋಜನೆ", "ಪ್ರಧಾನ ಮಂತ್ರಿ ಮಾತೃ ವಂದನಾ",
+      "मातृ वंदना", "मातृ वंदना योजना", "प्रधानमंत्री मातृ वंदना", "मातृत्व सहायता"
     ],
     en: "Pradhan Mantri Matru Vandana Yojana (PMMVY) provides maternity financial benefits of ₹5,000 in installments to pregnant women and lactating mothers for the first living child through Direct Benefit Transfer, compensating for wage loss and supporting nutrition.",
     kn: "ಪ್ರಧಾನ ಮಂತ್ರಿ ಮಾತೃ ವಂದನಾ ಯೋಜನೆ (PMMVY) ಮೊದಲ ಮಗುವಿನ ಗರ್ಭಧಾರಣೆಯ ಸಂದರ್ಭದಲ್ಲಿ ಗರ್ಭಿಣಿಯರಿಗೆ ಮತ್ತು ಬಾಣಂತಿಯರಿಗೆ ಪೌಷ್ಟಿಕಾಂಶ ಮತ್ತು ಧನಸಹಾಯವಾಗಿ 5,000 ರೂಪಾಯಿಗಳನ್ನು ನೇರ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ನೀಡುತ್ತದೆ.",

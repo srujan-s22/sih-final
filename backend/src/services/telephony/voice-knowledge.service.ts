@@ -6,6 +6,7 @@ import {
   toVoiceLanguage,
   SupportedVoiceLanguage,
   VoiceIntentType,
+  ExtractedVoiceEntities,
 } from "../../../../shared/types/voice.js";
 
 export interface KnowledgeMatchResult {
@@ -32,6 +33,7 @@ export class VoiceKnowledgeService {
     intent?: VoiceIntentType;
     topic?: string;
     schemeId?: string;
+    entities?: ExtractedVoiceEntities;
   }): KnowledgeMatchResult {
     const raw = (params.transcript || "").trim().toLowerCase();
     const lang = toVoiceLanguage(params.language || "en-IN");
@@ -67,6 +69,22 @@ export class VoiceKnowledgeService {
       }
     }
 
+    // 2.5. Entity-based Context Match (Maternal / Senior)
+    if (params.entities?.pregnancyStatus) {
+      const maternalItem = this.knowledgeItems.find(
+        (k) => k.topic === "maternal_care" || k.topic === "jsy"
+      );
+      if (maternalItem) {
+        return {
+          found: true,
+          text: maternalItem[langKey],
+          topic: maternalItem.topic,
+          category: maternalItem.category,
+          confidence: 0.93,
+        };
+      }
+    }
+
     // 3. Intent-based Filtering & Keyword Scoring
     let candidateItems = this.knowledgeItems;
     if (params.intent === "ABOUT_SWASTHYASETU") {
@@ -93,8 +111,14 @@ export class VoiceKnowledgeService {
       candidateItems = this.knowledgeItems.filter(
         (k) => k.category === "VOICE_CAPABILITIES" || k.category === "ABOUT_SWASTHYASETU"
       );
-    } else if (params.intent === "SCHEME_INFORMATION" || params.intent === "SPECIFIC_SCHEME_INFORMATION") {
-      candidateItems = this.knowledgeItems.filter((k) => k.category === "SCHEME");
+    } else if (
+      params.intent === "SCHEME_INFORMATION" ||
+      params.intent === "SPECIFIC_SCHEME_INFORMATION" ||
+      params.intent === "CHECK_SCHEMES"
+    ) {
+      candidateItems = this.knowledgeItems.filter(
+        (k) => k.category === "SCHEME" || k.topic === "maternal_care" || k.topic === "senior_citizens"
+      );
     }
 
     let bestItem: LocalizedKnowledgeItem | null = null;
