@@ -4,8 +4,13 @@ import React, { Suspense, useEffect, useState, useCallback, useRef } from "react
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { nfcService } from "@/services/nfc-service";
+import { voiceService } from "@/services/voice-service";
 import { useTranslation } from "@/i18n/i18n-context";
 import { NfcResolveResponse, NfcPublicSchemeSummary } from "@shared/types/nfc";
+import {
+  CANONICAL_HELPLINE_DISPLAY,
+  CANONICAL_HELPLINE_E164,
+} from "@shared/types/voice";
 import {
   ShieldCheck,
   Radio,
@@ -24,10 +29,13 @@ import {
   Volume2,
   Square,
   WifiOff,
+  Phone,
+  PhoneCall,
 } from "lucide-react";
 
 import { parseNfcCredential, ParseNfcCredentialResult, NfcCredential } from "@/lib/nfc/nfc-parser";
-import { buildHouseholdSpeechText, getSpeechSynthesisLang } from "@/lib/nfc/nfc-audio";
+import { buildHouseholdSpeechText, getLocalizedScheme } from "@/lib/nfc/nfc-audio";
+import { selectBestSpeechVoice } from "@/lib/nfc/speech-voice";
 
 function NfcResolverContent() {
   const searchParams = useSearchParams();
@@ -53,9 +61,14 @@ function NfcResolverContent() {
   );
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isWebNfcSupported, setIsWebNfcSupported] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+
+  // Exotel Registered Helpline support contact state (defaults to canonical verified constants)
+  const [helplineDisplay, setHelplineDisplay] = useState<string>(CANONICAL_HELPLINE_DISPLAY);
+  const [helplineTel, setHelplineTel] = useState<string>(CANONICAL_HELPLINE_E164);
 
   // In-flight concurrency guard and AbortController for clean unmounts
   const inFlightRef = useRef(false);
@@ -63,14 +76,47 @@ function NfcResolverContent() {
   const isMountedRef = useRef(true);
   const ndefAbortControllerRef = useRef<AbortController | null>(null);
 
-  // Check speech synthesis and Web NFC support on mount
+  // Check speech synthesis, Web NFC support, load voices asynchronously, and fetch voice config on mount
   useEffect(() => {
     isMountedRef.current = true;
-    setIsSpeechSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    const hasSpeech = typeof window !== "undefined" && "speechSynthesis" in window;
+    setIsSpeechSupported(hasSpeech);
     setIsWebNfcSupported(typeof window !== "undefined" && "NDEFReader" in window);
 
-    // Section 8 & 9: Sanitize visible URL bar immediately once credentials/parameters are processed
-    // This ensures bearer tokens do not linger in the browser window whether resolution succeeds or fails.
+    // Dynamic voice loading via voiceschanged event listener
+    const updateVoices = () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+          setAvailableVoices(voices);
+        }
+      }
+    };
+
+    if (hasSpeech) {
+      updateVoices();
+      window.speechSynthesis.addEventListener("voiceschanged", updateVoices);
+    }
+
+    // Safely sync with registered Exotel config if backend provides dynamic updates
+    voiceService
+      .getVoiceConfig()
+      .then((res) => {
+        if (!isMountedRef.current) return;
+        if (res.success && res.data) {
+          if (res.data.displayHelplineText) {
+            setHelplineDisplay(res.data.displayHelplineText);
+          }
+          if (res.data.virtualNumber) {
+            setHelplineTel(res.data.virtualNumber);
+          }
+        }
+      })
+      .catch(() => {
+        // Retain canonical fallback values gracefully
+      });
+
+    // Sanitize visible URL bar immediately once credentials/parameters are processed
     if (typeof window !== "undefined" && window.history?.replaceState && window.location.search) {
       window.history.replaceState(null, "", window.location.pathname);
     }
@@ -83,7 +129,8 @@ function NfcResolverContent() {
       if (ndefAbortControllerRef.current) {
         ndefAbortControllerRef.current.abort();
       }
-      if (typeof window !== "undefined" && window.speechSynthesis) {
+      if (hasSpeech && window.speechSynthesis) {
+        window.speechSynthesis.removeEventListener("voiceschanged", updateVoices);
         window.speechSynthesis.cancel();
       }
     };
@@ -95,7 +142,7 @@ function NfcResolverContent() {
       return;
     }
 
-    // In-flight guard to prevent duplicate concurrent executions (e.g. React 19 StrictMode)
+    // In-flight guard to prevent duplicate concurrent executions (e.g. React StrictMode)
     if (inFlightRef.current) {
       return;
     }
@@ -129,7 +176,7 @@ function NfcResolverContent() {
           return;
         }
 
-        // Section 25: Differentiate network connection issues from invalid NFC credentials
+        // Differentiate network connection issues from invalid NFC credentials
         if (
           res.error?.code === "NETWORK_UNREACHABLE" ||
           res.error?.code === "RATE_LIMIT_EXCEEDED"
@@ -242,9 +289,9 @@ function NfcResolverContent() {
     }
   };
 
-  // Accessible Audio Playback (Sections 11, 12, 39):
+  // Accessible Audio Playback:
   // User-triggered only, reads strictly visible approved public information in the selected language.
-  // Never reads raw tokens, version numbers, internal IDs, or sensitive data.
+  // Never reads raw tokens, version numbers, internal IDs, or private household phones.
   const handleToggleAudio = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
@@ -259,26 +306,44 @@ function NfcResolverContent() {
     const speechText = buildHouseholdSpeechText(data, language);
     if (!speechText) return;
 
+    // Immediately cancel any preceding or queued speech
+    window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = getSpeechSynthesisLang(language);
-    utterance.rate = 0.92; // Slightly measured rate for clear rural/low-literacy comprehension
+
+    // Select optimal voice following the required fallback chain
+    const currentVoices =
+      availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
+    const voiceResult = selectBestSpeechVoice(currentVoices, language);
+
+    if (voiceResult.voice) {
+      utterance.voice = voiceResult.voice;
+      utterance.lang = voiceResult.voice.lang;
+    } else {
+      utterance.lang = voiceResult.langTag;
+    }
+
+    utterance.rate = 0.92; // Slightly measured cadence for clear rural comprehension
 
     utterance.onend = () => {
-      setIsPlayingAudio(false);
+      if (isMountedRef.current) {
+        setIsPlayingAudio(false);
+      }
     };
 
     utterance.onerror = () => {
-      setIsPlayingAudio(false);
+      if (isMountedRef.current) {
+        setIsPlayingAudio(false);
+      }
     };
 
-    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
     setIsPlayingAudio(true);
   };
 
   // Language switch handler: stops audio narration immediately and updates language without re-resolving
   const handleLanguageChange = (langCode: "en" | "kn" | "hi") => {
-    if (isPlayingAudio && typeof window !== "undefined") {
+    if (isPlayingAudio && typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
     }
@@ -335,7 +400,7 @@ function NfcResolverContent() {
           <div
             className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs"
             role="group"
-            aria-label="Language selector"
+            aria-label={t("nfc.languageSelector")}
           >
             {languages.map((lang) => (
               <button
@@ -451,6 +516,29 @@ function NfcResolverContent() {
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
+
+            {/* Helpline CTA even in no-params state so users can call for help */}
+            <div className="pt-4 border-t border-slate-100">
+              <section
+                aria-labelledby="nfc-no-params-help"
+                className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3"
+              >
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-900 block" id="nfc-no-params-help">
+                    {t("nfc.helplineTitle")}
+                  </span>
+                  <p className="text-[11px] text-slate-600">{t("nfc.helplineDesc")}</p>
+                </div>
+                <a
+                  href={`tel:${helplineTel}`}
+                  aria-label={t("nfc.helplineAria", { phone: helplineDisplay })}
+                  className="w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] gap-2 px-4 py-2 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-mono text-xs sm:text-sm font-bold shadow-xs transition-colors shrink-0"
+                >
+                  <Phone className="w-3.5 h-3.5 text-teal-200" />
+                  <span>{helplineDisplay}</span>
+                </a>
+              </section>
+            </div>
           </section>
         ) : loading ? (
           /* STATE B: LOADING / CHECKING HOUSEHOLD */
@@ -470,7 +558,7 @@ function NfcResolverContent() {
                 {t("nfc.checkingHousehold")}
               </h2>
               <p className="text-xs text-slate-500">
-                SwasthyaSetu Secure Verification
+                {t("nfc.secureVerification")}
               </p>
             </div>
           </section>
@@ -519,6 +607,29 @@ function NfcResolverContent() {
                 </Link>
               )}
             </div>
+
+            {/* Helpline CTA in error state */}
+            <div className="pt-4 border-t border-slate-100">
+              <section
+                aria-labelledby="nfc-error-help"
+                className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3"
+              >
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-900 block" id="nfc-error-help">
+                    {t("nfc.helplineTitle")}
+                  </span>
+                  <p className="text-[11px] text-slate-600">{t("nfc.helplineDesc")}</p>
+                </div>
+                <a
+                  href={`tel:${helplineTel}`}
+                  aria-label={t("nfc.helplineAria", { phone: helplineDisplay })}
+                  className="w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] gap-2 px-4 py-2 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-mono text-xs sm:text-sm font-bold shadow-xs transition-colors shrink-0"
+                >
+                  <Phone className="w-3.5 h-3.5 text-teal-200" />
+                  <span>{helplineDisplay}</span>
+                </a>
+              </section>
+            </div>
           </section>
         ) : data ? (
           /* STATE C & D: SUCCESS - VERY SIMPLE MULTILINGUAL HOUSEHOLD VIEW */
@@ -540,7 +651,7 @@ function NfcResolverContent() {
                   <span>{t("nfc.verifiedBadge")}</span>
                 </span>
 
-                {/* Accessible Audio Readout Button (Sections 11 & 12) */}
+                {/* Accessible Audio Readout Button */}
                 {isSpeechSupported && (
                   <button
                     type="button"
@@ -610,7 +721,7 @@ function NfcResolverContent() {
                   </p>
                 </div>
                 <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
-                  {data.schemes.length} Available
+                  {t("nfc.schemesAvailable", { count: data.schemes.length })}
                 </span>
               </div>
 
@@ -633,41 +744,34 @@ function NfcResolverContent() {
                   </div>
                 </div>
               ) : (
-                /* SCHEME BENEFIT CARDS */
+                /* SCHEME BENEFIT CARDS: CLEAN & COLLAPSED (NO "WHAT TO DO NEXT" BOX) */
                 <div className="space-y-3.5">
-                  {data.schemes.map((scheme) => (
-                    <article
-                      key={scheme.schemeId}
-                      className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3.5 transition-shadow hover:shadow-xs"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-base font-bold text-slate-900 leading-snug">
-                          {scheme.name}
-                        </h3>
-                        {getStatusBadge(scheme.eligibilityStatus)}
-                      </div>
+                  {data.schemes.map((scheme) => {
+                    const localizedContent = getLocalizedScheme(scheme, language);
+                    return (
+                      <article
+                        key={scheme.schemeId}
+                        className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 transition-shadow hover:shadow-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-base font-bold text-slate-900 leading-snug">
+                            {localizedContent.name}
+                          </h3>
+                          {getStatusBadge(scheme.eligibilityStatus)}
+                        </div>
 
-                      {/* Benefit: "What you can get" */}
-                      <div className="space-y-1 text-xs">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                          {t("nfc.keyBenefits")}
-                        </span>
-                        <p className="text-slate-800 text-xs sm:text-sm font-medium leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
-                          {scheme.benefit}
-                        </p>
-                      </div>
-
-                      {/* Next Steps: "What to do next" */}
-                      <div className="space-y-1 text-xs">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-teal-900 block">
-                          {t("nfc.nextSteps")}
-                        </span>
-                        <p className="text-slate-700 text-xs leading-relaxed bg-teal-50/50 p-3 rounded-lg border border-teal-100">
-                          {scheme.nextSteps}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
+                        {/* Benefit: "What you can get" */}
+                        <div className="space-y-1 text-xs">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                            {t("nfc.keyBenefits")}
+                          </span>
+                          <p className="text-slate-800 text-xs sm:text-sm font-medium leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/80">
+                            {localizedContent.benefit}
+                          </p>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -705,7 +809,42 @@ function NfcResolverContent() {
               </section>
             )}
 
-            {/* Privacy Guarantee & Public vs Authenticated Notice (Sections 20, 21, 22) */}
+            {/* PUBLIC SWASTHYASETU / EXOTEL HELPLINE CTA */}
+            <section
+              id="nfc-helpline-cta"
+              aria-labelledby="nfc-helpline-heading"
+              className="rounded-2xl border border-teal-200/90 bg-gradient-to-br from-teal-50/90 via-white to-emerald-50/50 p-5 sm:p-6 shadow-xs space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-100/90 text-teal-900 border border-teal-300">
+                      <PhoneCall className="w-3 h-3 text-teal-700 shrink-0" />
+                      <span>{t("nfc.helplineBadge")}</span>
+                    </span>
+                  </div>
+                  <h2 id="nfc-helpline-heading" className="text-base sm:text-lg font-bold text-slate-900">
+                    {t("nfc.helplineTitle")}
+                  </h2>
+                  <p className="text-xs text-slate-600 max-w-md leading-relaxed">
+                    {t("nfc.helplineDesc")}
+                  </p>
+                </div>
+
+                <div className="shrink-0 flex sm:justify-end">
+                  <a
+                    href={`tel:${helplineTel}`}
+                    aria-label={t("nfc.helplineAria", { phone: helplineDisplay })}
+                    className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] gap-2.5 px-5 py-3 rounded-xl bg-teal-800 hover:bg-teal-900 active:bg-teal-950 text-white font-bold text-sm sm:text-base shadow-md hover:shadow-lg transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-teal-800 tracking-wide"
+                  >
+                    <Phone className="w-4 h-4 text-teal-200 shrink-0" />
+                    <span className="font-mono font-bold tracking-wider">{helplineDisplay}</span>
+                  </a>
+                </div>
+              </div>
+            </section>
+
+            {/* Privacy Guarantee & Public vs Authenticated Notice */}
             <aside
               id="nfc-privacy-guarantee"
               className="rounded-xl border border-slate-200 bg-slate-100/80 p-4 space-y-3 text-xs text-slate-600 leading-relaxed"
@@ -737,13 +876,14 @@ function NfcResolverContent() {
 }
 
 export default function NfcPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
           <div className="flex items-center gap-2 text-teal-800 font-semibold text-xs">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>Loading healthcare entitlements...</span>
+            <span>{t("nfc.loadingEntitlements")}</span>
           </div>
         </div>
       }

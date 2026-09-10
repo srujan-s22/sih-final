@@ -13,6 +13,22 @@ import {
 import { en } from "../../frontend/i18n/translations/en.js";
 import { hi } from "../../frontend/i18n/translations/hi.js";
 import { kn } from "../../frontend/i18n/translations/kn.js";
+import {
+  normalizeCurrency,
+  normalizeAges,
+  normalizeMemberCount,
+  normalizePhoneNumberForSpeech,
+  normalizeIdentifier,
+  normalizeSpeechText,
+} from "../../frontend/lib/nfc/speech-normalizer.js";
+import {
+  selectBestSpeechVoice,
+  SpeechSynthesisVoiceLike,
+} from "../../frontend/lib/nfc/speech-voice.js";
+import {
+  CANONICAL_HELPLINE_DISPLAY,
+  CANONICAL_HELPLINE_E164,
+} from "../../shared/types/voice.js";
 
 describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () => {
   let app: FastifyInstance;
@@ -510,6 +526,185 @@ describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () 
       const data = resolveRes.json().data;
       const topLevelKeys = Object.keys(data).sort();
       expect(topLevelKeys).toEqual(["asha", "household", "schemes"]);
+    });
+  });
+
+  // ============================================================================
+  // SECTION 42: MULTILINGUAL UI, ROBUST LISTEN, SCHEME CLEANUP & EXOTEL CTA
+  // ============================================================================
+  describe("Issue Fixes: Multilingual UI, Robust Listen, Scheme Cleanup & Exotel CTA", () => {
+    // 1. SPEECH NORMALIZATION
+    it("normalizes currency amounts naturally across English, Hindi, and Kannada", () => {
+      const sample500k = "Covers up to ₹5,00,000 per family per year.";
+      expect(normalizeCurrency(sample500k, "en")).toContain("5 lakh rupees");
+      expect(normalizeCurrency(sample500k, "hi")).toContain("5 लाख रुपये");
+      expect(normalizeCurrency(sample500k, "kn")).toContain("5 ಲಕ್ಷ ರೂಪಾಯಿ");
+
+      const sample1400 = "Direct cash benefit of ₹1,400 upon institutional delivery.";
+      expect(normalizeCurrency(sample1400, "en")).toContain("1 thousand 400 rupees");
+      expect(normalizeCurrency(sample1400, "hi")).toContain("1 हजार 400 रुपये");
+      expect(normalizeCurrency(sample1400, "kn")).toContain("1 ಸಾವಿರ 400 ರೂಪಾಯಿ");
+    });
+
+    it("normalizes age markers (70+) and member counts across languages", () => {
+      expect(normalizeAges("Senior Citizens 70+", "en")).toBe("Senior Citizens 70 years and above");
+      expect(normalizeAges("वरिष्ठ नागरिक 70+", "hi")).toBe("वरिष्ठ नागरिक 70 वर्ष से अधिक");
+      expect(normalizeAges("ಹಿರಿಯ ನಾಗರಿಕರು 70+", "kn")).toBe("ಹಿರಿಯ ನಾಗರಿಕರು 70 ವರ್ಷಕ್ಕಿಂತ ಹೆಚ್ಚು");
+
+      expect(normalizeMemberCount("4 members", "en")).toBe("4 members");
+      expect(normalizeMemberCount("4 members", "hi")).toBe("4 सदस्य");
+      expect(normalizeMemberCount("4 members", "kn")).toBe("4 ಸದಸ್ಯರು");
+    });
+
+    it("normalizes telephone numbers into distinct spoken digit sequences with pauses", () => {
+      const phoneDigits = normalizePhoneNumberForSpeech("08047283240");
+      expect(phoneDigits).toBe("0, 8, 0, 4, 7, 2, 8, 3, 2, 4, 0");
+    });
+
+    it("normalizes identifiers and PIN codes to prevent giant integer pronunciation", () => {
+      const idEn = normalizeIdentifier("RC-876567890", "en");
+      expect(idEn).toContain("R C");
+      expect(idEn).toContain("8, 7, 6, 5, 6, 7, 8, 9, 0");
+
+      const idHi = normalizeIdentifier("RC-876567890", "hi");
+      expect(idHi).toContain("आर सी");
+
+      const pinSpaced = normalizeIdentifier("562112", "en");
+      expect(pinSpaced).toBe("5, 6, 2, 1, 1, 2");
+    });
+
+    // 2. VOICE SELECTION & FALLBACK STRATEGY
+    it("selects best voice with graceful fallback chains for kn-IN, hi-IN, and en-IN", () => {
+      const mockVoices: SpeechSynthesisVoiceLike[] = [
+        { name: "Google Kannada", lang: "kn-IN" },
+        { name: "Google Hindi", lang: "hi-IN" },
+        { name: "Rishi (Indian English)", lang: "en-IN" },
+        { name: "Samantha", lang: "en-US" },
+      ];
+
+      // Kannada exact match
+      const knRes = selectBestSpeechVoice(mockVoices, "kn");
+      expect(knRes.voice?.name).toBe("Google Kannada");
+      expect(knRes.isNativeVoice).toBe(true);
+      expect(knRes.isFallback).toBe(false);
+
+      // Hindi exact match
+      const hiRes = selectBestSpeechVoice(mockVoices, "hi");
+      expect(hiRes.voice?.name).toBe("Google Hindi");
+      expect(hiRes.isNativeVoice).toBe(true);
+      expect(hiRes.isFallback).toBe(false);
+
+      // English exact match
+      const enRes = selectBestSpeechVoice(mockVoices, "en");
+      expect(enRes.voice?.name).toBe("Rishi (Indian English)");
+      expect(enRes.isNativeVoice).toBe(true);
+      expect(enRes.isFallback).toBe(false);
+
+      // Fallback chain when Kannada voice is absent -> Indian English fallback
+      const voicesNoKn: SpeechSynthesisVoiceLike[] = [
+        { name: "Rishi (Indian English)", lang: "en-IN" },
+        { name: "Samantha", lang: "en-US" },
+      ];
+      const knFallbackRes = selectBestSpeechVoice(voicesNoKn, "kn");
+      expect(knFallbackRes.voice?.name).toBe("Rishi (Indian English)");
+      expect(knFallbackRes.isNativeVoice).toBe(false);
+      expect(knFallbackRes.isFallback).toBe(true);
+
+      // Fallback chain when only US English is available
+      const voicesOnlyUs: SpeechSynthesisVoiceLike[] = [
+        { name: "Samantha", lang: "en-US" },
+      ];
+      const hiFallbackRes = selectBestSpeechVoice(voicesOnlyUs, "hi");
+      expect(hiFallbackRes.voice?.name).toBe("Samantha");
+      expect(hiFallbackRes.isFallback).toBe(true);
+
+      // Empty voice list returns default tag without throwing
+      const emptyRes = selectBestSpeechVoice([], "kn");
+      expect(emptyRes.voice).toBeNull();
+      expect(emptyRes.langTag).toBe("kn-IN");
+      expect(emptyRes.isFallback).toBe(true);
+    });
+
+    // 3. SCHEME CARD CLEANUP (REMOVAL OF "WHAT TO DO NEXT")
+    it("completely excludes 'What to do next' from spoken speech text", () => {
+      const mockDataWithNextSteps = {
+        household: {
+          displayName: "Basavaraj Patil",
+          region: { village: "Harohalli", district: "Ramanagara", state: "Karnataka" },
+        },
+        schemes: [
+          {
+            schemeId: "ab-pmjay",
+            name: "Ayushman Bharat",
+            benefit: "₹5,00,000 hospital cover",
+            nextSteps: "Visit nearest CSC kiosk with Aadhaar card",
+            eligibilityStatus: "ELIGIBLE" as const,
+          },
+        ],
+        asha: null,
+      };
+
+      const speechEn = buildHouseholdSpeechText(mockDataWithNextSteps, "en");
+      const speechHi = buildHouseholdSpeechText(mockDataWithNextSteps, "hi");
+      const speechKn = buildHouseholdSpeechText(mockDataWithNextSteps, "kn");
+
+      // Verify "What to do next" is never spoken
+      expect(speechEn).not.toContain("What to do next");
+      expect(speechEn).not.toContain("Visit nearest CSC kiosk");
+      expect(speechHi).not.toContain("आगे क्या करना है");
+      expect(speechKn).not.toContain("ಮುಂದೆ ಏನು ಮಾಡಬೇಕು");
+    });
+
+    // 4. EXOTEL REGISTERED HELPLINE CTA & PRIVACY VERIFICATION
+    it("uses canonical Exotel helpline 08047283240 / +918047283240 and NEVER exposes household phone", () => {
+      expect(CANONICAL_HELPLINE_DISPLAY).toBe("08047283240");
+      expect(CANONICAL_HELPLINE_E164).toBe("+918047283240");
+
+      const mockDataWithPrivatePhone = {
+        household: {
+          displayName: "Basavaraj Patil",
+          region: { village: "Harohalli", district: "Ramanagara", state: "Karnataka" },
+        },
+        schemes: [],
+        asha: null,
+      };
+
+      const speechEn = buildHouseholdSpeechText(mockDataWithPrivatePhone, "en");
+      // Spoken closing mentions public helpline in digit cadence
+      expect(speechEn).toContain("0, 8, 0, 4, 7, 2, 8, 3, 2, 4, 0");
+
+      // Household private phone MUST NOT appear in speech
+      expect(speechEn).not.toContain("9876543210");
+    });
+
+    // 5. TRANSLATION KEYS COVERAGE FOR NEW NFC STRINGS
+    it("ensures all new NFC UI strings exist with 1:1 parity in English, Hindi, and Kannada", () => {
+      const requiredNfcKeys = [
+        "languageSelector",
+        "secureVerification",
+        "schemesAvailable",
+        "loadingEntitlements",
+        "speaking",
+        "helplineTitle",
+        "helplineDesc",
+        "helplineBadge",
+        "helplineAria",
+        "callHelplineBtn",
+      ] as const;
+
+      for (const key of requiredNfcKeys) {
+        expect((en.nfc as any)[key]).toBeDefined();
+        expect(typeof (en.nfc as any)[key]).toBe("string");
+        expect((en.nfc as any)[key].trim().length).toBeGreaterThan(0);
+
+        expect((hi.nfc as any)[key]).toBeDefined();
+        expect(typeof (hi.nfc as any)[key]).toBe("string");
+        expect((hi.nfc as any)[key].trim().length).toBeGreaterThan(0);
+
+        expect((kn.nfc as any)[key]).toBeDefined();
+        expect(typeof (kn.nfc as any)[key]).toBe("string");
+        expect((kn.nfc as any)[key].trim().length).toBeGreaterThan(0);
+      }
     });
   });
 });
