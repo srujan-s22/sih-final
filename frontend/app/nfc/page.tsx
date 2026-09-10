@@ -794,7 +794,16 @@ function NfcResolverContent() {
                         {data.asha.displayName}
                       </span>
                       <span className="text-xs text-slate-600 block pt-0.5">
-                        {t("nfc.serviceArea")}: <strong>{data.asha.serviceArea}</strong>
+                        {t("nfc.serviceArea")}:{" "}
+                        <strong>
+                          {data.asha.serviceArea === "Field Jurisdiction"
+                            ? language === "kn"
+                              ? "ಕ್ಷೇತ್ರ ವ್ಯಾಪ್ತಿ"
+                              : language === "hi"
+                              ? "कार्यक्षेत्र"
+                              : "Field Jurisdiction"
+                            : data.asha.serviceArea}
+                        </strong>
                       </span>
                     </div>
                     <span className="font-mono text-[10px] bg-white text-teal-900 px-2 py-1 rounded border border-teal-200 font-semibold">

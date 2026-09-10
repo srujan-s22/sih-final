@@ -73,7 +73,19 @@ export function normalizeCurrency(text: string, language: string): string {
     }
   });
 
-  // 5. Match any other ₹ amount with Indian comma formatting (e.g. ₹500, ₹2,500)
+  // 5. Match round thousand amounts like ₹5,000, ₹6,000, ₹1,000, ₹2,000, ₹3,000
+  result = result.replace(/₹\s*([1-9]\d*)[,.]000(?:\/[-=])?\b/gi, (_match, thousands) => {
+    switch (language) {
+      case "hi":
+        return `${thousands} हजार रुपये`;
+      case "kn":
+        return `${thousands} ಸಾವಿರ ರೂಪಾಯಿ`;
+      default:
+        return `${thousands} thousand rupees`;
+    }
+  });
+
+  // 6. Match any other ₹ amount with Indian comma formatting (e.g. ₹500, ₹2,500)
   result = result.replace(/₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/gi, (_match, num) => {
     const cleanNum = num.replace(/,/g, "");
     switch (language) {
@@ -180,18 +192,27 @@ export function normalizeProperNouns(text: string, language: string): string {
   if (language === "hi") {
     result = result
       .replace(/\b(?:AB-PMJAY|PM-JAY|PMJAY)\b/g, "आयुष्मान भारत पीएम-जेएवाई")
+      .replace(/\b(?:PMMVY)\b/g, "प्रधानमंत्री मातृ वंदना योजना पीएमएमवीवाई")
+      .replace(/\b(?:DBT)\b/g, "डीबीटी")
+      .replace(/\b(?:JSSK)\b/g, "जननी शिशु सुरक्षा कार्यक्रम जेएसएसके")
       .replace(/\bJSY\b/g, "जननी सुरक्षा योजना जेएसवाई")
       .replace(/\bNFC\b/g, "एनएफसी")
       .replace(/\bASHA\b/g, "आशा");
   } else if (language === "kn") {
     result = result
       .replace(/\b(?:AB-PMJAY|PM-JAY|PMJAY)\b/g, "ಆಯುಷ್ಮಾನ್ ಭಾರತ್ ಪಿಎಂ-ಜೆಎವೈ")
+      .replace(/\b(?:PMMVY)\b/g, "ಪ್ರಧಾನ ಮಂತ್ರಿ ಮಾತೃ ವಂದನಾ ಯೋಜನೆ ಪಿಎಂಎಂವಿವೈ")
+      .replace(/\b(?:DBT)\b/g, "ಡಿಬಿಟಿ")
+      .replace(/\b(?:JSSK)\b/g, "ಜನನಿ ಶಿಶು ಸುರಕ್ಷಾ ಕಾರ್ಯಕ್ರಮ ಜೆಎಸ್‌ಎಸ್‌ಕೆ")
       .replace(/\bJSY\b/g, "ಜನನಿ ಸುರಕ್ಷಾ ಯೋಜನೆ ಜೆಎಸ್ ವೈ")
       .replace(/\bNFC\b/g, "ಎನ್‌ಎಫ್‌ಸಿ")
       .replace(/\bASHA\b/g, "ಆಶಾ");
   } else {
     result = result
       .replace(/\b(?:AB-PMJAY|PM-JAY|PMJAY)\b/g, "Ayushman Bharat P M Jay")
+      .replace(/\b(?:PMMVY)\b/g, "Pradhan Mantri Matru Vandana Yojana P M M V Y")
+      .replace(/\b(?:DBT)\b/g, "D B T")
+      .replace(/\b(?:JSSK)\b/g, "Janani Shishu Suraksha Karyakram J S S K")
       .replace(/\bJSY\b/g, "Janani Suraksha Yojana J S Y")
       .replace(/\bNFC\b/g, "N F C")
       .replace(/\bASHA\b/g, "ASHA");

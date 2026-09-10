@@ -9,6 +9,7 @@ import { parseNfcCredential } from "../../frontend/lib/nfc/nfc-parser.js";
 import {
   buildHouseholdSpeechText,
   getSpeechSynthesisLang,
+  getLocalizedScheme,
 } from "../../frontend/lib/nfc/nfc-audio.js";
 import { en } from "../../frontend/i18n/translations/en.js";
 import { hi } from "../../frontend/i18n/translations/hi.js";
@@ -705,6 +706,49 @@ describe("Phase 5: Simplified Household View & Multilingual NFC Experience", () 
         expect(typeof (kn.nfc as any)[key]).toBe("string");
         expect((kn.nfc as any)[key].trim().length).toBeGreaterThan(0);
       }
+    });
+
+    // 6. PMMVY (3RD SCHEME) LOCALIZATION IN HINDI AND KANNADA
+    it("localizes PMMVY (Pradhan Mantri Matru Vandana Yojana) in Hindi and Kannada", () => {
+      const pmmvySummary = {
+        schemeId: "pmmvy",
+        name: "Pradhan Mantri Matru Vandana Yojana",
+        benefit: "Direct Benefit Transfer (DBT) of ₹5,000 in two installments for the first living child, and ₹6,000 in a single installment for a second child if the infant is a girl.",
+        nextSteps: "Contact local Anganwadi or ASHA worker",
+        eligibilityStatus: "CHECK_REQUIRED" as const,
+      };
+
+      // Kannada
+      const knContent = getLocalizedScheme(pmmvySummary, "kn");
+      expect(knContent.name).toBe("ಪ್ರಧಾನ ಮಂತ್ರಿ ಮಾತೃ ವಂದನಾ ಯೋಜನೆ (PMMVY)");
+      expect(knContent.benefit).toContain("₹5,000");
+      expect(knContent.benefit).toContain("₹6,000");
+      expect(knContent.benefit).toContain("ನೇರ ನಗದು ವರ್ಗಾವಣೆ (DBT)");
+
+      // Hindi
+      const hiContent = getLocalizedScheme(pmmvySummary, "hi");
+      expect(hiContent.name).toBe("प्रधानमंत्री मातृ वंदना योजना (PMMVY)");
+      expect(hiContent.benefit).toContain("₹5,000");
+      expect(hiContent.benefit).toContain("₹6,000");
+      expect(hiContent.benefit).toContain("प्रत्यक्ष लाभ अंतरण (DBT)");
+
+      // English
+      const enContent = getLocalizedScheme(pmmvySummary, "en");
+      expect(enContent.name).toContain("Pradhan Mantri Matru Vandana Yojana");
+      expect(enContent.benefit).toContain("Direct Benefit Transfer (DBT)");
+    });
+
+    // 7. THOUSAND AMOUNTS SPEECH NORMALIZATION (₹5,000 and ₹6,000)
+    it("normalizes PMMVY thousand currency amounts (₹5,000, ₹6,000) for spoken audio", () => {
+      const pmmvySample = "DBT of ₹5,000 and ₹6,000";
+      expect(normalizeCurrency(pmmvySample, "kn")).toContain("5 ಸಾವಿರ ರೂಪಾಯಿ");
+      expect(normalizeCurrency(pmmvySample, "kn")).toContain("6 ಸಾವಿರ ರೂಪಾಯಿ");
+
+      expect(normalizeCurrency(pmmvySample, "hi")).toContain("5 हजार रुपये");
+      expect(normalizeCurrency(pmmvySample, "hi")).toContain("6 हजार रुपये");
+
+      expect(normalizeCurrency(pmmvySample, "en")).toContain("5 thousand rupees");
+      expect(normalizeCurrency(pmmvySample, "en")).toContain("6 thousand rupees");
     });
   });
 });
