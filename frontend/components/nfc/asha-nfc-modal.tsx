@@ -44,7 +44,79 @@ type ModalStep =
   | "SUCCESS"
   | "ERROR";
 
-export function AshaNfcModal({
+interface NfcModalErrorBoundaryProps {
+  children: React.ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface NfcModalErrorBoundaryState {
+  hasError: boolean;
+  errorMessage: string | null;
+}
+
+class NfcModalErrorBoundary extends React.Component<
+  NfcModalErrorBoundaryProps,
+  NfcModalErrorBoundaryState
+> {
+  constructor(props: NfcModalErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorMessage: null };
+  }
+
+  static getDerivedStateFromError(error: unknown): NfcModalErrorBoundaryState {
+    const msg = error instanceof Error ? error.message : "An unexpected NFC dialog error occurred.";
+    return { hasError: true, errorMessage: msg };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
+    console.error("AshaNfcModal caught unhandled exception:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError && this.props.isOpen) {
+      return (
+        <Modal
+          isOpen={this.props.isOpen}
+          onClose={() => {
+            this.setState({ hasError: false, errorMessage: null });
+            this.props.onClose();
+          }}
+          title="NFC Management Unavailable"
+          description="A client-side error occurred while displaying the NFC modal."
+          className="max-w-md"
+        >
+          <div className="p-4 space-y-4 text-xs">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-sm text-red-900">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>Could not load NFC interface</span>
+              </p>
+              <p className="text-slate-600">
+                {this.state.errorMessage || "Please try again or contact system support."}
+              </p>
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  this.setState({ hasError: false, errorMessage: null });
+                  this.props.onClose();
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AshaNfcModalInner({
   isOpen,
   onClose,
   householdId,
@@ -100,7 +172,11 @@ export function AshaNfcModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    setIsNfcSupported(isNfcWritingSupported());
+    try {
+      setIsNfcSupported(isNfcWritingSupported());
+    } catch {
+      setIsNfcSupported(false);
+    }
     let mounted = true;
 
     async function loadStatus() {
@@ -108,20 +184,28 @@ export function AshaNfcModal({
       setStep("INITIAL_CHECK");
       setErrorMessage(null);
       try {
-        const res = await nfcService.getHouseholdNfcStatus(householdId);
+        if (!householdId || !householdId.trim()) {
+          if (mounted) {
+            setErrorMessage("No household ID associated with this case.");
+            setStep("ERROR");
+          }
+          return;
+        }
+        const res = await nfcService.getHouseholdNfcStatus(householdId.trim());
         if (!mounted) return;
         if (res.success) {
           setStatusData(res.data);
           setStep("STATUS_OVERVIEW");
         } else {
           setErrorMessage(
-            res.error.message || "Failed to retrieve household NFC status."
+            res.error?.message || "Failed to retrieve household NFC status."
           );
           setStep("ERROR");
         }
-      } catch {
+      } catch (err: unknown) {
         if (mounted) {
-          setErrorMessage("Failed to connect to backend NFC service.");
+          const msg = err instanceof Error ? err.message : "Failed to connect to backend NFC service.";
+          setErrorMessage(msg);
           setStep("ERROR");
         }
       } finally {
@@ -822,5 +906,13 @@ export function AshaNfcModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+export function AshaNfcModal(props: AshaNfcModalProps) {
+  return (
+    <NfcModalErrorBoundary isOpen={props.isOpen} onClose={props.onClose}>
+      <AshaNfcModalInner {...props} />
+    </NfcModalErrorBoundary>
   );
 }

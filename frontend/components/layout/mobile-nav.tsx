@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { BrandLogo } from "@/components/brand-logo";
 import { LanguageSelector } from "@/components/i18n/language-selector";
-import { X } from "lucide-react";
+import { X, Radio } from "lucide-react";
 
 export interface MobileNavProps {
   isOpen: boolean;
@@ -93,6 +93,14 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
 
           {/* Navigation Links */}
           <nav className="flex flex-col space-y-1">
+            <Link
+              href="/nfc"
+              onClick={onClose}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-teal-900 bg-teal-50/90 hover:bg-teal-100 border border-teal-200/80 transition-colors"
+            >
+              <Radio className="w-4 h-4 text-teal-600 animate-pulse shrink-0" />
+              <span>{t("navigation.nfcCard")}</span>
+            </Link>
             {siteConfig.navItems.map((item) => (
               <Link
                 key={item.href}

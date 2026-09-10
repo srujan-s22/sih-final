@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { BrandLogo } from "@/components/brand-logo";
 import { LanguageSelector } from "@/components/i18n/language-selector";
-import { Menu } from "lucide-react";
+import { Menu, Radio } from "lucide-react";
 
 export function Header() {
   const router = useRouter();
@@ -60,6 +60,13 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
+          <Link
+            href="/nfc"
+            className="text-sm font-semibold text-teal-800 hover:text-teal-900 transition-colors flex items-center gap-1.5 py-2 px-2.5 rounded-lg bg-teal-50/70 hover:bg-teal-100/70 border border-teal-200/60"
+          >
+            <Radio className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+            <span>{t("navigation.nfcCard")}</span>
+          </Link>
           {siteConfig.navItems.map((item) => (
             <Link
               key={item.href}

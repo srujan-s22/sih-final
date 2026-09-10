@@ -53,16 +53,21 @@ function NfcResolverContent() {
   );
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const [isWebNfcSupported, setIsWebNfcSupported] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   // In-flight concurrency guard and AbortController for clean unmounts
   const inFlightRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
+  const ndefAbortControllerRef = useRef<AbortController | null>(null);
 
-  // Check speech synthesis support on mount
+  // Check speech synthesis and Web NFC support on mount
   useEffect(() => {
     isMountedRef.current = true;
     setIsSpeechSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    setIsWebNfcSupported(typeof window !== "undefined" && "NDEFReader" in window);
 
     // Section 8 & 9: Sanitize visible URL bar immediately once credentials/parameters are processed
     // This ensures bearer tokens do not linger in the browser window whether resolution succeeds or fails.
@@ -74,6 +79,9 @@ function NfcResolverContent() {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      if (ndefAbortControllerRef.current) {
+        ndefAbortControllerRef.current.abort();
       }
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
@@ -150,6 +158,89 @@ function NfcResolverContent() {
       resolveCredential();
     }
   }, [parseResult.status, resolveCredential]);
+
+  const handleStartScan = async () => {
+    if (typeof window === "undefined" || !("NDEFReader" in window)) return;
+    setScanError(null);
+    setIsScanning(true);
+
+    if (ndefAbortControllerRef.current) {
+      ndefAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    ndefAbortControllerRef.current = controller;
+
+    try {
+      const NDEFReaderClass = (window as any).NDEFReader;
+      const ndef = new NDEFReaderClass();
+
+      await ndef.scan({ signal: controller.signal });
+
+      ndef.addEventListener(
+        "reading",
+        (event: any) => {
+          if (!isMountedRef.current) return;
+          try {
+            if (!event.message?.records?.length) {
+              setScanError(t("nfc.invalidCardDesc"));
+              setIsScanning(false);
+              return;
+            }
+
+            for (const record of event.message.records) {
+              let recordText = "";
+              if (record.recordType === "url" || record.recordType === "text") {
+                const decoder = new TextDecoder();
+                recordText = decoder.decode(record.data);
+              }
+
+              if (recordText) {
+                try {
+                  const url = new URL(recordText, window.location.origin);
+                  const parsed = parseNfcCredential(url.searchParams);
+                  if (parsed.status === "VALID") {
+                    credentialRef.current = parsed.credential;
+                    setIsScanning(false);
+                    resolveCredential();
+                    return;
+                  }
+                } catch {
+                  // If not a standard URL, continue to next record
+                }
+              }
+            }
+
+            setScanError(t("nfc.invalidCardDesc"));
+            setIsScanning(false);
+          } catch {
+            if (isMountedRef.current) {
+              setScanError(t("nfc.invalidCardDesc"));
+              setIsScanning(false);
+            }
+          }
+        },
+        { signal: controller.signal }
+      );
+
+      ndef.addEventListener(
+        "readingerror",
+        () => {
+          if (isMountedRef.current) {
+            setScanError(t("nfc.invalidCardDesc"));
+            setIsScanning(false);
+          }
+        },
+        { signal: controller.signal }
+      );
+    } catch (err: any) {
+      if (isMountedRef.current) {
+        setIsScanning(false);
+        if (err?.name !== "AbortError") {
+          setScanError(err?.message || t("nfc.networkErrorDesc"));
+        }
+      }
+    }
+  };
 
   // Accessible Audio Playback (Sections 11, 12, 39):
   // User-triggered only, reads strictly visible approved public information in the selected language.
@@ -266,7 +357,7 @@ function NfcResolverContent() {
         </header>
 
         {/* STATE A: NO NFC CREDENTIAL IN URL */}
-        {parseResult.status === "EMPTY" && !data ? (
+        {parseResult.status === "EMPTY" && !data && !loading && !error ? (
           <section
             id="nfc-no-params"
             className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-center space-y-6 shadow-xs"
@@ -286,6 +377,34 @@ function NfcResolverContent() {
                 {t("nfc.noParamsDesc")}
               </p>
             </div>
+
+            {/* Interactive Web NFC Scan Button if browser supports it */}
+            {isWebNfcSupported ? (
+              <div className="space-y-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleStartScan}
+                  disabled={isScanning}
+                  className={`w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] gap-2.5 px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer ${
+                    isScanning
+                      ? "bg-amber-500 text-slate-950 border border-amber-400 animate-pulse cursor-wait"
+                      : "bg-teal-800 hover:bg-teal-900 text-white border border-teal-700"
+                  }`}
+                >
+                  <Radio className={`w-5 h-5 ${isScanning ? "animate-spin" : "animate-pulse"}`} />
+                  <span>{isScanning ? t("nfc.scanningPrompt") : t("nfc.startScanBtn")}</span>
+                </button>
+                {scanError && (
+                  <p className="text-xs text-red-600 font-medium">
+                    {scanError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 italic max-w-sm mx-auto">
+                {t("nfc.nfcNotSupportedPrompt")}
+              </p>
+            )}
 
             {/* Simple 3-step visual instruction for low literacy users */}
             <div className="p-4 bg-teal-50/80 border border-teal-200 rounded-xl text-xs text-teal-950 text-left space-y-2.5">

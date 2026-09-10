@@ -71,10 +71,14 @@ function normalizeOrigin(origin: string): string {
  * Strictly SSR-safe: returns false if called during Next.js SSR.
  */
 export function isNfcWritingSupported(): boolean {
-  if (typeof window === "undefined") {
+  try {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return "NDEFReader" in window || Boolean((window as any).NDEFReader);
+  } catch {
     return false;
   }
-  return "NDEFReader" in window || Boolean((window as any).NDEFReader);
 }
 
 /**

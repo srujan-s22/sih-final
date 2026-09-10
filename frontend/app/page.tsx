@@ -20,6 +20,7 @@ import {
   HeartHandshake,
   ChevronRight,
   Info,
+  Radio,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -113,22 +114,38 @@ export default function HomePage() {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full sm:w-auto">
-                <Link href={getStartedHref} className="w-full sm:w-auto">
+                <Link href="/nfc" className="w-full sm:w-auto">
                   <Button
                     variant="primary"
                     size="lg"
-                    className="w-full sm:w-auto text-base shadow-sm font-semibold flex items-center justify-center gap-2 group cursor-pointer"
+                    className="w-full sm:w-auto text-base bg-teal-800 hover:bg-teal-900 text-white shadow-md font-semibold flex items-center justify-center gap-2.5 cursor-pointer border border-teal-700 ring-2 ring-teal-600/20"
+                  >
+                    <Radio className="w-5 h-5 text-teal-200 animate-pulse shrink-0" />
+                    <span>{t("home.tapNfcCardBtn")}</span>
+                  </Button>
+                </Link>
+                <Link href={getStartedHref} className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full sm:w-auto text-base font-semibold flex items-center justify-center gap-2 group cursor-pointer border-slate-300 text-slate-800 hover:bg-slate-50"
                   >
                     <span>{isAuthenticated ? getPortalLabel() : t("home.getStartedBtn")}</span>
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                   </Button>
                 </Link>
                 <a href="#how-it-works" className="w-full sm:w-auto">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base">
+                  <Button variant="ghost" size="lg" className="w-full sm:w-auto text-base text-slate-600 hover:text-slate-900">
                     {t("navigation.howItWorks")}
                   </Button>
                 </a>
               </div>
+
+              {/* Citizen NFC Subtitle / Prompt */}
+              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 -mt-1.5">
+                <Radio className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                <span>{t("home.nfcCardSubtitle")}</span>
+              </p>
 
               {/* Trust Micro-Badges */}
               <div className="pt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500 font-medium">

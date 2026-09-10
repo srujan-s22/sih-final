@@ -2779,7 +2779,11 @@ export default function AshaWorkspacePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsNfcModalOpen(true)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsNfcModalOpen(true);
+                    }}
                     className="text-xs font-semibold flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
                     title={caseNfcStatus?.hasActiveNfc ? "Manage Household NFC Card" : "Register Household NFC Card"}
                   >
@@ -3439,7 +3443,11 @@ export default function AshaWorkspacePage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setIsNfcModalOpen(true)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setIsNfcModalOpen(true);
+                            }}
                             className="text-xs font-semibold shrink-0 bg-white border-teal-300 text-teal-800 hover:bg-teal-100/50 cursor-pointer"
                           >
                             <Radio className="w-3.5 h-3.5 mr-1" />
