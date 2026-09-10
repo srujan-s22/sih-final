@@ -118,7 +118,12 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       expect(parsed.pathname).toBe("/nfc");
       expect(parsed.searchParams.get("hh")).toBe(hhId);
       expect(parsed.searchParams.get("t")).toBe(token);
-      expect(parsed.searchParams.get("v")).toBe("1");
+      // For version 1, &v=1 is omitted to minimize payload for NTAG213 tags
+      expect(parsed.searchParams.get("v")).toBeNull();
+
+      // For version > 1, version parameter is preserved
+      const urlV2 = buildNfcUrl(hhId, token, customOrigin, 2);
+      expect(new URL(urlV2).searchParams.get("v")).toBe("2");
     });
 
     it("should safely URL-encode household IDs with special characters without truncating token", () => {

@@ -18,7 +18,12 @@ export function getPublicOrigin(customOrigin?: string): string {
     return normalizeOrigin(customOrigin.trim());
   }
 
-  // 1. Check explicit public site URL environment variables
+  // 1. Client-side execution: prioritize browser window origin over deployment/preview URLs
+  if (typeof window !== "undefined" && window.location && window.location.origin) {
+    return normalizeOrigin(window.location.origin);
+  }
+
+  // 2. Check explicit public site URL environment variables (server-side / explicit config)
   const envSiteUrl =
     (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SITE_URL) ||
     (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_APP_URL);
@@ -27,7 +32,7 @@ export function getPublicOrigin(customOrigin?: string): string {
     return normalizeOrigin(envSiteUrl.trim());
   }
 
-  // 2. Check Vercel deployment URL
+  // 3. Check Vercel deployment URL (fallback for server-side / SSR when window is undefined)
   const vercelUrl = typeof process !== "undefined" && process.env?.NEXT_PUBLIC_VERCEL_URL;
   if (vercelUrl && vercelUrl.trim()) {
     const rawVercel = vercelUrl.trim();
@@ -35,11 +40,6 @@ export function getPublicOrigin(customOrigin?: string): string {
       ? rawVercel
       : `https://${rawVercel}`;
     return normalizeOrigin(prefixed);
-  }
-
-  // 3. Check browser window origin
-  if (typeof window !== "undefined" && window.location && window.location.origin) {
-    return normalizeOrigin(window.location.origin);
   }
 
   // 4. Non-production development fallback
@@ -84,6 +84,8 @@ export function isNfcWritingSupported(): boolean {
 /**
  * Centralized, environment-aware builder for NFC deep-link URLs.
  * Encodes householdId, access token, and schema version into standard NDEF URI format.
+ * Omits optional "&v=1" when version === 1 to ensure the NDEF message fits comfortably
+ * within NTAG213 tag capacity (<117 bytes).
  */
 export function buildNfcUrl(
   householdId: string,
@@ -102,7 +104,9 @@ export function buildNfcUrl(
   const url = new URL("/nfc", baseOrigin);
   url.searchParams.set("hh", householdId.trim());
   url.searchParams.set("t", token.trim());
-  url.searchParams.set("v", String(version));
+  if (version !== 1) {
+    url.searchParams.set("v", String(version));
+  }
   return url.toString();
 }
 

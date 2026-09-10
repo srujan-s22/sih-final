@@ -714,21 +714,33 @@ describe("Phase 7: Final NFC Security Audit, End-to-End Validation & Demo Readin
   it("Frontend Utility 16: NDEF URL builder encodes correctly for physical tags", () => {
     const url = buildNfcUrl(householdId, "secret_bearer_token_12345678", "https://swasthyasetu.org", 1);
     expect(url).toBe(
-      "https://swasthyasetu.org/nfc?hh=hh_demo_harohalli_001&t=secret_bearer_token_12345678&v=1"
+      "https://swasthyasetu.org/nfc?hh=hh_demo_harohalli_001&t=secret_bearer_token_12345678"
     );
+    expect(url).not.toContain("&v=");
 
-    // URL length is ~88 bytes, perfectly fitting NTAG213 (144 bytes) and NTAG215 (504 bytes)
+    // URL length is ~84 bytes, comfortably fitting NTAG213 (<117 bytes) and NTAG215 (504 bytes)
     expect(url.length).toBeLessThan(100);
   });
 
-  it("Frontend Utility 17: NFC URL parser extracts parameters securely", () => {
-    const search = "?hh=hh_demo_harohalli_001&t=secret_bearer_token_12345678&v=1";
-    const parseResult = parseNfcCredential(search);
-    expect(parseResult.status).toBe("VALID");
-    if (parseResult.status === "VALID") {
-      expect(parseResult.credential.householdId).toBe("hh_demo_harohalli_001");
-      expect(parseResult.credential.token).toBe("secret_bearer_token_12345678");
-      expect(parseResult.credential.version).toBe(1);
+  it("Frontend Utility 17: NFC URL parser extracts parameters securely with or without version parameter", () => {
+    // 1. Without version parameter (v=1 omitted for NTAG213 optimization)
+    const searchNoV = "?hh=hh_demo_harohalli_001&t=secret_bearer_token_12345678";
+    const parseResultNoV = parseNfcCredential(searchNoV);
+    expect(parseResultNoV.status).toBe("VALID");
+    if (parseResultNoV.status === "VALID") {
+      expect(parseResultNoV.credential.householdId).toBe("hh_demo_harohalli_001");
+      expect(parseResultNoV.credential.token).toBe("secret_bearer_token_12345678");
+      expect(parseResultNoV.credential.version).toBeUndefined();
+    }
+
+    // 2. With version parameter (backward compatible & for version > 1)
+    const searchWithV = "?hh=hh_demo_harohalli_001&t=secret_bearer_token_12345678&v=2";
+    const parseResultWithV = parseNfcCredential(searchWithV);
+    expect(parseResultWithV.status).toBe("VALID");
+    if (parseResultWithV.status === "VALID") {
+      expect(parseResultWithV.credential.householdId).toBe("hh_demo_harohalli_001");
+      expect(parseResultWithV.credential.token).toBe("secret_bearer_token_12345678");
+      expect(parseResultWithV.credential.version).toBe(2);
     }
   });
 

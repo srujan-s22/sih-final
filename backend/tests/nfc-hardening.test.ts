@@ -4,10 +4,13 @@ import { buildApp } from "../src/app.js";
 import { HTTP_STATUS } from "../src/config/constants.js";
 import { Household } from "../../shared/types/household.js";
 import { AshaCase } from "../../shared/types/case.js";
+import crypto from "node:crypto";
 import {
   buildNfcUrl,
   getPublicOrigin,
+  writeNfcTag,
 } from "../../frontend/lib/nfc/nfc-writer.js";
+import { parseNfcCredential } from "../../frontend/lib/nfc/nfc-parser.js";
 
 const getGlobal = (): Record<string, any> => globalThis as Record<string, any>;
 
@@ -467,7 +470,8 @@ describe("Phase 2 Hardening: NFC Rotation Failure Safety & Dynamic URL Resolutio
       expect(origin).toBe("https://swasthyasetu.karnataka.gov.in");
 
       const url = buildNfcUrl("hh_1", "tok");
-      expect(url).toBe("https://swasthyasetu.karnataka.gov.in/nfc?hh=hh_1&t=tok&v=1");
+      expect(url).toBe("https://swasthyasetu.karnataka.gov.in/nfc?hh=hh_1&t=tok");
+      expect(url).not.toContain("&v=1");
     });
 
     it("TEST 3: NEXT_PUBLIC_APP_URL environment variable is used when NEXT_PUBLIC_SITE_URL is absent", () => {
@@ -477,28 +481,31 @@ describe("Phase 2 Hardening: NFC Rotation Failure Safety & Dynamic URL Resolutio
       expect(origin).toBe("https://app.swasthyasetu.org");
     });
 
-    it("TEST 4: NEXT_PUBLIC_VERCEL_URL is formatted with https://", () => {
+    it("TEST 4: NEXT_PUBLIC_VERCEL_URL is formatted with https:// when window is undefined", () => {
       delete process.env.NEXT_PUBLIC_SITE_URL;
       delete process.env.NEXT_PUBLIC_APP_URL;
+      delete getGlobal().window;
       process.env.NEXT_PUBLIC_VERCEL_URL = "swasthyasetu-preview.vercel.app";
 
       const origin = getPublicOrigin();
       expect(origin).toBe("https://swasthyasetu-preview.vercel.app");
     });
 
-    it("TEST 5: window.location.origin is used client-side when no env var is set", () => {
+    it("TEST 5: window.location.origin is prioritized over NEXT_PUBLIC_VERCEL_URL on client-side", () => {
       delete process.env.NEXT_PUBLIC_SITE_URL;
       delete process.env.NEXT_PUBLIC_APP_URL;
-      delete process.env.NEXT_PUBLIC_VERCEL_URL;
+      process.env.NEXT_PUBLIC_VERCEL_URL = "long-preview-branch-name-12345.vercel.app";
 
       getGlobal().window = {
         location: {
-          origin: "https://my-deployed-host.internal",
+          origin: "https://sih-final-frontend-ten.vercel.app",
         },
       };
 
+      // In the browser, window.location.origin MUST win over long Vercel branch/preview URLs
       const origin = getPublicOrigin();
-      expect(origin).toBe("https://my-deployed-host.internal");
+      expect(origin).toBe("https://sih-final-frontend-ten.vercel.app");
+      expect(origin).not.toContain("long-preview-branch-name");
     });
 
     it("TEST 6: development localhost fallback is used in non-production environments", () => {
@@ -520,6 +527,94 @@ describe("Phase 2 Hardening: NFC Rotation Failure Safety & Dynamic URL Resolutio
       process.env.NODE_ENV = "production";
 
       expect(() => getPublicOrigin()).toThrow("NFC URL generation failed: No public site origin configured");
+    });
+
+    it("TEST 8: buildNfcUrl omits &v=1 for version 1 but preserves &v=2 for higher versions", () => {
+      const urlV1 = buildNfcUrl("hh_123", "tok_abc", "https://swasthyasetu.org", 1);
+      expect(urlV1).toBe("https://swasthyasetu.org/nfc?hh=hh_123&t=tok_abc");
+      expect(urlV1).not.toContain("&v=");
+
+      const urlV2 = buildNfcUrl("hh_123", "tok_abc", "https://swasthyasetu.org", 2);
+      expect(urlV2).toBe("https://swasthyasetu.org/nfc?hh=hh_123&t=tok_abc&v=2");
+    });
+
+    it("TEST 9: generated production NDEF URI message size is comfortably below 117 bytes", () => {
+      // Real production values:
+      // Canonical origin: https://sih-final-frontend-ten.vercel.app (41 chars)
+      // Field household ID: hh_1789034000000_a8b9c (22 chars)
+      // Real token: crypto.randomBytes(32).toString("base64url") (43 chars)
+      const canonicalOrigin = "https://sih-final-frontend-ten.vercel.app";
+      const householdId = "hh_1789034000000_a8b9c";
+      const token = crypto.randomBytes(32).toString("base64url");
+      expect(token.length).toBe(43);
+
+      const url = buildNfcUrl(householdId, token, canonicalOrigin, 1);
+      expect(url).not.toContain("&v=1");
+      expect(url.length).toBe(117);
+
+      // In Chromium / W3C NFC Forum Well-Known URI record (RTD_URI):
+      // https:// is compressed to 1 prefix byte (0x04)
+      const uriWithoutScheme = url.replace(/^https:\/\//, "");
+      const payloadBytes = 1 + new TextEncoder().encode(uriWithoutScheme).length;
+      const ndefMessageBytes = 4 + payloadBytes; // 4 bytes short-record header (0xD1, 0x01, len, 0x55)
+
+      // Must be strictly below 117 bytes (usable capacity of standard 120-byte CC NTAG213 tags)
+      expect(ndefMessageBytes).toBe(114);
+      expect(ndefMessageBytes).toBeLessThan(117);
+
+      // Total Type 2 Tag storage required (with 3-byte TLV wrapper: 0x03, len, 0xFE)
+      const totalTagBytes = ndefMessageBytes + 3;
+      expect(totalTagBytes).toBe(117);
+      expect(totalTagBytes).toBeLessThanOrEqual(120);
+    });
+
+    it("TEST 10: parser still accepts the resulting production URL without v parameter", () => {
+      const canonicalOrigin = "https://sih-final-frontend-ten.vercel.app";
+      const householdId = "hh_1789034000000_a8b9c";
+      const token = crypto.randomBytes(32).toString("base64url");
+
+      const url = buildNfcUrl(householdId, token, canonicalOrigin, 1);
+      const parsedUrl = new URL(url);
+      const parseResult = parseNfcCredential(parsedUrl.search);
+
+      expect(parseResult.status).toBe("VALID");
+      if (parseResult.status === "VALID") {
+        expect(parseResult.credential.householdId).toBe(householdId);
+        expect(parseResult.credential.token).toBe(token);
+        expect(parseResult.credential.version).toBeUndefined();
+      }
+    });
+
+    it("TEST 11: writeNfcTag error handling sanitizes errors and never leaks raw tokens", async () => {
+      const secretToken = "super_secret_token_1234567890abcdef";
+      const url = buildNfcUrl("hh_test_123", secretToken, "https://swasthyasetu.org", 1);
+
+      // Mock NDEFReader to throw a NetworkError with sensitive details in message
+      const originalWindow = getGlobal().window;
+      getGlobal().window = {
+        NDEFReader: class MockNDEFReader {
+          async write() {
+            const err = new Error(`Failed to write due to an IO error: null for ${url}`);
+            err.name = "NetworkError";
+            throw err;
+          }
+        },
+      };
+
+      const result = await writeNfcTag(url);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      // Verify raw token, query parameters, or internal paths are never leaked in error messages
+      expect(result.error).not.toContain(secretToken);
+      expect(result.error).not.toContain("hh_test_123");
+      expect(result.error).not.toContain("?");
+      expect(result.error).toContain("NFC communication was interrupted");
+
+      if (originalWindow) {
+        getGlobal().window = originalWindow;
+      } else {
+        delete getGlobal().window;
+      }
     });
   });
 });
