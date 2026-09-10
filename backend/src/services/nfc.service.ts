@@ -42,6 +42,8 @@ export class NfcService {
   private readonly MAX_FAILED_ATTEMPTS = 10;
   private readonly ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
+  private leaveService?: { evaluateAndRestoreExpiredLeaves: () => Promise<any> };
+
   constructor(
     private nfcRepo: NfcRepository,
     private householdRepo: HouseholdRepository,
@@ -49,6 +51,14 @@ export class NfcService {
     private userRepo: UserRepository,
     private eligibilityService: EligibilityService
   ) {}
+
+  /**
+   * Optional setter for LeaveService to allow lazy evaluation and automatic restoration
+   * of expired temporary ASHA assignments before resolving caseloads or public ASHA details.
+   */
+  public setLeaveService(service: { evaluateAndRestoreExpiredLeaves: () => Promise<any> }): void {
+    this.leaveService = service;
+  }
 
   /**
    * Generates a cryptographically random, high-entropy, URL-safe bearer token.
@@ -75,6 +85,15 @@ export class NfcService {
         HTTP_STATUS.FORBIDDEN,
         "FORBIDDEN_ROLE"
       );
+    }
+
+    // Lazy automatic restoration check before verifying ASHA caseload
+    if (this.leaveService) {
+      try {
+        await this.leaveService.evaluateAndRestoreExpiredLeaves();
+      } catch {
+        // Safe degrade: non-fatal if background restoration check encounters an issue
+      }
     }
 
     // ASHA workers may ONLY provision/manage NFC for households assigned to their caseload
@@ -534,6 +553,14 @@ export class NfcService {
     }));
 
     // 6. Resolve safe public ASHA worker directory information
+    if (this.leaveService) {
+      try {
+        await this.leaveService.evaluateAndRestoreExpiredLeaves();
+      } catch {
+        // Safe degrade: do not fail NFC resolution if lazy restoration check encountered an error
+      }
+    }
+
     let ashaInfo: NfcPublicAshaInfo | null = null;
     const householdCase = await this.caseRepo.getCaseByHouseholdId(household.id);
     if (householdCase) {

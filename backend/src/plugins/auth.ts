@@ -203,6 +203,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     userRepository,
     eligibilityService
   );
+  nfcService.setLeaveService(leaveService);
 
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
