@@ -14,6 +14,7 @@ import { assistanceRoutes } from "./assistance.js";
 import { voiceRoutes } from "./voice.js";
 import { testAuthRoutes } from "./test-auth.js";
 import { leaveRoutes } from "./leave.js";
+import { nfcRoutes } from "./nfc.js";
 
 export const apiRoutes: FastifyPluginAsync = async (fastify) => {
   // Register health routes
@@ -57,6 +58,9 @@ export const apiRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Register ASHA Leave Request and Temporary Reassignment routes
   await fastify.register(leaveRoutes);
+
+  // Register Household NFC routes (Phase 1)
+  await fastify.register(nfcRoutes);
 
   // Register authorization verification test routes
   await fastify.register(testAuthRoutes);

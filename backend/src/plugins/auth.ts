@@ -33,6 +33,8 @@ import { VoiceActionService } from "../services/telephony/voice-action.service.j
 import { VoiceGatewayService } from "../services/telephony/voice-gateway.service.js";
 import { LeaveRepository } from "../repositories/leave.repository.js";
 import { LeaveService } from "../services/leave.service.js";
+import { NfcRepository } from "../repositories/nfc.repository.js";
+import { NfcService } from "../services/nfc.service.js";
 import { HTTP_STATUS } from "../config/constants.js";
 import { env } from "../config/env.js";
 
@@ -47,6 +49,8 @@ declare module "fastify" {
     caseService: CaseService;
     leaveRepository: LeaveRepository;
     leaveService: LeaveService;
+    nfcRepository: NfcRepository;
+    nfcService: NfcService;
     automationService: AutomationService;
     connectionRepository: ConnectionRepository;
     connectionService: ConnectionService;
@@ -191,6 +195,15 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   );
   caseService.setLeaveService(leaveService);
 
+  const nfcRepository = new NfcRepository(firestoreInstance);
+  const nfcService = new NfcService(
+    nfcRepository,
+    householdRepository,
+    caseRepository,
+    userRepository,
+    eligibilityService
+  );
+
   fastify.decorate("userRepository", userRepository);
   fastify.decorate("userService", userService);
   fastify.decorate("privilegedAuthService", privilegedAuthService);
@@ -198,6 +211,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("householdService", householdService);
   fastify.decorate("caseRepository", caseRepository);
   fastify.decorate("caseService", caseService);
+  fastify.decorate("leaveRepository", leaveRepository);
+  fastify.decorate("leaveService", leaveService);
+  fastify.decorate("nfcRepository", nfcRepository);
+  fastify.decorate("nfcService", nfcService);
   fastify.decorate("automationService", automationService);
   fastify.decorate("connectionRepository", connectionRepository);
   fastify.decorate("connectionService", connectionService);
@@ -220,8 +237,6 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("exotelService", exotelService);
   fastify.decorate("voiceActionService", voiceActionService);
   fastify.decorate("voiceGatewayService", voiceGatewayService);
-  fastify.decorate("leaveRepository", leaveRepository);
-  fastify.decorate("leaveService", leaveService);
   fastify.decorateRequest("user", null);
   fastify.decorateRequest("userProfile", null);
 

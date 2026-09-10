@@ -14,3 +14,4 @@ export * from "./connection.js";
 export * from "./assistance.js";
 export * from "./voice.js";
 export * from "./leave.js";
+export * from "./nfc.js";

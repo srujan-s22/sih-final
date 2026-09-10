@@ -11,3 +11,4 @@ export * from "./connection.schema.js";
 export * from "./assistance.schema.js";
 export * from "./voice.schema.js";
 export * from "./leave.schema.js";
+export * from "./nfc.schema.js";
