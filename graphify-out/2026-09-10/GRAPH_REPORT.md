@@ -1,30 +1,30 @@
-# Graph Report - sih-final  (2026-09-10)
+# Graph Report - sih-final  (2026-09-01)
 
 ## Corpus Check
-- 315 files · ~500,577 words
+- 285 files · ~445,978 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2113 nodes · 5730 edges · 125 communities (101 shown, 24 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 477 edges (avg confidence: 0.8)
+- 1899 nodes · 5001 edges · 123 communities (104 shown, 19 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 415 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1526d087`
+- Built from commit: `b1a3e027`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - cn
-- types/case.ts
+- src/config/constants.ts
 - auth-context.tsx
-- types/auth.ts
+- .getUserById
 - types/evidence.ts
 - scheme.schema.ts
 - types/guidance.ts
 - dependencies
 - dependencies
-- intelligence.service.ts
+- .generateIntelligence
 - AshaConnectionRequest
 - types/eligibility.ts
 - plugins/auth.ts
@@ -34,24 +34,24 @@
 - ai.schema.ts
 - compilerOptions
 - compilerOptions
-- leave.service.ts
+- AIContext
 - package.json
-- types/index.ts
+- gap.service.ts
 - SECTION I: CURRENT IMPLEMENTATION DEEP DIVE
 - shared/package.json
-- .listCasesByAsha
+- case.service.ts
 - AiService
 - AutomationService
 - INotificationService
 - ISchemeService
 - ITelephonyService
 - api.d.ts
-- Household
+- IEligibilityService
 - FirebaseService
 - types/voice.ts
 - frontend/types/api.ts
 - common.schema.ts
-- nfc.service.ts
+- types/index.ts
 - actions.d.ts
 - common.ts
 - common.d.ts
@@ -66,7 +66,7 @@
 - health.schema.d.ts
 - health.schema.js
 - VoiceSession
-- exotel-websocket-stream.test.ts
+- exotel-stream-gateway.service.ts
 - asha/page.tsx
 - ApiResult
 - toVoiceLanguage
@@ -74,17 +74,17 @@
 - AshaAssistanceRequest
 - routes/index.ts
 - SWASTHYASETU — COMPLETE SYSTEM DISCOVERY, END-TO-END FUNCTIONALITY AUDIT & USER-FLOW FORENSICS
-- MultilingualNLU
-- .getMembers
+- sarvam.service.ts
+- i18n-context.tsx
 - 2. DETAILED E2E TEST EVIDENCE & RESULTS (SECTIONS A — J)
-- case.service.ts
+- case.schema.ts
 - types/ai.ts
-- SchemeRepository
-- healthcare-assistant-drawer.tsx
+- api-client.ts
+- privileged-auth.service.ts
 - 3. Forensic Root-Cause Analysis & Fixes Implemented
-- routes/voice.ts
-- useTranslation
-- routes/nfc.ts
+- voice.schema.ts
+- header.tsx
+- UserRepository
 - routes/auth.ts
 - SwasthyaSetu — Scheme-Assistance Workflow Specification
 - routes/connection.ts
@@ -94,26 +94,27 @@
 - SwasthyaSetu — Scheme Journey, Task & Milestone Counting Model Audit
 - button.tsx
 - ApiClient
-- routes/leave.ts
+- BaseFirestoreRepository
 - Sarvam AI + Exotel Multilingual Voice & Telephony Assistance
 - SwasthyaSetu — Scheme Registry & Deterministic Rule Engine Architecture
-- ExotelService
+- VoiceServiceClient
 - SwasthyaSetu — System Architecture & Architectural Principles
 - SwasthyaSetu — SIH 2026
-- schemas/index.ts
+- routes/assistance.ts
 - 2. Color Palette & Tokens
 - Privileged Account Provisioning & Security Architecture
 - 28. Complete API Specification
-- execute-clean-reset.ts
+- LyzrService
 - routes/household.ts
 - 2.1 Collection Schemas
 - 3. Usage & CLI Commands
-- assistant.schema.ts
+- sign-in/page.tsx
 - 3. Endpoints Summary
-- nfc/layout.tsx
+- SarvamService
 - 11. Citizen Portal Functional Specification
 - 12. ASHA Workspace Functional Specification
 - 13. Admin Console Functional Specification
+- firebase.ts
 - 35. Complete A-to-Z User Journeys
 - 36. Status Enums & Finite State Machines
 - 3. System Objectives
@@ -133,100 +134,103 @@
 - AGENTS.md
 - 18. Multilingual Website & UI Localization (Phase E)
 - 5. User Roles & Permission Matrix
-- AssistantServiceError
 
 ## God Nodes (most connected - your core abstractions)
-1. `ApiResult` - 88 edges
-2. `UserProfile` - 80 edges
-3. `HouseholdRepository` - 57 edges
-4. `CaseRepository` - 55 edges
+1. `ApiResult` - 71 edges
+2. `UserProfile` - 62 edges
+3. `HouseholdRepository` - 54 edges
+4. `CaseRepository` - 51 edges
 5. `SwasthyaSetu — Software Requirements Specification (SRS)` - 49 edges
-6. `HTTP_STATUS` - 46 edges
-7. `SchemeRepository` - 46 edges
-8. `toVoiceLanguage()` - 45 edges
-9. `VoiceSession` - 43 edges
-10. `CaseService` - 42 edges
+6. `SchemeRepository` - 46 edges
+7. `toVoiceLanguage()` - 45 edges
+8. `VoiceSession` - 43 edges
+9. `CaseService` - 41 edges
+10. `useTranslation()` - 39 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `VerificationResult` --references--> `UserRole`  [EXTRACTED]
+  backend/src/services/privileged-auth.service.ts → shared/types/auth.ts
+- `buildApp()` --indirect_call--> `corsPlugin()`  [INFERRED]
+  backend/src/app.ts → backend/src/plugins/cors.ts
 - `FastifyRequest` --references--> `UserProfile`  [EXTRACTED]
   backend/src/plugins/auth.ts → shared/types/auth.ts
 - `voiceRoutes()` --calls--> `toVoiceLanguage()`  [EXTRACTED]
   backend/src/routes/voice.ts → shared/types/voice.ts
-- `VerificationResult` --references--> `UserRole`  [EXTRACTED]
-  backend/src/services/privileged-auth.service.ts → shared/types/auth.ts
 - `StreamSessionContext` --references--> `VoiceSession`  [EXTRACTED]
   backend/src/services/telephony/exotel-stream-gateway.service.ts → shared/types/voice.ts
-- `HealthcareAssistantDrawerProps` --references--> `UserRole`  [EXTRACTED]
-  frontend/components/assistant/healthcare-assistant-drawer.tsx → shared/types/auth.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (125 total, 24 thin omitted)
+## Communities (123 total, 19 thin omitted)
 
 ### Community 0 - "cn"
-Cohesion: 0.08
-Nodes (29): UnauthorizedPage(), Shell(), ShellProps, Button, Card, CardContent, CardDescription, CardFooter (+21 more)
+Cohesion: 0.09
+Nodes (27): Shell(), ShellProps, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle (+19 more)
 
-### Community 1 - "types/case.ts"
-Cohesion: 0.05
-Nodes (49): args, hash, runSeed(), buildApp(), APP_NAME, APP_VERSION, CORRELATION_ID_HEADER, HTTP_STATUS (+41 more)
+### Community 1 - "src/config/constants.ts"
+Cohesion: 0.13
+Nodes (17): runSeed(), buildApp(), APP_NAME, APP_VERSION, CORRELATION_ID_HEADER, DEFAULT_USER_ROLE, HTTP_STATUS, REQUEST_ID_HEADER (+9 more)
 
 ### Community 2 - "auth-context.tsx"
-Cohesion: 0.30
-Nodes (13): CURRENT_CONSENT_VERSION, DEFAULT_USER_ROLE, AuthContext, AuthProvider(), authSendPasswordReset(), authSignInWithEmail(), authSignInWithGoogle(), authSignOut() (+5 more)
+Cohesion: 0.27
+Nodes (14): CURRENT_CONSENT_VERSION, DEFAULT_USER_ROLE, AuthContext, AuthContextType, AuthProvider(), authSendPasswordReset(), authSignInWithEmail(), authSignInWithGoogle() (+6 more)
 
-### Community 3 - "types/auth.ts"
-Cohesion: 0.08
-Nodes (18): CURRENT_CONSENT_VERSION, DEFAULT_USER_ROLE, authPlugin(), AttemptRecord, PrivilegedAuthService, VerificationResult, UserService, HealthcareAssistantDrawerProps (+10 more)
+### Community 3 - ".getUserById"
+Cohesion: 0.24
+Nodes (3): authPlugin(), UserService, ConsentRecord
 
 ### Community 4 - "types/evidence.ts"
 Cohesion: 0.08
-Nodes (25): runPhase6FirestoreSmoke(), runPhase6TavilySmoke(), EvidenceRepository, EvidenceService, SourceValidator, ValidatedSourceResult, TavilySearchOptions, TavilyService (+17 more)
+Nodes (24): runPhase6FirestoreSmoke(), runPhase6TavilySmoke(), EvidenceRepository, EvidenceService, SourceValidator, ValidatedSourceResult, TavilySearchOptions, TavilyService (+16 more)
 
 ### Community 5 - "scheme.schema.ts"
 Cohesion: 0.08
 Nodes (28): EligibilityResultSchema, EligibilityStatusSchema, MissingRequirementDetailSchema, RuleEvaluationDetailSchema, ActionPlanItemSchema, DocumentReadinessItemSchema, DocumentStatusSchema, GapPrioritySchema (+20 more)
 
 ### Community 6 - "types/guidance.ts"
-Cohesion: 0.17
-Nodes (12): ActionPlanService, GapDetectionService, CitizenEligibilityResponse, EligibilityResult, RequiredDocument, SourceMetadata, ActionPlanItem, DocumentReadinessItem (+4 more)
+Cohesion: 0.23
+Nodes (10): ActionPlanService, DocumentReadinessService, GapDetectionService, EligibilityResult, SchemeVersion, DocumentReadinessItem, DocumentStatus, Gap (+2 more)
 
 ### Community 7 - "dependencies"
 Cohesion: 0.04
 Nodes (47): dependencies, dotenv, fastify, @fastify/cors, fastify-plugin, @fastify/sensible, @fastify/websocket, firebase-admin (+39 more)
 
 ### Community 8 - "dependencies"
-Cohesion: 0.04
-Nodes (45): clsx, firebase, dependencies, clsx, firebase, lucide-react, next, react (+37 more)
+Cohesion: 0.05
+Nodes (40): clsx, firebase, dependencies, clsx, firebase, lucide-react, next, react (+32 more)
 
-### Community 9 - "intelligence.service.ts"
-Cohesion: 0.12
-Nodes (15): runPhase7FirestoreSmoke(), runPhase7LyzrSmoke(), AICacheRepository, IntelligenceService, LyzrService, LyzrServiceConfig, buildActionPlanPrompt(), buildEligibilityExplanationPrompt() (+7 more)
+### Community 9 - ".generateIntelligence"
+Cohesion: 0.23
+Nodes (5): runPhase7FirestoreSmoke(), AICacheRepository, AIIntelligenceCacheRecord, AIIntelligenceRequest, AIIntelligenceResponse
+
+### Community 10 - "AshaConnectionRequest"
+Cohesion: 0.10
+Nodes (5): ConnectionService, HouseholdService, AshaConnectionRequest, ConnectionRequestStatus, GuidanceResponse
 
 ### Community 11 - "types/eligibility.ts"
-Cohesion: 0.13
-Nodes (25): runPhase4FirestoreSmoke(), evaluateRule(), evaluateRuleSet(), evaluateScalarComparison(), evaluateScheme(), memberMatchesRule(), RuleEvaluationResult, RuleSetEvaluationResult (+17 more)
+Cohesion: 0.11
+Nodes (26): runPhase4FirestoreSmoke(), evaluateRule(), evaluateRuleSet(), evaluateScalarComparison(), evaluateScheme(), memberMatchesRule(), RuleEvaluationResult, RuleSetEvaluationResult (+18 more)
 
 ### Community 12 - "plugins/auth.ts"
-Cohesion: 0.12
-Nodes (16): fastify, FastifyInstance, CaseRepository, ConnectionRepository, BaseFirestoreRepository, FilterCondition, ListOptions, HouseholdRepository (+8 more)
+Cohesion: 0.17
+Nodes (17): fastify, FastifyInstance, AssistanceRepository, ConnectionRepository, HouseholdRepository, SchemeRepository, AIContextBuilder, AssistantService (+9 more)
 
 ### Community 13 - "assistant.service.ts"
-Cohesion: 0.15
-Nodes (8): AIContextBuilder, AssistantService, RateLimitRecord, sanitizeAssistantReply(), GeminiGenerateOptions, GeminiProviderError, GeminiService, QueryRoutingInfo
+Cohesion: 0.07
+Nodes (19): migrateFirestorePhase4C(), AssistantServiceError, RateLimitRecord, GeminiGenerateOptions, GeminiProviderError, GeminiService, buildAssistantSystemInstruction(), ChatEntry (+11 more)
 
 ### Community 14 - "citizen/page.tsx"
-Cohesion: 0.08
-Nodes (32): HouseholdServiceError, ASSISTANCE_CATEGORIES, GENDER_OPTIONS, INCOME_OPTIONS, RELATIONSHIP_OPTIONS, Input, InputProps, AshaCallModal() (+24 more)
+Cohesion: 0.11
+Nodes (25): ASSISTANCE_CATEGORIES, GENDER_OPTIONS, INCOME_OPTIONS, RELATIONSHIP_OPTIONS, Input, InputProps, CitizenCallModal(), CitizenCallModalProps (+17 more)
 
 ### Community 15 - "UserProfile"
-Cohesion: 0.14
-Nodes (8): runFirestoreCaseSmokeTest(), FastifyRequest, CaseService, CreateCaseNoteInput, UserProfile, CaseActivity, CaseFollowUp, CaseNote
+Cohesion: 0.13
+Nodes (8): runFirestoreCaseSmokeTest(), runSmokeTest(), FastifyRequest, CaseRepository, CaseService, UserProfile, CaseFollowUp, CaseTask
 
 ### Community 16 - "ai.schema.ts"
-Cohesion: 0.12
-Nodes (16): AIActionPlanItemSchema, AICapabilitySchema, AICertaintyStateSchema, AIContextSchema, AIEligibilitySummarySchema, AIEvidenceReferenceSchema, AIExistingActionSummarySchema, AIGapSummarySchema (+8 more)
+Cohesion: 0.11
+Nodes (17): LyzrServiceConfig, AIActionPlanItemSchema, AICapabilitySchema, AICertaintyStateSchema, AIContextSchema, AIEligibilitySummarySchema, AIEvidenceReferenceSchema, AIExistingActionSummarySchema (+9 more)
 
 ### Community 17 - "compilerOptions"
 Cohesion: 0.09
@@ -236,17 +240,17 @@ Nodes (23): compilerOptions, declaration, esModuleInterop, forceConsistentCasing
 Cohesion: 0.07
 Nodes (29): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+21 more)
 
-### Community 19 - "leave.service.ts"
-Cohesion: 0.10
-Nodes (17): LeaveRepository, LeaveService, LeaveServiceError, AvailableAshaWorker, LeaveServiceClient, ApproveLeaveRequestInput, ApproveLeaveResponse, AshaLeaveRequest (+9 more)
+### Community 19 - "AIContext"
+Cohesion: 0.32
+Nodes (7): buildActionPlanPrompt(), buildEvidenceSummaryPrompt(), buildGapPrioritizationPrompt(), buildNeedsInformationPrompt(), PROMPT_VERSION, SYSTEM_SAFETY_RULES, AIContext
 
 ### Community 20 - "package.json"
 Cohesion: 0.13
 Nodes (14): shared, name, private, scripts, build, dev, dev:backend, dev:frontend (+6 more)
 
-### Community 21 - "types/index.ts"
-Cohesion: 0.13
-Nodes (8): GapService, IGapService, ActionResolution, EvidenceRecord, FollowUp, GapSeverity, GapStatus, HealthcareGap
+### Community 21 - "gap.service.ts"
+Cohesion: 0.22
+Nodes (5): GapService, IGapService, GapSeverity, GapStatus, HealthcareGap
 
 ### Community 22 - "SECTION I: CURRENT IMPLEMENTATION DEEP DIVE"
 Cohesion: 0.04
@@ -256,21 +260,21 @@ Nodes (47): 1. Calculation & Persistence, 1. Conceptual Shift: Two Equal Doors t
 Cohesion: 0.22
 Nodes (8): dependencies, zod, zod, main, name, private, type, version
 
+### Community 24 - "case.service.ts"
+Cohesion: 0.10
+Nodes (32): CaseServiceError, CancelCaseFollowUpInput, CompleteCaseFollowUpInput, CompleteCaseTaskInput, CreateCaseFollowUpInput, CreateCaseNoteInput, CreateCaseTaskInput, RescheduleCaseFollowUpInput (+24 more)
+
 ### Community 26 - "AutomationService"
-Cohesion: 0.15
-Nodes (4): AutomationService, IAutomationService, AutomationDomainEvent, DomainEventType
+Cohesion: 0.12
+Nodes (4): AutomationService, IAutomationService, InboundAutomationWebhookInput, AutomationDomainEvent
 
 ### Community 30 - "api.d.ts"
 Cohesion: 0.40
 Nodes (4): ApiErrorResponse, ApiResult, ErrorDetail, HealthCheckResponse
 
-### Community 31 - "Household"
-Cohesion: 0.24
-Nodes (7): EligibilityService, IEligibilityService, DocumentReadinessService, GuidanceService, GuidanceResponse, Household, Member
-
 ### Community 33 - "types/voice.ts"
-Cohesion: 0.07
-Nodes (47): env, EnvConfig, envSchema, ExotelCallResult, ExotelOutboundOptions, ExotelTelephonyError, FRAME_CHUNK_SIZE_MULAW, FRAME_CHUNK_SIZE_PCM (+39 more)
+Cohesion: 0.08
+Nodes (33): env, EnvConfig, envSchema, corsPlugin(), startServer(), ExotelCallResult, ExotelOutboundOptions, ExotelTelephonyError (+25 more)
 
 ### Community 34 - "frontend/types/api.ts"
 Cohesion: 0.50
@@ -280,9 +284,9 @@ Nodes (3): ApiErrorResponse, ApiResult, HealthCheckResponse
 Cohesion: 0.50
 Nodes (3): ApiErrorResponseDto, ApiErrorResponseSchema, ErrorDetailSchema
 
-### Community 36 - "nfc.service.ts"
-Cohesion: 0.10
-Nodes (16): NfcRepository, FailedAttemptTracker, NfcService, NfcServiceError, NfcServiceClient, HouseholdNfcRecord, HouseholdNfcStatusResponse, NfcCancelRotationResponse (+8 more)
+### Community 36 - "types/index.ts"
+Cohesion: 0.33
+Nodes (3): ActionResolution, EvidenceRecord, FollowUp
 
 ### Community 37 - "actions.d.ts"
 Cohesion: 0.50
@@ -305,84 +309,96 @@ Cohesion: 0.50
 Nodes (3): GapSeverity, GapStatus, HealthcareGap
 
 ### Community 50 - "VoiceSession"
-Cohesion: 0.10
-Nodes (7): VoiceSessionRepository, VoiceServiceClient, InitiateOutboundCallInput, AshaCallRequest, CallHistoryItem, CitizenCallRequest, VoiceSession
+Cohesion: 0.11
+Nodes (6): VoiceSessionRepository, ExotelService, VoiceGatewayService, CallHistoryItem, ExotelInboundWebhookPayload, VoiceSession
 
-### Community 51 - "exotel-websocket-stream.test.ts"
-Cohesion: 0.13
-Nodes (16): calculatePcmRms(), chunkAudioBuffer(), createWavHeader(), extractPcmFromWav(), linear16ToMulaw(), linear16ToMulawSample(), MULAW_TO_LINEAR_TABLE, mulawToLinear16() (+8 more)
+### Community 51 - "exotel-stream-gateway.service.ts"
+Cohesion: 0.11
+Nodes (25): calculatePcmRms(), chunkAudioBuffer(), createWavHeader(), extractPcmFromWav(), linear16ToMulaw(), linear16ToMulawSample(), MULAW_TO_LINEAR_TABLE, mulawToLinear16() (+17 more)
 
 ### Community 52 - "asha/page.tsx"
-Cohesion: 0.11
-Nodes (17): AdminPage(), AshaWorkerSummary, ProtectedRoute(), AshaNfcModal(), AshaNfcModalProps, ModalStep, NfcModalErrorBoundary, NfcModalErrorBoundaryProps (+9 more)
+Cohesion: 0.12
+Nodes (29): AdminPage(), AshaWorkerSummary, AshaWorkspacePage(), ConsentPage(), CitizenPage(), HomePage(), UnauthorizedPage(), HealthcareAssistantDrawer() (+21 more)
 
 ### Community 53 - "ApiResult"
-Cohesion: 0.08
-Nodes (16): CaseServiceClient, ConnectionServiceClient, CreateCaseFollowUpInput, CreateCaseTaskInput, UpdateCaseFollowUpInput, UpdateCaseInput, UpdateCaseTaskInput, ApiResult (+8 more)
+Cohesion: 0.11
+Nodes (3): CaseServiceClient, ConnectionServiceClient, ApiResult
 
 ### Community 54 - "toVoiceLanguage"
-Cohesion: 0.09
-Nodes (6): SarvamService, VoiceGatewayService, VoiceResponseFormatter, ExotelInboundWebhookPayload, toVoiceLanguage(), VoiceTurnRequest
+Cohesion: 0.17
+Nodes (3): VoiceActionService, VoiceResponseFormatter, toVoiceLanguage()
 
 ### Community 55 - "SwasthyaSetu — Software Requirements Specification (SRS)"
 Cohesion: 0.07
 Nodes (29): 19.1 Website-to-Voice Language Binding & Precedence Rules, 19. Sarvam Multilingual Voice Architecture (Phase F & Phase 11), 1. Executive Summary, 20. End-to-End PSTN Voice Call Flow, 21. Sarvam Saaras Speech-to-Text (STT) Specification, 22. Sarvam Bulbul Text-to-Speech (TTS) Specification, 25. Exotel Telephony & WebSocket Streaming Integration, 27. Database & Firestore Data Model (+21 more)
 
 ### Community 56 - "AshaAssistanceRequest"
-Cohesion: 0.15
-Nodes (8): AssistanceRepository, AssistanceService, AshaAssistanceRequest, AssistanceCategory, AssistancePriority, AssistanceStatus, CreateAssistanceRequestInput, UpdateAssistanceRequestInput
+Cohesion: 0.16
+Nodes (7): AssistanceService, AshaAssistanceRequest, AssistanceCategory, AssistancePriority, AssistanceStatus, CreateAssistanceRequestInput, UpdateAssistanceRequestInput
 
 ### Community 57 - "routes/index.ts"
 Cohesion: 0.26
-Nodes (18): requireAuth(), requireConsent(), requireRole(), aiRoutes(), assistantRoutes(), caseRoutes(), connectionRoutes(), eligibilityRoutes() (+10 more)
+Nodes (18): requireAuth(), requireConsent(), requireRole(), aiRoutes(), assistanceRoutes(), assistantRoutes(), authRoutes(), caseRoutes() (+10 more)
 
 ### Community 58 - "SWASTHYASETU — COMPLETE SYSTEM DISCOVERY, END-TO-END FUNCTIONALITY AUDIT & USER-FLOW FORENSICS"
 Cohesion: 0.08
 Nodes (23): Distinction of Workflows, Final Classification, Readiness Breakdown, SECTION A — EXECUTIVE SUMMARY, SECTION B — THE COMPLETE USER JOURNEY, SECTION C — SYSTEM ARCHITECTURE, SECTION D — ROLE RESPONSIBILITY MATRIX, SECTION E — CITIZEN FUNCTIONALITY AUDIT (+15 more)
 
+### Community 59 - "sarvam.service.ts"
+Cohesion: 0.17
+Nodes (12): MultilingualNLU, NUMBER_WORDS, SemanticParseResult, SarvamIntentExtractionResult, SarvamSttResponse, SarvamTtsResponse, LocalizedKnowledgeItem, KnowledgeMatchResult (+4 more)
+
+### Community 60 - "i18n-context.tsx"
+Cohesion: 0.17
+Nodes (14): I18nContext, I18nContextValue, I18nProvider(), interpolate(), resolveKey(), TRANSLATION_MAP, en, hi (+6 more)
+
 ### Community 61 - "2. DETAILED E2E TEST EVIDENCE & RESULTS (SECTIONS A — J)"
 Cohesion: 0.10
 Nodes (20): 1. EXECUTIVE SUMMARY & ACCEPTANCE TEST VERDICT, 2. DETAILED E2E TEST EVIDENCE & RESULTS (SECTIONS A — J), 3. GRANULAR PASS / FAIL MATRIX, 4. SIMPLE HUMAN LANGUAGE EXPLANATION, "How does the ASHA actually help the Citizen?" — The Real-World Story, "If I am the Admin, what do I do?", "If I am the ASHA, what do I do?", "If I am the Citizen, what do I do?" (+12 more)
 
-### Community 62 - "case.service.ts"
-Cohesion: 0.08
-Nodes (27): AssignCaseInput, AssignCaseInputSchema, CancelCaseFollowUpInput, CancelCaseFollowUpInputSchema, CasePrioritySchema, CaseStatusSchema, CaseTaskStatusSchema, CompleteCaseFollowUpInput (+19 more)
+### Community 62 - "case.schema.ts"
+Cohesion: 0.17
+Nodes (18): AssignCaseInput, AssignCaseInputSchema, CancelCaseFollowUpInputSchema, CasePrioritySchema, CaseStatusSchema, CaseTaskStatusSchema, CompleteCaseFollowUpInputSchema, CompleteCaseTaskInputSchema (+10 more)
 
 ### Community 65 - "types/ai.ts"
-Cohesion: 0.16
-Nodes (20): buildAssistantSystemInstruction(), formatEligibilityKnowledge(), formatSchemeKnowledge(), PROMPT_VERSION, SYSTEM_SAFETY_RULES, AIActionPlanItem, AICertaintyState, AIContext (+12 more)
+Cohesion: 0.19
+Nodes (16): AIActionPlanItem, AICapability, AICertaintyState, AIEligibilitySummary, AIEvidenceReference, AIExistingActionSummary, AIGapSummary, AIHouseholdSummary (+8 more)
 
-### Community 67 - "healthcare-assistant-drawer.tsx"
-Cohesion: 0.22
-Nodes (12): ChatEntry, FormattedMessageContent(), HealthcareAssistantDrawer(), renderInlineFormatted(), AssistantService, AssistantChatRequest, AssistantChatResponse, AssistantCitedEvidence (+4 more)
+### Community 66 - "api-client.ts"
+Cohesion: 0.18
+Nodes (10): HealthState, AuthFailureCallback, authService, eligibilityService, evidenceService, guidanceService, ApiErrorResponse, HealthCheckResponse (+2 more)
+
+### Community 67 - "privileged-auth.service.ts"
+Cohesion: 0.18
+Nodes (7): args, hash, AttemptRecord, PrivilegedAuthService, VerificationResult, hashSecret(), verifySecretHash()
 
 ### Community 69 - "3. Forensic Root-Cause Analysis & Fixes Implemented"
 Cohesion: 0.11
 Nodes (17): 1. Executive Summary & Core Principles, 2. State Transition Lifecycle Matrix, 3. Forensic Root-Cause Analysis & Fixes Implemented, 4. Single Source of Truth & Counting Model Rules, 5. Automated Verification & Test Coverage, A. PM-JAY (Ayushman Bharat — Senior Citizen & Vulnerable Household), B. JSY (Janani Suraksha Yojana — Maternal Health & Institutional Delivery), Bug #1: Journey Appears Completed Before Starting (+9 more)
 
-### Community 70 - "routes/voice.ts"
+### Community 70 - "voice.schema.ts"
 Cohesion: 0.11
-Nodes (19): AshaCallRequestInput, AshaCallRequestSchema, CitizenCallRequestInput, CitizenCallRequestSchema, ExotelInboundWebhook, ExotelInboundWebhookSchema, ExotelStatusCallback, ExotelStatusCallbackSchema (+11 more)
+Nodes (17): AshaCallRequestInput, AshaCallRequestSchema, CitizenCallRequestInput, CitizenCallRequestSchema, ExotelInboundWebhook, ExotelInboundWebhookSchema, ExotelStatusCallback, ExotelStatusCallbackSchema (+9 more)
 
-### Community 71 - "useTranslation"
-Cohesion: 0.10
-Nodes (36): AshaWorkspacePage(), ConsentPage(), SignInPage(), CitizenPage(), metadata, viewport, HomePage(), BrandLogo() (+28 more)
-
-### Community 72 - "routes/nfc.ts"
+### Community 71 - "header.tsx"
 Cohesion: 0.24
-Nodes (10): NfcCancelRotationInput, NfcCancelRotationSchema, NfcConfirmRotationInput, NfcConfirmRotationSchema, NfcProvisionParamsInput, NfcProvisionParamsSchema, NfcResolveInput, NfcResolveSchema (+2 more)
+Nodes (10): metadata, viewport, BrandLogo(), BrandLogoProps, SIZE_MAP, Footer(), Header(), MobileNav() (+2 more)
+
+### Community 72 - "UserRepository"
+Cohesion: 0.23
+Nodes (5): UserRepository, ConnectionServiceError, ConsentStatus, ConsentSubmission, RoleAssignmentRequest
 
 ### Community 73 - "routes/auth.ts"
 Cohesion: 0.17
-Nodes (14): authRoutes(), maskEmail(), ConsentStatusSchema, ConsentSubmissionInput, ConsentSubmissionSchema, RoleAssignmentInput, RoleAssignmentSchema, RolePrevalidateInput (+6 more)
+Nodes (14): CURRENT_CONSENT_VERSION, maskEmail(), ConsentStatusSchema, ConsentSubmissionInput, ConsentSubmissionSchema, RoleAssignmentInput, RoleAssignmentSchema, RolePrevalidateInput (+6 more)
 
 ### Community 74 - "SwasthyaSetu — Scheme-Assistance Workflow Specification"
 Cohesion: 0.12
 Nodes (15): 1. Overview & Architectural Purpose, 2. Supported Schemes & Versioned Pathways, 3. Common Assistance Domain Model, 4. State Machines, 5. Security & Multi-Tenant IDOR Boundaries, 6. API Map, 7. Firestore Data Hierarchy, A. Assistance Request (`asha_assistance_requests/{requestId}`) (+7 more)
 
 ### Community 75 - "routes/connection.ts"
-Cohesion: 0.43
-Nodes (5): AshaServiceCodeSchema, ConnectionActionInput, ConnectionActionSchema, CreateConnectionRequestInput, CreateConnectionRequestSchema
+Cohesion: 0.16
+Nodes (11): AssistantChatRequestInput, AssistantChatRequestSchema, AssistantLanguageSchema, AssistantMessageInput, AssistantMessageSchema, AssistantRoleSchema, AshaServiceCodeSchema, ConnectionActionInput (+3 more)
 
 ### Community 76 - "SwasthyaSetu — Phase 10: Actions, Follow-ups & n8n Automation Engine"
 Cohesion: 0.13
@@ -404,13 +420,9 @@ Nodes (13): 1. Executive Summary & Semantic Definitions, 2. Mathematical Countin
 Cohesion: 0.25
 Nodes (9): Badge(), BadgeProps, ButtonProps, StatusBadgeProps, BadgeVariant, ButtonSize, ButtonVariant, NavItem (+1 more)
 
-### Community 81 - "ApiClient"
-Cohesion: 0.12
-Nodes (10): DevStatusBar(), env, HealthState, useHealthCheck(), ApiClient, AuthFailureCallback, guidanceService, schemeService (+2 more)
-
-### Community 82 - "routes/leave.ts"
-Cohesion: 0.31
-Nodes (7): ApproveLeaveRequestInput, ApproveLeaveRequestSchema, CreateLeaveRequestInput, CreateLeaveRequestSchema, DateStringSchema, RejectLeaveRequestInput, RejectLeaveRequestSchema
+### Community 82 - "BaseFirestoreRepository"
+Cohesion: 0.24
+Nodes (3): BaseFirestoreRepository, FilterCondition, ListOptions
 
 ### Community 83 - "Sarvam AI + Exotel Multilingual Voice & Telephony Assistance"
 Cohesion: 0.17
@@ -420,6 +432,10 @@ Nodes (11): 1. Architectural Overview & Design Philosophy, 2. Provider API Contr
 Cohesion: 0.17
 Nodes (11): 1. Overview, 2.1 `/schemes/{schemeId}` Document, 2.2 `/schemes/{schemeId}/versions/{versionId}` Document, 2. Cloud Firestore Data Model, 3.1 Supported Operators, 3.2 Boolean Composition, 3. Deterministic Rule Grammar & Operators, 4. API Endpoints (+3 more)
 
+### Community 85 - "VoiceServiceClient"
+Cohesion: 0.17
+Nodes (4): VoiceServiceClient, InitiateOutboundCallInput, VerifyCallerIdentityInput, VoiceTurnInput
+
 ### Community 86 - "SwasthyaSetu — System Architecture & Architectural Principles"
 Cohesion: 0.18
 Nodes (10): 1. System Overview, 2.1 Authentication vs. Authorization vs. Consent, 2.2 Role Architecture & Authoritative Source, 2. Authentication, Roles & Authorization (Phase 2), 3.1 Ownership Model & Security, 3.2 Member Subcollection Isolation, 3. Household Onboarding & Management (Phase 3), 4. Observability & Correlation Tracing (+2 more)
@@ -428,9 +444,9 @@ Nodes (10): 1. System Overview, 2.1 Authentication vs. Authorization vs. Consent
 Cohesion: 0.18
 Nodes (10): 1. Architecture Overview, 2. Repository Structure, 3. Local Development Setup, 4. Running Automated Tests & Builds, 5. Phase 3 Implemented Capabilities, Backend Vitest Test Suite (28 Tests), Full Production Build (Backend + Frontend), Prerequisites (+2 more)
 
-### Community 88 - "schemas/index.ts"
-Cohesion: 0.21
-Nodes (8): assistanceRoutes(), parseResultError(), AssistanceServiceError, AssistanceCategoryEnum, AssistancePriorityEnum, AssistanceStatusEnum, CreateAssistanceRequestSchema, UpdateAssistanceRequestSchema
+### Community 88 - "routes/assistance.ts"
+Cohesion: 0.24
+Nodes (7): parseResultError(), AssistanceServiceError, AssistanceCategoryEnum, AssistancePriorityEnum, AssistanceStatusEnum, CreateAssistanceRequestSchema, UpdateAssistanceRequestSchema
 
 ### Community 89 - "2. Color Palette & Tokens"
 Cohesion: 0.20
@@ -444,9 +460,9 @@ Nodes (9): 1. Security Architecture & Invariants, 2. Generating & Configuring Pr
 Cohesion: 0.20
 Nodes (10): 28.1 Health & Diagnostics, 28.2 Authentication & User Governance, 28.3 Household & Family Management, 28.4 Scheme Registry & Eligibility, 28.5 ASHA Connection & Caseload, 28.6 Assistance Requests & Case Management, 28.7 Voice & Telephony, 28.8 Automation & n8n Webhooks (+2 more)
 
-### Community 92 - "execute-clean-reset.ts"
+### Community 92 - "LyzrService"
 Cohesion: 0.33
-Nodes (5): isIdentifiedTestAccount(), ResetPlanItem, runReset(), TEST_EMAIL_PATTERNS, TEST_UID_EXACT
+Nodes (3): runPhase7LyzrSmoke(), LyzrService, buildEligibilityExplanationPrompt()
 
 ### Community 93 - "routes/household.ts"
 Cohesion: 0.33
@@ -460,9 +476,9 @@ Nodes (8): 1. Architectural Boundary, 1. `households` (`/households/{householdId
 Cohesion: 0.22
 Nodes (8): 1. Overview, 2. Directory Structure, 3. Usage & CLI Commands, Fast Code-Only Scan (AST Mode), Full Graph Scan, Incremental Update (After Code Changes), Querying the Knowledge Graph, SwasthyaSetu — Graphify Knowledge Graph Documentation
 
-### Community 96 - "assistant.schema.ts"
-Cohesion: 0.29
-Nodes (6): AssistantChatRequestInput, AssistantChatRequestSchema, AssistantLanguageSchema, AssistantMessageInput, AssistantMessageSchema, AssistantRoleSchema
+### Community 96 - "sign-in/page.tsx"
+Cohesion: 0.36
+Nodes (5): SignInPage(), DevStatusBar(), env, useHealthCheck(), getFriendlyAuthErrorMessage()
 
 ### Community 97 - "3. Endpoints Summary"
 Cohesion: 0.25
@@ -479,6 +495,10 @@ Nodes (7): 12.1 Operational Metric Dashboard, 12.2 Attention Signal Triage, 12.3
 ### Community 101 - "13. Admin Console Functional Specification"
 Cohesion: 0.29
 Nodes (7): 13.1 Platform Overview Dashboard, 13.2 Complete Household Directory, 13.3 ASHA Workforce Management, 13.4 Platform-Wide Case Oversight, 13.5 Scheme Registry & Policy Governance, 13.6 System Monitoring & Telemetry, 13. Admin Console Functional Specification
+
+### Community 102 - "firebase.ts"
+Cohesion: 0.50
+Nodes (4): fastify, FastifyInstance, firebasePlugin(), resolveFilePath()
 
 ### Community 103 - "35. Complete A-to-Z User Journeys"
 Cohesion: 0.40
@@ -545,24 +565,24 @@ Cohesion: 0.67
 Nodes (3): 6.1 Web Application & Data Plane Architecture, 6.2 Real-Time PSTN Voice & Telephony Architecture, 6. High-Level System Architecture
 
 ## Knowledge Gaps
-- **619 isolated node(s):** `name`, `version`, `private`, `description`, `main` (+614 more)
+- **592 isolated node(s):** `name`, `version`, `private`, `description`, `main` (+587 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `UserProfile` connect `UserProfile` to `types/case.ts`, `auth-context.tsx`, `types/auth.ts`, `nfc.service.ts`, `AshaConnectionRequest`, `plugins/auth.ts`, `leave.service.ts`, `.listCasesByAsha`, `AshaAssistanceRequest`, `case.service.ts`, `Household`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
-- **Why does `AutomationService` connect `AutomationService` to `types/voice.ts`, `types/case.ts`, `routes/voice.ts`, `plugins/auth.ts`, `UserProfile`, `case.service.ts`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Why does `ApiResult` connect `ApiResult` to `healthcare-assistant-drawer.tsx`, `types/auth.ts`, `types/evidence.ts`, `types/guidance.ts`, `nfc.service.ts`, `routes/voice.ts`, `citizen/page.tsx`, `ApiClient`, `VoiceSession`, `leave.service.ts`, `AshaAssistanceRequest`, `.listCasesByAsha`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `HouseholdRepository` connect `plugins/auth.ts` to `types/voice.ts`, `SarvamService`, `types/evidence.ts`, `UserRepository`, `AshaConnectionRequest`, `assistant.service.ts`, `UserProfile`, `BaseFirestoreRepository`, `case.service.ts`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **Why does `Household` connect `plugins/auth.ts` to `types/ai.ts`, `src/config/constants.ts`, `api-client.ts`, `types/evidence.ts`, `types/guidance.ts`, `UserRepository`, `types/eligibility.ts`, `citizen/page.tsx`, `gap.service.ts`, `ApiResult`, `case.service.ts`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `SchemeRepository` connect `plugins/auth.ts` to `src/config/constants.ts`, `types/evidence.ts`, `types/eligibility.ts`, `assistant.service.ts`, `BaseFirestoreRepository`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _619 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _592 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `cn` be split into smaller, more focused modules?**
-  _Cohesion score 0.08325624421831637 - nodes in this community are weakly interconnected._
-- **Should `types/case.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.054344063689858085 - nodes in this community are weakly interconnected._
-- **Should `types/auth.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.08350951374207188 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08686868686868687 - nodes in this community are weakly interconnected._
+- **Should `src/config/constants.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.13240418118466898 - nodes in this community are weakly interconnected._
+- **Should `types/evidence.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.08050655811849841 - nodes in this community are weakly interconnected._
