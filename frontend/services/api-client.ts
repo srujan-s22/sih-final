@@ -41,11 +41,23 @@ class ApiClient {
     const correlationId = this.generateCorrelationId();
 
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
       Accept: "application/json",
       "X-Correlation-ID": correlationId,
       ...(options.headers as Record<string, string>),
     };
+
+    // Only set Content-Type: application/json when a request body actually exists,
+    // preserving any explicitly supplied Content-Type headers (case-insensitive check).
+    const hasExplicitContentType = Boolean(
+      headers["Content-Type"] || headers["content-type"]
+    );
+    if (
+      options.body !== undefined &&
+      options.body !== null &&
+      !hasExplicitContentType
+    ) {
+      headers["Content-Type"] = "application/json";
+    }
 
     const rawHeaders = options.headers as Record<string, string> | undefined;
     const hadExplicitAuth = Boolean(rawHeaders?.["Authorization"] || rawHeaders?.["authorization"]);

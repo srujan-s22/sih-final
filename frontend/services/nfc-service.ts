@@ -50,7 +50,8 @@ export class NfcServiceClient {
     householdId: string
   ): Promise<ApiResult<NfcProvisionResponse>> {
     return apiClient.post<NfcProvisionResponse>(
-      `/api/v1/asha/households/${encodeURIComponent(householdId)}/nfc`
+      `/api/v1/asha/households/${encodeURIComponent(householdId)}/nfc`,
+      {}
     );
   }
 
