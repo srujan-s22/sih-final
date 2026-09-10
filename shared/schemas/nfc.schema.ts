@@ -74,6 +74,12 @@ export const NfcResolveSchema = z.object({
     .trim()
     .min(16, "Access token must be at least 16 characters")
     .max(128, "Access token must be under 128 characters"),
+  version: z
+    .number()
+    .int("Version must be an integer")
+    .positive("Version must be a positive integer")
+    .max(100000, "Version parameter out of range")
+    .optional(),
 });
 
 export type NfcProvisionParamsInput = z.infer<typeof NfcProvisionParamsSchema>;

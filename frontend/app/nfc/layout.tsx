@@ -7,6 +7,7 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  referrer: "no-referrer",
 };
 
 export default function NfcLayout({

@@ -25,28 +25,51 @@ import {
   Square,
 } from "lucide-react";
 
+import { parseNfcCredential, ParseNfcCredentialResult, NfcCredential } from "@/lib/nfc/nfc-parser";
+
 function NfcResolverContent() {
   const searchParams = useSearchParams();
   const { t, language, setLanguage, languages } = useTranslation();
 
-  // Read initial credential from URL search params into memory
-  const initialHouseholdId = searchParams.get("hh");
-  const initialToken = searchParams.get("t");
+  // Parse NFC credential on initial mount with strict validation & duplicate detection
+  const [parseResult] = useState<ParseNfcCredentialResult>(() =>
+    parseNfcCredential(searchParams)
+  );
 
-  // Keep credentials in memory only (never written to localStorage/sessionStorage)
-  const [householdId] = useState<string | null>(initialHouseholdId);
-  const [token] = useState<string | null>(initialToken);
+  // Keep bearer credentials strictly in memory (never written to localStorage/sessionStorage/cookies)
+  const credentialRef = useRef<NfcCredential | null>(
+    parseResult.status === "VALID" ? parseResult.credential : null
+  );
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(parseResult.status === "VALID");
   const [data, setData] = useState<NfcResolveResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    parseResult.status === "MALFORMED" ? t("nfc.invalidCardDesc") : null
+  );
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
 
+  // In-flight concurrency guard and AbortController for clean unmounts
+  const inFlightRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
   // Check speech synthesis support on mount
   useEffect(() => {
+    isMountedRef.current = true;
     setIsSpeechSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+
+    // Section 8 & 9: Sanitize visible URL bar immediately once credentials/parameters are processed
+    // This ensures bearer tokens do not linger in the browser window whether resolution succeeds or fails.
+    if (typeof window !== "undefined" && window.history?.replaceState && window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
     return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -54,39 +77,65 @@ function NfcResolverContent() {
   }, []);
 
   const resolveCredential = useCallback(async () => {
-    if (!householdId || !token) {
+    const cred = credentialRef.current;
+    if (!cred || !cred.householdId || !cred.token) {
       return;
     }
+
+    // In-flight guard to prevent duplicate concurrent executions (e.g. React 19 StrictMode)
+    if (inFlightRef.current) {
+      return;
+    }
+    inFlightRef.current = true;
+
+    // Abort any preceding in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     setError(null);
 
     try {
-      const res = await nfcService.resolvePublicNfc(householdId, token);
+      const res = await nfcService.resolvePublicNfc(
+        cred.householdId,
+        cred.token,
+        cred.version,
+        controller.signal
+      );
+
+      if (!isMountedRef.current) return;
+
       if (res.success) {
         setData(res.data);
-
-        // Security Hardening (Issue 3):
-        // Once successfully resolved, clean the bearer credential from the visible URL bar
-        // using history replacement without triggering a Next.js re-navigation.
-        if (typeof window !== "undefined" && window.history?.replaceState) {
-          window.history.replaceState(null, "", window.location.pathname);
-        }
       } else {
-        setError(res.error?.message || t("nfc.invalidCardDesc"));
+        if (res.error?.code === "REQUEST_ABORTED") {
+          return;
+        }
+        if (res.error?.code === "RATE_LIMIT_EXCEEDED") {
+          setError(res.error.message || t("nfc.invalidCardDesc"));
+        } else {
+          setError(t("nfc.invalidCardDesc"));
+        }
       }
     } catch {
+      if (!isMountedRef.current) return;
       setError(t("nfc.invalidCardDesc"));
     } finally {
-      setLoading(false);
+      inFlightRef.current = false;
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [householdId, token, t]);
+  }, [t]);
 
   useEffect(() => {
-    if (householdId && token) {
+    if (parseResult.status === "VALID") {
       resolveCredential();
     }
-  }, [householdId, token, resolveCredential]);
+  }, [parseResult.status, resolveCredential]);
 
   // Accessible Audio Playback (Issue 11 & 12):
   // Reads strictly visible, approved public information in the selected language.
@@ -225,7 +274,7 @@ function NfcResolverContent() {
         </header>
 
         {/* STATE 1: NO NFC CREDENTIAL IN URL */}
-        {!householdId || !token ? (
+        {parseResult.status === "EMPTY" && !data ? (
           <section
             id="nfc-no-params"
             className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-center space-y-5 shadow-xs"
@@ -310,14 +359,24 @@ function NfcResolverContent() {
             </div>
 
             <div className="pt-2 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={resolveCredential}
-                className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-5 py-2.5 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-900 rounded-lg shadow-2xs transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>{t("nfc.tryAgain")}</span>
-              </button>
+              {credentialRef.current ? (
+                <button
+                  type="button"
+                  onClick={resolveCredential}
+                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-5 py-2.5 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-900 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{t("nfc.tryAgain")}</span>
+                </button>
+              ) : (
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-5 py-2.5 text-xs font-semibold text-teal-800 hover:text-teal-950 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>{t("nfc.backToHome")}</span>
+                </Link>
+              )}
             </div>
           </section>
         ) : data ? (

@@ -149,6 +149,21 @@ class ApiClient {
 
       return { success: true, data, correlationId: responseCorrelationId };
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return {
+          success: false,
+          error: {
+            success: false,
+            error: "AbortError",
+            message: "Request was cancelled.",
+            code: "REQUEST_ABORTED",
+            correlation_id: correlationId,
+            timestamp: new Date().toISOString(),
+          },
+          correlationId,
+        };
+      }
+
       const networkError: ApiErrorResponse = {
         success: false,
         error: "NetworkError",

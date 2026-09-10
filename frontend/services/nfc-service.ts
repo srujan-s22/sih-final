@@ -16,12 +16,19 @@ export class NfcServiceClient {
    */
   public async resolvePublicNfc(
     householdId: string,
-    token: string
+    token: string,
+    version?: number,
+    signal?: AbortSignal
   ): Promise<ApiResult<NfcResolveResponse>> {
-    return apiClient.post<NfcResolveResponse>("/api/v1/nfc/resolve", {
-      householdId,
-      token,
-    });
+    return apiClient.post<NfcResolveResponse>(
+      "/api/v1/nfc/resolve",
+      {
+        householdId,
+        token,
+        ...(version !== undefined ? { version } : {}),
+      },
+      { signal }
+    );
   }
   /**
    * Retrieves safe status metadata for a household's NFC tag.
