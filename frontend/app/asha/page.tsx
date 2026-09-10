@@ -40,8 +40,12 @@ import {
   CalendarDays,
   FileCheck,
   PhoneCall,
+  Radio,
 } from "lucide-react";
 import { caseService } from "@/services/case-service";
+import { nfcService } from "@/services/nfc-service";
+import { AshaNfcModal } from "@/components/nfc/asha-nfc-modal";
+import { HouseholdNfcStatusResponse } from "@shared/types/nfc";
 import { connectionService } from "@/services/connection-service";
 import { assistanceService } from "@/services/assistance-service";
 import { voiceService } from "@/services/voice-service";
@@ -112,6 +116,11 @@ export default function AshaWorkspacePage() {
   const [selectedRequestContext, setSelectedRequestContext] = useState<AshaAssistanceRequest | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailTab, setDetailTab] = useState<CaseDetailTab>("overview");
+
+  // NFC Management State
+  const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
+  const [caseNfcStatus, setCaseNfcStatus] = useState<HouseholdNfcStatusResponse | null>(null);
+  const [nfcStatusMap, setNfcStatusMap] = useState<Record<string, boolean>>({});
 
   // Tasks & Journey State
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -273,6 +282,21 @@ export default function AshaWorkspacePage() {
 
       if (casesRes.success && casesRes.data) {
         setCases(casesRes.data.cases);
+        // Non-blocking background fetch of NFC status for households in caseload
+        const uniqueHouseholdIds = Array.from(new Set(casesRes.data.cases.map((c) => c.householdId)));
+        uniqueHouseholdIds.forEach(async (hhId) => {
+          try {
+            const nfcRes = await nfcService.getHouseholdNfcStatus(hhId);
+            if (nfcRes.success && nfcRes.data) {
+              setNfcStatusMap((prev) => ({
+                ...prev,
+                [hhId]: nfcRes.data.hasActiveNfc,
+              }));
+            }
+          } catch {
+            // Non-blocking
+          }
+        });
       }
       if (summaryRes.success && summaryRes.data) {
         setSummary(summaryRes.data);
@@ -469,6 +493,9 @@ export default function AshaWorkspacePage() {
       const res = await caseService.getCaseDetail(caseId);
       if (res.success && res.data) {
         setCaseDetail(res.data);
+        if (res.data.household?.id) {
+          fetchNfcStatus(res.data.household.id);
+        }
       } else {
         setErrorMessage(res.success ? null : (res as any).error?.message || "Failed to load case details.");
       }
@@ -478,6 +505,23 @@ export default function AshaWorkspacePage() {
       setIsDetailLoading(false);
     }
   };
+
+  const fetchNfcStatus = useCallback(async (householdId: string) => {
+    try {
+      const res = await nfcService.getHouseholdNfcStatus(householdId);
+      if (res.success && res.data) {
+        setCaseNfcStatus(res.data);
+        setNfcStatusMap((prev) => ({
+          ...prev,
+          [householdId]: res.data.hasActiveNfc,
+        }));
+      } else {
+        setCaseNfcStatus(null);
+      }
+    } catch {
+      setCaseNfcStatus(null);
+    }
+  }, []);
 
   // Open Case Detail by Household ID
   const openCaseDetailByHousehold = (
@@ -497,6 +541,8 @@ export default function AshaWorkspacePage() {
     setSelectedCaseId(null);
     setCaseDetail(null);
     setSelectedRequestContext(null);
+    setCaseNfcStatus(null);
+    setIsNfcModalOpen(false);
   };
 
   // Status / Priority Update
@@ -1599,6 +1645,18 @@ export default function AshaWorkspacePage() {
                               >
                                 {c.status.replace(/_/g, " ")}
                               </span>
+                              {nfcStatusMap[c.householdId] !== undefined && (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                                    nfcStatusMap[c.householdId]
+                                      ? "bg-teal-50 text-teal-800 border-teal-200"
+                                      : "bg-slate-50 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  <Radio className="w-2.5 h-2.5" />
+                                  <span>{nfcStatusMap[c.householdId] ? "NFC: Registered" : "NFC: None"}</span>
+                                </span>
+                              )}
                             </div>
 
                             {/* Active Scheme or Gap detail */}
@@ -2721,6 +2779,20 @@ export default function AshaWorkspacePage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setIsNfcModalOpen(true)}
+                    className="text-xs font-semibold flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
+                    title={caseNfcStatus?.hasActiveNfc ? "Manage Household NFC Card" : "Register Household NFC Card"}
+                  >
+                    <Radio className="w-3.5 h-3.5 text-teal-700" />
+                    <span>
+                      {caseNfcStatus?.hasActiveNfc
+                        ? `NFC (v${caseNfcStatus.record?.version})`
+                        : "Register NFC"}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setIsAssistantOpen(true)}
                     className="text-xs font-semibold flex items-center gap-1 border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
                   >
@@ -3336,6 +3408,43 @@ export default function AshaWorkspacePage() {
                               {caseDetail.household.contactPhone || "Not Provided"}
                             </span>
                           </div>
+                        </div>
+
+                        {/* Household NFC Card Access Section */}
+                        <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
+                              <Radio className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-slate-900">Household NFC Smart Card</h4>
+                                {caseNfcStatus?.hasActiveNfc ? (
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px] flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Active v{caseNfcStatus.record?.version}
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-bold rounded-full text-[10px]">
+                                    Not Registered
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-500 mt-0.5 text-[11px]">
+                                {caseNfcStatus?.hasActiveNfc
+                                  ? `Physical card is linked to this household. Activated on ${new Date(caseNfcStatus.record?.createdAt || "").toLocaleDateString()}.`
+                                  : "Provision a physical NDEF tag to grant the family tap-to-access scheme details."}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsNfcModalOpen(true)}
+                            className="text-xs font-semibold shrink-0 bg-white border-teal-300 text-teal-800 hover:bg-teal-100/50 cursor-pointer"
+                          >
+                            <Radio className="w-3.5 h-3.5 mr-1" />
+                            {caseNfcStatus?.hasActiveNfc ? "Manage NFC" : "Register NFC"}
+                          </Button>
                         </div>
 
                         <div>
@@ -3972,6 +4081,24 @@ export default function AshaWorkspacePage() {
               }
               loadFollowUps();
               loadCaseload();
+            }}
+          />
+        )}
+
+        {/* ASHA NFC Provisioning & Management Modal */}
+        {isNfcModalOpen && caseDetail && (
+          <AshaNfcModal
+            isOpen={isNfcModalOpen}
+            onClose={() => setIsNfcModalOpen(false)}
+            householdId={caseDetail.household.id}
+            headOfHouseholdName={caseDetail.household.headOfHouseholdName}
+            village={caseDetail.household.village}
+            district={caseDetail.household.district}
+            state={caseDetail.household.state}
+            onNfcStatusChanged={() => {
+              if (caseDetail.household.id) {
+                fetchNfcStatus(caseDetail.household.id);
+              }
             }}
           />
         )}

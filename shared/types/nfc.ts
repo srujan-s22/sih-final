@@ -89,3 +89,20 @@ export interface NfcResolveResponse {
   schemes: NfcPublicSchemeSummary[];
   asha: NfcPublicAshaInfo | null;
 }
+
+/**
+ * Safe status metadata for an authorized household NFC credential query.
+ * Excludes raw tokens and cryptographic hashes.
+ */
+export interface HouseholdNfcStatusResponse {
+  hasActiveNfc: boolean;
+  record: {
+    id: string;
+    householdId: string;
+    version: number;
+    status: NfcCardStatus;
+    createdAt: string;
+    updatedAt: string;
+    revokedAt?: string | null;
+  } | null;
+}

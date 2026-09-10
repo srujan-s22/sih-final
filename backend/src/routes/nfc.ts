@@ -216,4 +216,45 @@ export const nfcRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
   );
+
+  /**
+   * GET /api/v1/asha/households/:householdId/nfc
+   * Retrieves safe status and version metadata for a household's NFC tag.
+   * Guard: ASHA (assigned to household) or Admin.
+   */
+  fastify.get<{ Params: { householdId: string } }>(
+    "/v1/asha/households/:householdId/nfc",
+    { preHandler: [requireRole(["ASHA", "ADMIN"]), requireConsent] },
+    async (request, reply) => {
+      const correlationId = request.correlationId || "nfc-status-ctx";
+
+      const paramResult = NfcProvisionParamsSchema.safeParse(request.params);
+      if (!paramResult.success) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+          success: false,
+          code: "VALIDATION_FAILED",
+          error: "ValidationError",
+          message: paramResult.error.errors[0]?.message || "Invalid household parameter.",
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      try {
+        const result = await fastify.nfcService.getHouseholdNfcStatus(
+          paramResult.data.householdId,
+          request.userProfile!
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: result,
+          correlation_id: correlationId,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        return handleNfcError(err, reply, correlationId);
+      }
+    }
+  );
 };

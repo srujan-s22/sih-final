@@ -518,4 +518,53 @@ describe("Phase 1: Secure NFC Backend Foundation", () => {
       expect(activeRecords.length).toBe(1);
     });
   });
+
+  // ============================================================================
+  // F. STATUS QUERY TESTS
+  // ============================================================================
+  describe("F. Safe NFC Status Query", () => {
+    it("22. returns hasActiveNfc: false when no card has been provisioned", async () => {
+      await establishConsent(asha1Token);
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/v1/asha/households/${householdId}/nfc`,
+        headers: { authorization: `Bearer ${asha1Token}` },
+      });
+
+      expect(res.statusCode).toBe(HTTP_STATUS.OK);
+      const body = res.json();
+      expect(body.success).toBe(true);
+      expect(body.data.hasActiveNfc).toBe(false);
+      expect(body.data.record).toBeNull();
+    });
+
+    it("23. returns hasActiveNfc: true with safe metadata (no token/hash) when card is active", async () => {
+      await establishConsent(asha1Token);
+
+      await app.inject({
+        method: "POST",
+        url: `/api/v1/asha/households/${householdId}/nfc`,
+        headers: { authorization: `Bearer ${asha1Token}` },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/v1/asha/households/${householdId}/nfc`,
+        headers: { authorization: `Bearer ${asha1Token}` },
+      });
+
+      expect(res.statusCode).toBe(HTTP_STATUS.OK);
+      const body = res.json();
+      expect(body.success).toBe(true);
+      expect(body.data.hasActiveNfc).toBe(true);
+      expect(body.data.record.version).toBe(1);
+      expect(body.data.record.status).toBe("ACTIVE");
+
+      // Verify NO token or tokenHash is leaked
+      const rawString = JSON.stringify(body);
+      expect(rawString).not.toContain("tokenHash");
+      expect(body.data.record.token).toBeUndefined();
+    });
+  });
 });

@@ -56,8 +56,10 @@ import {
   ArrowRight,
   ArrowRightLeft,
   UserMinus,
+  Radio,
 } from "lucide-react";
 import { HealthcareAssistantDrawer } from "@/components/assistant/healthcare-assistant-drawer";
+import { AshaNfcModal } from "@/components/nfc/asha-nfc-modal";
 
 interface AshaWorkerSummary {
   ashaUid: string;
@@ -110,6 +112,7 @@ export default function AdminPage() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseDetail, setCaseDetail] = useState<CaseDetailResponse | null>(null);
   const [isCaseDetailLoading, setIsCaseDetailLoading] = useState(false);
+  const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
 
   // --- Reassign ASHA Modal State ---
   const [reassigningCase, setReassigningCase] = useState<AshaCase | null>(null);
@@ -2671,15 +2674,29 @@ export default function AdminPage() {
                       {t("common.code")}: <span className="font-mono">{selectedCaseId}</span>
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedCaseId(null);
-                      setCaseDetail(null);
-                    }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {caseDetail && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsNfcModalOpen(true)}
+                        className="text-xs font-semibold flex items-center gap-1.5 border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
+                      >
+                        <Radio className="w-3.5 h-3.5 text-teal-700" />
+                        <span>NFC Actions</span>
+                      </Button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedCaseId(null);
+                        setCaseDetail(null);
+                        setIsNfcModalOpen(false);
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {isCaseDetailLoading ? (
@@ -3280,6 +3297,19 @@ export default function AdminPage() {
           onClose={() => setIsAssistantOpen(false)}
           userRole="ADMIN"
         />
+
+        {/* Admin NFC Management Modal */}
+        {isNfcModalOpen && caseDetail && (
+          <AshaNfcModal
+            isOpen={isNfcModalOpen}
+            onClose={() => setIsNfcModalOpen(false)}
+            householdId={caseDetail.household.id}
+            headOfHouseholdName={caseDetail.household.headOfHouseholdName}
+            village={caseDetail.household.village}
+            district={caseDetail.household.district}
+            state={caseDetail.household.state}
+          />
+        )}
       </AuthenticatedShell>
     </ProtectedRoute>
   );

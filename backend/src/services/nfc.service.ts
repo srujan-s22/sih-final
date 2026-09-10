@@ -5,6 +5,7 @@ import {
   NfcProvisionResponse,
   NfcRevokeResponse,
   NfcResolveResponse,
+  HouseholdNfcStatusResponse,
   NfcPublicSchemeSummary,
   NfcPublicAshaInfo,
 } from "../../../shared/types/nfc.js";
@@ -278,6 +279,38 @@ export class NfcService {
       householdId,
       status: "REVOKED",
       revokedAt: now,
+    };
+  }
+
+  /**
+   * Safe status query for authorized ASHA / Admin to check if an active card exists.
+   * Strictly returns metadata only — NEVER returns raw tokens or token hashes.
+   */
+  public async getHouseholdNfcStatus(
+    householdId: string,
+    actorProfile: UserProfile
+  ): Promise<HouseholdNfcStatusResponse> {
+    await this.verifyHouseholdAuthorization(householdId, actorProfile);
+
+    const activeRecord = await this.nfcRepo.getActiveByHouseholdId(householdId);
+    if (!activeRecord) {
+      return {
+        hasActiveNfc: false,
+        record: null,
+      };
+    }
+
+    return {
+      hasActiveNfc: true,
+      record: {
+        id: activeRecord.id,
+        householdId: activeRecord.householdId,
+        version: activeRecord.version,
+        status: activeRecord.status,
+        createdAt: activeRecord.createdAt,
+        updatedAt: activeRecord.updatedAt,
+        revokedAt: activeRecord.revokedAt,
+      },
     };
   }
 
