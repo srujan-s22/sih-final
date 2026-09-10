@@ -8,6 +8,7 @@ import {
   buildNfcUrl,
   isNfcWritingSupported,
   writeNfcTag,
+  copyNfcLinkToClipboard,
 } from "../../frontend/lib/nfc/nfc-writer.js";
 
 const getGlobal = (): Record<string, any> => globalThis as Record<string, any>;
@@ -344,6 +345,241 @@ describe("Phase 2: ASHA NFC Provisioning & Physical NFC Writing Flow", () => {
       expect(writeMock).toHaveBeenCalledTimes(1);
       expect(onRetryMock).not.toHaveBeenCalled();
       expect(result.error).toContain("read-only");
+    });
+  });
+
+  // =========================================================================
+  // 3b. Web NFC Fallback & Clipboard Provisioning URL Transport
+  // =========================================================================
+  describe("Web NFC Fallback & Clipboard Provisioning URL Transport", () => {
+    const originalNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    const originalDocumentDesc = Object.getOwnPropertyDescriptor(globalThis, "document");
+    const originalLocalStorage = getGlobal().localStorage;
+    const originalSessionStorage = getGlobal().sessionStorage;
+
+    const setMockNavigator = (val: any) => {
+      Object.defineProperty(globalThis, "navigator", {
+        value: val,
+        configurable: true,
+        writable: true,
+      });
+    };
+
+    const setMockDocument = (val: any) => {
+      Object.defineProperty(globalThis, "document", {
+        value: val,
+        configurable: true,
+        writable: true,
+      });
+    };
+
+    afterEach(() => {
+      if (originalNavigatorDesc) {
+        Object.defineProperty(globalThis, "navigator", originalNavigatorDesc);
+      } else {
+        delete (globalThis as any).navigator;
+      }
+      if (originalDocumentDesc) {
+        Object.defineProperty(globalThis, "document", originalDocumentDesc);
+      } else {
+        delete (globalThis as any).document;
+      }
+      if (originalLocalStorage !== undefined) {
+        getGlobal().localStorage = originalLocalStorage;
+      } else {
+        delete getGlobal().localStorage;
+      }
+      if (originalSessionStorage !== undefined) {
+        getGlobal().sessionStorage = originalSessionStorage;
+      } else {
+        delete getGlobal().sessionStorage;
+      }
+      vi.restoreAllMocks();
+    });
+
+    it("rejects empty or whitespace URL with safe error without throwing", async () => {
+      const res1 = await copyNfcLinkToClipboard("");
+      expect(res1.success).toBe(false);
+      expect(res1.error).toBe("No NFC link available to copy.");
+
+      const res2 = await copyNfcLinkToClipboard("   ");
+      expect(res2.success).toBe(false);
+      expect(res2.error).toBe("No NFC link available to copy.");
+    });
+
+    it("successfully copies generated provisioning URL via navigator.clipboard.writeText", async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      setMockNavigator({
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+
+      const testUrl = "https://swasthyasetu.org/nfc?hh=hh_123&t=sample_secure_token";
+      const result = await copyNfcLinkToClipboard(testUrl);
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeUndefined();
+      expect(writeTextMock).toHaveBeenCalledTimes(1);
+      expect(writeTextMock).toHaveBeenCalledWith(testUrl);
+    });
+
+    it("handles clipboard permission rejection safely and returns clear error message", async () => {
+      const permError = new Error("Clipboard permission was denied by user agent");
+      const writeTextMock = vi.fn().mockRejectedValue(permError);
+      setMockNavigator({
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+
+      const testUrl = "https://swasthyasetu.org/nfc?hh=hh_123&t=sample_secure_token";
+      const result = await copyNfcLinkToClipboard(testUrl);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unable to copy NFC link automatically");
+      expect(result.error).toContain("clipboard permissions");
+    });
+
+    it("falls back to document.execCommand when navigator.clipboard is unavailable", async () => {
+      // Modern clipboard unavailable
+      setMockNavigator({});
+
+      const appendChildMock = vi.fn();
+      const removeChildMock = vi.fn();
+      const selectMock = vi.fn();
+      const focusMock = vi.fn();
+      const execCommandMock = vi.fn().mockReturnValue(true);
+
+      const mockTextArea = {
+        value: "",
+        style: {},
+        setAttribute: vi.fn(),
+        select: selectMock,
+        focus: focusMock,
+      };
+
+      setMockDocument({
+        createElement: vi.fn().mockReturnValue(mockTextArea),
+        body: {
+          appendChild: appendChildMock,
+          removeChild: removeChildMock,
+        },
+        execCommand: execCommandMock,
+      });
+
+      const testUrl = "https://swasthyasetu.org/nfc?hh=hh_legacy&t=token_legacy_123";
+      const result = await copyNfcLinkToClipboard(testUrl);
+
+      expect(result.success).toBe(true);
+      expect(getGlobal().document.createElement).toHaveBeenCalledWith("textarea");
+      expect(mockTextArea.value).toBe(testUrl);
+      expect(appendChildMock).toHaveBeenCalledWith(mockTextArea);
+      expect(selectMock).toHaveBeenCalled();
+      expect(execCommandMock).toHaveBeenCalledWith("copy");
+      expect(removeChildMock).toHaveBeenCalledWith(mockTextArea);
+    });
+
+    it("copies the exact backend-generated URL without creating alternate tokens or modifying credentials", async () => {
+      await establishConsent(ashaAuthorizedToken);
+
+      // 1. Provision via real backend Fastify API
+      const provRes = await app.inject({
+        method: "POST",
+        url: `/api/v1/asha/households/${assignedHouseholdId}/nfc`,
+        headers: {
+          authorization: `Bearer ${ashaAuthorizedToken}`,
+        },
+      });
+      expect(provRes.statusCode).toBe(HTTP_STATUS.CREATED);
+      const provBody = JSON.parse(provRes.payload);
+      const { token, version, householdId } = provBody.data;
+
+      // 2. Build URL using existing origin & NTAG213 rules
+      const generatedUrl = buildNfcUrl(householdId, token, "https://swasthyasetu.gov.in", version);
+
+      // 3. Mock clipboard and copy
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      setMockNavigator({
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+
+      const copyResult = await copyNfcLinkToClipboard(generatedUrl);
+      expect(copyResult.success).toBe(true);
+
+      // Verify the copied URL is exact
+      const copiedUrl = writeTextMock.mock.calls[0][0];
+      expect(copiedUrl).toBe(generatedUrl);
+
+      const parsed = new URL(copiedUrl);
+      expect(parsed.pathname).toBe("/nfc");
+      expect(parsed.searchParams.get("hh")).toBe(assignedHouseholdId);
+      expect(parsed.searchParams.get("t")).toBe(token);
+      expect(parsed.searchParams.get("v")).toBeNull(); // version 1 omitted for NTAG213
+
+      // 4. Verify this exact copied URL resolves successfully via public NFC resolver
+      const resolveRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/nfc/resolve",
+        payload: {
+          householdId: parsed.searchParams.get("hh"),
+          token: parsed.searchParams.get("t"),
+        },
+      });
+      expect(resolveRes.statusCode).toBe(HTTP_STATUS.OK);
+      const resolveBody = JSON.parse(resolveRes.payload);
+      expect(resolveBody.data.household.displayName).toBe("Ramesh Kumar");
+
+      // 5. Verify no duplicate or alternate record exists in the repository
+      const allRecords = await app.nfcRepository.listByHouseholdId(assignedHouseholdId);
+      expect(allRecords.length).toBe(1);
+      expect(allRecords[0].version).toBe(1);
+    });
+
+    it("preserves zero storage persistence invariant: token is never stored in localStorage, sessionStorage, or cookies", async () => {
+      const mockStorage: Record<string, string> = {};
+      const storageMock = {
+        getItem: vi.fn((key: string) => mockStorage[key] || null),
+        setItem: vi.fn((key: string, val: string) => {
+          mockStorage[key] = val;
+        }),
+        length: 0,
+      };
+
+      getGlobal().localStorage = storageMock;
+      getGlobal().sessionStorage = storageMock;
+      setMockDocument({
+        cookie: "",
+      });
+
+      const testToken = "secure_raw_token_never_persist_12345";
+      const testUrl = buildNfcUrl("hh_storage_check", testToken, "https://swasthyasetu.org");
+
+      setMockNavigator({
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      await copyNfcLinkToClipboard(testUrl);
+
+      // Verify storage was never touched
+      expect(storageMock.setItem).not.toHaveBeenCalled();
+      expect(mockStorage[testToken]).toBeUndefined();
+      expect(getGlobal().document.cookie).not.toContain(testToken);
+    });
+
+    it("verifies the copied fallback URL complies with NTAG213 byte capacity limit (<117 bytes)", () => {
+      // Standard 32-byte base64url token is ~43 chars, canonical hostname
+      const token = "a".repeat(43);
+      const url = buildNfcUrl("hh_ramanagara_harohalli_01", token, "https://swasthyasetu.vercel.app");
+
+      const byteLength = new TextEncoder().encode(url).length;
+      // Must comfortably fit within NTAG213 117-byte usable limit
+      expect(byteLength).toBeLessThanOrEqual(117);
+      expect(new URL(url).searchParams.get("v")).toBeNull();
     });
   });
 

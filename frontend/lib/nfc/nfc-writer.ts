@@ -1,4 +1,6 @@
 declare const window: any;
+declare const navigator: any;
+declare const document: any;
 
 /**
  * Resolves the public site origin dynamically from environment variables or browser context.
@@ -235,4 +237,64 @@ export async function writeNfcTag(
       error: "An unexpected error occurred while communicating with the NFC tag.",
     };
   }
+}
+
+/**
+ * Copies the generated NFC provisioning URL to the user's clipboard.
+ * Production-quality fallback for environments lacking Web NFC (e.g. iOS Safari, desktop, non-Chrome browsers).
+ * Uses navigator.clipboard.writeText when available, with a safe fallback to document.execCommand.
+ * Does not persist, log, or expose the URL or token.
+ */
+export async function copyNfcLinkToClipboard(
+  nfcUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!nfcUrl || !nfcUrl.trim()) {
+    return { success: false, error: "No NFC link available to copy." };
+  }
+
+  // 1. Modern navigator.clipboard API
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+    ) {
+      await navigator.clipboard.writeText(nfcUrl);
+      return { success: true };
+    }
+  } catch {
+    // If navigator.clipboard fails (e.g. permissions or older WebKit), fall through to execCommand
+  }
+
+  // 2. Legacy fallback for older browsers or constrained contexts
+  try {
+    if (typeof document !== "undefined" && document.createElement && document.body) {
+      const textArea = document.createElement("textarea");
+      textArea.value = nfcUrl;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "-9999px";
+      textArea.style.opacity = "0";
+      textArea.setAttribute("readonly", "");
+      textArea.setAttribute("aria-hidden", "true");
+      document.body.appendChild(textArea);
+
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textArea);
+
+      if (successful) {
+        return { success: true };
+      }
+    }
+  } catch {
+    // Both mechanisms failed
+  }
+
+  return {
+    success: false,
+    error:
+      "Unable to copy NFC link automatically. Please check your browser clipboard permissions.",
+  };
 }

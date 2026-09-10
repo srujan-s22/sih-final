@@ -8,6 +8,7 @@ import {
   isNfcWritingSupported,
   buildNfcUrl,
   writeNfcTag,
+  copyNfcLinkToClipboard,
 } from "@/lib/nfc/nfc-writer";
 import { HouseholdNfcStatusResponse } from "@shared/types/nfc";
 import {
@@ -133,6 +134,7 @@ function AshaNfcModalInner({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [nfcVersion, setNfcVersion] = useState<number>(1);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [revokeReason, setRevokeReason] = useState("");
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isRotationFlow, setIsRotationFlow] = useState(false);
@@ -167,6 +169,7 @@ function AshaNfcModalInner({
     setSuccessMessage(null);
     setRevokeReason("");
     setCopied(false);
+    setCopyError(null);
     setIsRetryingWrite(false);
     onClose();
   };
@@ -428,35 +431,68 @@ function AshaNfcModalInner({
     }
   };
 
-  // Fallback demo simulation
-  const handleSimulateDemoWrite = async () => {
-    if (isRotationRef.current && pendingNfcIdRef.current) {
-      try {
-        await nfcService.confirmRotateNfc(
-          householdId,
-          pendingNfcIdRef.current,
-          nfcVersion,
-          revokeReason || "REPLACEMENT_DEMO_CONFIRMED"
-        );
-      } catch {
-        // Best-effort confirmation in demo mode
-      }
+  // Copy generated NFC link to clipboard with error handling
+  const handleCopyUrl = async () => {
+    setCopyError(null);
+    if (!currentUrlRef.current) {
+      setCopyError("No NFC link available to copy.");
+      return;
     }
+
+    const result = await copyNfcLinkToClipboard(currentUrlRef.current);
+    if (result.success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 4000);
+    } else {
+      setCopyError(result.error || "Unable to copy to clipboard.");
+    }
+  };
+
+  // Complete external NFC provision on unsupported devices
+  const handleCompleteExternalProvision = () => {
     clearSensitiveMemory();
     setSuccessMessage(
-      isRotationRef.current
-        ? "Replacement tag write simulated successfully. Previous card deactivated (Demo Mode)."
-        : "Tag write simulated successfully (Demo Mode)."
+      "The NFC card link was generated and copied. After writing the link to the card, family members can tap to view their schemes."
     );
     setStep("SUCCESS");
     onNfcStatusChanged?.();
   };
 
-  const handleCopyUrl = () => {
-    if (currentUrlRef.current) {
-      navigator.clipboard.writeText(currentUrlRef.current);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  // Complete external replacement confirmation on unsupported devices
+  const handleCompleteExternalRotation = async () => {
+    if (!pendingNfcIdRef.current) {
+      setStep("STATUS_OVERVIEW");
+      return;
+    }
+    setLoading(true);
+    try {
+      const confirmRes = await nfcService.confirmRotateNfc(
+        householdId,
+        pendingNfcIdRef.current,
+        nfcVersion,
+        revokeReason || "REPLACEMENT_EXTERNAL_CONFIRMED"
+      );
+      if (confirmRes.success) {
+        clearSensitiveMemory();
+        setSuccessMessage(
+          "The replacement NFC card was successfully activated on the server. The previous card is now deactivated."
+        );
+        setStep("SUCCESS");
+        onNfcStatusChanged?.();
+      } else {
+        setErrorMessage(
+          confirmRes.error.message ||
+            "Failed to activate replacement card on server. Your previous card remains active."
+        );
+        setStep("ERROR");
+      }
+    } catch {
+      setErrorMessage(
+        "Failed to communicate with server to activate replacement card. Your previous card remains active."
+      );
+      setStep("ERROR");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -590,8 +626,12 @@ function AshaNfcModalInner({
               </h4>
               <p className="text-slate-600 leading-relaxed">
                 This will generate a cryptographically secure, privacy-minimal access
-                link for <strong>{headOfHouseholdName}</strong>. Please ensure you have
-                an NDEF-compatible NFC tag ready.
+                link for <strong>{headOfHouseholdName}</strong>.
+                {isNfcSupported ? (
+                  <span> Please ensure you have an NDEF-compatible NFC tag ready.</span>
+                ) : (
+                  <span> Since this device does not support Web NFC writing, you will be able to copy the link and write it using an external NFC-writing app.</span>
+                )}
               </p>
             </div>
 
@@ -609,7 +649,7 @@ function AshaNfcModalInner({
                 onClick={handleStartProvisioning}
                 className="font-semibold"
               >
-                Continue & Write NFC
+                {isNfcSupported ? "Continue & Write NFC" : "Continue & Prepare NFC Link"}
               </Button>
             </div>
           </div>
@@ -626,6 +666,11 @@ function AshaNfcModalInner({
               <p className="text-amber-900 leading-relaxed">
                 Your current NFC card will <strong>remain active</strong> until the new card is successfully written.
                 Once confirmed, the new card (Version {(statusData?.record?.version || 1) + 1}) will activate and the previous card will be deactivated.
+                {!isNfcSupported && (
+                  <span className="block mt-1">
+                    On this device, you will generate and copy the replacement link to write using an external NFC app.
+                  </span>
+                )}
               </p>
               <div className="pt-2">
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
@@ -655,7 +700,7 @@ function AshaNfcModalInner({
                 onClick={handleStartRotation}
                 className="font-semibold bg-amber-700 hover:bg-amber-800 text-white"
               >
-                Proceed to Replace Card
+                {isNfcSupported ? "Proceed to Replace Card" : "Proceed & Prepare Replacement Link"}
               </Button>
             </div>
           </div>
@@ -767,73 +812,105 @@ function AshaNfcModalInner({
                 </div>
               </div>
             ) : (
-              /* Fallback when browser lacks Web NFC API */
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-xs">
+              /* Production Fallback when browser/device lacks Web NFC API */
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3.5 text-xs">
                 <div className="flex items-start gap-2.5">
-                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
                     <h4 className="font-bold text-slate-900 text-sm">
-                      Web NFC Not Supported on this Browser
+                      NFC writing isn&apos;t supported on this device
                     </h4>
-                    <p className="text-slate-600 mt-1 leading-relaxed">
-                      Web NFC writing requires an NFC-enabled Android phone running Google
-                      Chrome.
+                    <p className="text-slate-600 leading-relaxed">
+                      NFC writing isn&apos;t available in this browser. Copy the NFC link below and use an external NFC-writing app (such as NFC Tools) to write it to the NFC card.
                     </p>
                   </div>
                 </div>
 
-                <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Authorized Demo Fallback — NDEF Deep-Link URL:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={currentUrlRef.current || ""}
-                      className="w-full text-[11px] font-mono py-1.5 px-2 rounded bg-slate-100 border border-slate-200 text-slate-700"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyUrl}
-                      className="shrink-0 flex items-center gap-1 text-xs"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-slate-400">
-                    You can copy this link into an external NFC tool (e.g. NFC Tools app)
-                    or simulate a successful write for demo validation.
-                  </p>
+                {/* Primary Action: Copy NFC Link */}
+                <div className="pt-1">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={handleCopyUrl}
+                    className={`w-full py-2.5 font-semibold text-xs flex items-center justify-center gap-2 transition-colors ${
+                      copied
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "bg-teal-700 hover:bg-teal-800 text-white"
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4 text-white" />
+                        <span>NFC link copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Copy NFC Link</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-1">
+                {/* Copy Error Alert if clipboard operation failed */}
+                {copyError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-1 text-xs text-red-900">
+                    <p className="font-semibold flex items-center gap-1.5 text-red-800">
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Clipboard Error</span>
+                    </p>
+                    <p className="text-red-700 text-[11px] leading-relaxed">
+                      {copyError}
+                    </p>
+                  </div>
+                )}
+
+                {/* Instructions on how to write using external app */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-2 text-slate-700">
+                  <p className="font-semibold text-slate-900 text-[11px] flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                    <span>How to write to card:</span>
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-600 leading-normal">
+                    <li>Open an NFC-writing app (e.g. <strong>NFC Tools</strong> on iOS or Android).</li>
+                    <li>Select <strong>Write</strong> → <strong>Add a record</strong> → <strong>Custom URL / URI</strong>.</li>
+                    <li>Paste the copied NFC link and tap your card to the phone to complete writing.</li>
+                  </ol>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleCancelWrite}
+                    className="text-xs text-slate-600"
                   >
-                    Cancel
+                    {isRotationFlow ? "Cancel Replacement" : "Cancel"}
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleSimulateDemoWrite}
-                    className="font-semibold"
-                  >
-                    Simulate Tag Write (Demo Mode)
-                  </Button>
+                  {isRotationFlow ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleCompleteExternalRotation}
+                      disabled={loading}
+                      className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{loading ? "Activating..." : "Complete Replacement"}</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleCompleteExternalProvision}
+                      className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>I&apos;ve Written the Card</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
