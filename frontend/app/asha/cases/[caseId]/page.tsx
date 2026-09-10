@@ -386,14 +386,14 @@ export default function AshaCaseWorkspacePage({
                       ? t("asha.caseUnauthorized")
                       : errorCode === "CASE_NOT_FOUND"
                       ? t("asha.caseNotFound")
-                      : "Case Information Unavailable"}
+                      : t("asha.caseUnavailable")}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
                     {errorCode === "FORBIDDEN_ROLE"
                       ? t("asha.caseUnauthorizedDesc")
                       : errorCode === "CASE_NOT_FOUND"
                       ? t("asha.caseNotFoundDesc")
-                      : errorMessage || "An unexpected error occurred while retrieving case details."}
+                      : errorMessage || t("asha.caseUnavailableDesc")}
                   </p>
                 </div>
 
@@ -415,7 +415,7 @@ export default function AshaCaseWorkspacePage({
                     className="text-xs font-semibold flex items-center gap-2"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Try Again</span>
+                    <span>{t("common.tryAgain")}</span>
                   </Button>
                 </div>
               </div>

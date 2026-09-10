@@ -6,7 +6,6 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
-import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import {
   Users,
@@ -722,7 +721,7 @@ export default function AshaWorkspacePage() {
             : activeTab === "followups"
             ? t("navigation.followUps")
             : activeTab === "leave"
-            ? "Leave & Temporary Reassignment"
+            ? t("leave.title")
             : t("navigation.dashboard")
         }
         description={
@@ -735,7 +734,7 @@ export default function AshaWorkspacePage() {
             : activeTab === "followups"
             ? t("asha.dueFollowUps")
             : activeTab === "leave"
-            ? "Request absence and monitor temporary caseload transfer"
+            ? t("leave.desc")
             : t("asha.workspaceDesc")
         }
         navTabs={navTabs}
@@ -1010,7 +1009,7 @@ export default function AshaWorkspacePage() {
                                     >
                                       {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
                                         ? t("common.submitting")
-                                        : t("citizen.requestAssistanceBtn")}
+                                        : t("asha.assistHousehold")}
                                     </Button>
                                   )}
                                   <Button
@@ -1817,7 +1816,7 @@ export default function AshaWorkspacePage() {
                                 <span>
                                   {initiatingSchemeId === `${sig.caseId}_${sig.schemeId}`
                                     ? t("common.submitting")
-                                    : t("citizen.requestAssistanceBtn")}
+                                    : t("asha.assistHousehold")}
                                 </span>
                               </Button>
                             )}
@@ -2149,18 +2148,18 @@ export default function AshaWorkspacePage() {
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-slate-900">
-                        ASHA Leave Request & Temporary Caseload Reassignment
+                        {t("leave.title")}
                       </h2>
                       <p className="text-xs text-slate-600 mt-0.5">
-                        Request planned absence. Once approved by an Administrator, your assigned households will be temporarily reassigned to a designated replacement ASHA and automatically returned when your leave period ends.
+                        {t("leave.desc")}
                       </p>
                     </div>
                   </div>
                   <div className="px-4 py-2.5 rounded-xl bg-white/80 backdrop-blur-xs border border-teal-200/80 shadow-xs flex items-center gap-3 shrink-0">
                     <Users className="w-4 h-4 text-teal-700" />
                     <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Currently Assigned</p>
-                      <p className="text-base font-extrabold text-teal-900">{totalAssignedHouseholds} Households</p>
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{t("leave.currentlyAssigned")}</p>
+                      <p className="text-base font-extrabold text-teal-900">{t("leave.householdsCount", { count: totalAssignedHouseholds })}</p>
                     </div>
                   </div>
                 </div>
@@ -2170,7 +2169,7 @@ export default function AshaWorkspacePage() {
                   <div className="lg:col-span-1 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs h-fit">
                     <div className="flex items-center gap-2 mb-4">
                       <Clock className="w-4 h-4 text-emerald-600" />
-                      <h3 className="text-sm font-bold text-slate-900">Submit New Leave Request</h3>
+                      <h3 className="text-sm font-bold text-slate-900">{t("leave.submitNewRequest")}</h3>
                     </div>
 
                     {leaveError && (
@@ -2190,7 +2189,7 @@ export default function AshaWorkspacePage() {
                     <form onSubmit={handleLeaveSubmit} className="space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Start Date <span className="text-rose-500">*</span>
+                          {t("leave.startDate")} <span className="text-rose-500">*</span>
                         </label>
                         <input
                           type="date"
@@ -2203,7 +2202,7 @@ export default function AshaWorkspacePage() {
 
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          End Date <span className="text-rose-500">*</span>
+                          {t("leave.endDate")} <span className="text-rose-500">*</span>
                         </label>
                         <input
                           type="date"
@@ -2217,7 +2216,7 @@ export default function AshaWorkspacePage() {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="block text-xs font-semibold text-slate-700">
-                            Reason for Absence <span className="text-rose-500">*</span>
+                            {t("leave.reasonForAbsence")} <span className="text-rose-500">*</span>
                           </label>
                           <span className="text-[10px] text-slate-400">{leaveReason.length}/1000</span>
                         </div>
@@ -2225,7 +2224,7 @@ export default function AshaWorkspacePage() {
                           rows={3}
                           value={leaveReason}
                           onChange={(e) => setLeaveReason(e.target.value)}
-                          placeholder="e.g. Attending district health training or medical leave..."
+                          placeholder={t("leave.reasonPlaceholder")}
                           className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                           maxLength={1000}
                           required
@@ -2233,10 +2232,10 @@ export default function AshaWorkspacePage() {
                       </div>
 
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
-                        <p className="font-semibold text-slate-700">Authoritative Process:</p>
-                        <p>• Requires approval by PHC Administrator.</p>
-                        <p>• {totalAssignedHouseholds} assigned households will temporarily switch to replacement worker.</p>
-                        <p>• Tasks, notes, and records remain completely intact.</p>
+                        <p className="font-semibold text-slate-700">{t("leave.authoritativeProcess")}</p>
+                        <p>• {t("leave.processRule1")}</p>
+                        <p>• {t("leave.processRule2", { count: totalAssignedHouseholds })}</p>
+                        <p>• {t("leave.processRule3")}</p>
                       </div>
 
                       <Button
@@ -2247,12 +2246,12 @@ export default function AshaWorkspacePage() {
                         {isLeaveSubmitting ? (
                           <>
                             <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Submitting...</span>
+                            <span>{t("common.submitting")}</span>
                           </>
                         ) : (
                           <>
                             <Send className="w-3.5 h-3.5" />
-                            <span>Submit Leave Request</span>
+                            <span>{t("leave.submitRequest")}</span>
                           </>
                         )}
                       </Button>
@@ -2264,7 +2263,7 @@ export default function AshaWorkspacePage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <History className="w-4 h-4 text-slate-600" />
-                        <h3 className="text-sm font-bold text-slate-900">Your Leave Requests & Reassignment History</h3>
+                        <h3 className="text-sm font-bold text-slate-900">{t("leave.historyTitle")}</h3>
                       </div>
                       <Button
                         variant="outline"
@@ -2273,20 +2272,20 @@ export default function AshaWorkspacePage() {
                         disabled={isLeaveLoading}
                         className="text-xs font-medium cursor-pointer"
                       >
-                        Refresh
+                        {t("common.refresh")}
                       </Button>
                     </div>
 
                     {isLeaveLoading ? (
                       <div className="py-12 text-center text-xs text-slate-500">
                         <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                        Loading leave requests...
+                        {t("leave.loadingRequests")}
                       </div>
                     ) : leaveRequests.length === 0 ? (
                       <div className="py-12 text-center rounded-xl bg-slate-50 border border-slate-200/60 p-6">
                         <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs font-semibold text-slate-700">No leave requests found</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">Use the form on the left to submit a leave request when needed.</p>
+                        <p className="text-xs font-semibold text-slate-700">{t("leave.noRequestsFound")}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{t("leave.noRequestsDesc")}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -2316,22 +2315,22 @@ export default function AshaWorkspacePage() {
                                   >
                                     <span className="w-1.5 h-1.5 rounded-full bg-current" />
                                     {isPending
-                                      ? "Pending Admin Approval"
+                                      ? t("leave.pendingApproval")
                                       : isApproved
-                                      ? "Approved & Active"
+                                      ? t("leave.approvedActive")
                                       : isRejected
-                                      ? "Rejected"
-                                      : "Completed"}
+                                      ? t("leave.rejected")
+                                      : t("leave.completed")}
                                   </span>
 
                                   {req.restorationStatus === "RESTORED" && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
-                                      Assignments Restored
+                                      {t("leave.restored")}
                                     </span>
                                   )}
                                   {req.restorationStatus === "REQUIRES_REVIEW" && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                      Review Required
+                                      {t("leave.reviewRequired")}
                                     </span>
                                   )}
                                 </div>
@@ -2344,24 +2343,24 @@ export default function AshaWorkspacePage() {
                                     onClick={() => handleCancelLeave(req.id)}
                                     className="text-[11px] text-rose-700 border-rose-200 hover:bg-rose-50 h-7 px-2.5 cursor-pointer"
                                   >
-                                    {cancellingLeaveId === req.id ? "Cancelling..." : "Cancel Request"}
+                                    {cancellingLeaveId === req.id ? t("leave.cancelling") : t("leave.cancelRequest")}
                                   </Button>
                                 )}
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 mb-2">
                                 <div>
-                                  <span className="font-semibold text-slate-700">Leave Period: </span>
+                                  <span className="font-semibold text-slate-700">{t("leave.leavePeriod")}: </span>
                                   <span className="font-medium text-slate-900">{req.startDate} → {req.endDate}</span>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-slate-700">Affected Households: </span>
+                                  <span className="font-semibold text-slate-700">{t("leave.affectedHouseholds")}: </span>
                                   <span className="font-medium text-slate-900">{req.affectedHouseholdCount}</span>
                                 </div>
                               </div>
 
                               <div className="text-xs text-slate-700 mb-2 bg-white p-2.5 rounded-lg border border-slate-200/60">
-                                <span className="font-semibold text-slate-800">Reason: </span>
+                                <span className="font-semibold text-slate-800">{t("leave.reasonLabel")}: </span>
                                 <span>{req.reason}</span>
                               </div>
 
@@ -2369,11 +2368,11 @@ export default function AshaWorkspacePage() {
                               {isApproved && req.replacementAshaName && (
                                 <div className="p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-900 flex items-center justify-between">
                                   <div>
-                                    <span className="font-semibold">Designated Replacement: </span>
+                                    <span className="font-semibold">{t("leave.designatedReplacement")}: </span>
                                     <span>{req.replacementAshaName}</span>
                                   </div>
                                   <span className="text-[10px] text-emerald-700 font-mono">
-                                    Until {req.endDate}
+                                    {t("leave.until")} {req.endDate}
                                   </span>
                                 </div>
                               )}
@@ -2381,7 +2380,7 @@ export default function AshaWorkspacePage() {
                               {/* Rejection Note */}
                               {isRejected && req.reviewNotes && (
                                 <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
-                                  <span className="font-semibold">Review Note: </span>
+                                  <span className="font-semibold">{t("leave.reviewNote")}: </span>
                                   <span>{req.reviewNotes}</span>
                                 </div>
                               )}
@@ -2636,16 +2635,6 @@ export default function AshaWorkspacePage() {
             </div>
           </div>
         )}
-
-        {/* Floating Field Assistant Trigger */}
-        <button
-          onClick={() => setIsAssistantOpen(true)}
-          aria-label={t("assistant.badge")}
-          className="fixed bottom-6 right-6 z-40 bg-emerald-800 hover:bg-emerald-900 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 border border-emerald-700 cursor-pointer"
-        >
-          <Bot className="w-4 h-4 text-emerald-200" />
-          <span>{t("assistant.badge")}</span>
-        </button>
 
         {/* SwasthyaSetu Healthcare Assistant Drawer */}
         <HealthcareAssistantDrawer

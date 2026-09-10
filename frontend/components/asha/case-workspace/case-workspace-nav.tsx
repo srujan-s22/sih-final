@@ -59,7 +59,7 @@ export function CaseWorkspaceNav({
     items: NavItemConfig[];
   }[] = [
     {
-      category: "CASE",
+      category: t("asha.navCategoryCase"),
       items: [
         {
           id: "overview",
@@ -71,7 +71,7 @@ export function CaseWorkspaceNav({
       ],
     },
     {
-      category: "CASE WORK",
+      category: t("asha.navCategoryCaseWork"),
       items: [
         {
           id: "journey",
@@ -114,7 +114,7 @@ export function CaseWorkspaceNav({
       ],
     },
     {
-      category: "SYSTEM",
+      category: t("asha.navCategorySystem"),
       items: [
         {
           id: "audit",

@@ -5,7 +5,6 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
-import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -858,19 +857,6 @@ export default function CitizenPage() {
             {/* ============================================================ */}
             {activeTab === "overview" && (
               <div className="space-y-6">
-                {/* -------------------------------------------------------- */}
-                {/* -------------------------------------------------------- */}
-                {/* QUICK LANGUAGE SELECTOR BAR */}
-                {/* -------------------------------------------------------- */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <span className="w-2 h-2 rounded-full bg-teal-600" />
-                    <span>{t("citizen.quickLangLabel")}</span>
-                    <span className="text-slate-400 font-normal">{t("citizen.quickLangSubtitle")}</span>
-                  </div>
-                  <LanguageSelector variant="pills" size="sm" />
-                </div>
-
                 {/* -------------------------------------------------------- */}
                 {/* SECTION 2: WHAT DO YOU NEED HELP WITH? */}
                 {/* -------------------------------------------------------- */}
@@ -2593,8 +2579,8 @@ export default function CitizenPage() {
                     {connectionStatus?.status === "ACTIVE" && (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
                         <div className="text-xs text-slate-700">
-                          <p className="font-bold text-slate-900">Need help completing these steps?</p>
-                          <p className="text-slate-600 mt-0.5">Your connected ASHA worker can assist you with forms and doorstep verification.</p>
+                          <p className="font-bold text-slate-900">{t("citizen.assistanceNeededTitle")}</p>
+                          <p className="text-slate-600 mt-0.5">{t("citizen.assistanceNeededDesc")}</p>
                         </div>
                         <Button
                           variant="outline"
@@ -2602,7 +2588,7 @@ export default function CitizenPage() {
                           onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
                           className="text-xs font-semibold border-teal-200 text-teal-800 hover:bg-teal-50 whitespace-nowrap"
                         >
-                          <Send className="w-3.5 h-3.5 mr-1" /> Request ASHA Help
+                          <Send className="w-3.5 h-3.5 mr-1" /> {t("citizen.requestAssistanceBtn")}
                         </Button>
                       </div>
                     )}
@@ -3038,16 +3024,6 @@ export default function CitizenPage() {
             </div>
           </form>
         </Modal>
-
-        {/* Floating Healthcare Assistant Trigger */}
-        <button
-          onClick={() => setIsAssistantOpen(true)}
-          aria-label="Open SwasthyaSetu Healthcare Assistant"
-          className="fixed bottom-6 right-6 z-40 bg-teal-800 hover:bg-teal-900 text-white rounded-full px-4 py-3 shadow-lg flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 border border-teal-700 cursor-pointer"
-        >
-          <Bot className="w-4 h-4 text-teal-200" />
-          <span>{t("citizen.healthcareAssistantBtn")}</span>
-        </button>
 
         {/* SwasthyaSetu Healthcare Assistant Drawer */}
         <HealthcareAssistantDrawer

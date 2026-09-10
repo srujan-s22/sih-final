@@ -5,6 +5,7 @@ import { CaseDetailResponse } from "@shared/types/case";
 import { AshaAssistanceRequest } from "@shared/types/assistance";
 import { useTranslation } from "@/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
+import { getLocalizedStatus } from "../formatters";
 import {
   CheckSquare,
   CheckCircle2,
@@ -168,10 +169,10 @@ export function CaseJourneySection({
                             <div className="p-2.5 rounded-xl bg-white border border-teal-100 flex items-center justify-between text-xs">
                               <div>
                                 <span className="text-[10px] font-semibold text-slate-400 uppercase block">
-                                  Eligible Beneficiary
+                                  {t("asha.eligibleBeneficiary")}
                                 </span>
                                 <span className="font-bold text-slate-900">
-                                  {targetMember.fullName} ({targetMember.relationship}, Age {targetMember.age}
+                                  {targetMember.fullName} ({targetMember.relationship}, {t("citizen.ageYears", { age: targetMember.age })}
                                   {targetMember.maternalStatus === "pregnant"
                                     ? ` • ${t("citizen.pregnantTag")}`
                                     : ""}
@@ -199,7 +200,7 @@ export function CaseJourneySection({
                           >
                             <Send className="w-3.5 h-3.5" />
                             <span>
-                              {isInitiating ? t("common.submitting") : t("citizen.requestAssistanceBtn")}
+                              {isInitiating ? t("common.submitting") : t("asha.assistHousehold")}
                             </span>
                           </Button>
                         </div>
@@ -258,7 +259,7 @@ export function CaseJourneySection({
                   ) : (
                     <>
                       <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                      <span>{t("forms.relationship")}: {caseData.status}</span>
+                      <span>{getLocalizedStatus(caseData.status, t)}</span>
                     </>
                   )}
                 </span>
@@ -268,7 +269,7 @@ export function CaseJourneySection({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-white p-3 rounded-xl border border-teal-100">
                 <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                  Target Beneficiary
+                  {t("asha.assistingBeneficiary")}
                 </span>
                 <span className="font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
                   <UserCheck className="w-3.5 h-3.5 text-teal-700" />
@@ -357,7 +358,7 @@ export function CaseJourneySection({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-teal-700" />
-                <span>Field Tasks Checklist ({tasks?.length || 0})</span>
+                <span>{t("asha.milestoneChecklistRoadmap")} ({tasks?.length || 0})</span>
               </h4>
 
               <Button
@@ -368,25 +369,25 @@ export function CaseJourneySection({
                 className="text-xs font-semibold self-start sm:self-auto cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
-                <span>Add Task</span>
+                <span>{t("asha.addCustomTask")}</span>
               </Button>
             </div>
 
             {/* Add Custom Task Form */}
             {showAddTask && (
               <form onSubmit={handleTaskSubmit} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
-                <h5 className="font-bold text-slate-800">Add Field Task</h5>
+                <h5 className="font-bold text-slate-800">{t("asha.addCustomTask")}</h5>
                 <input
                   type="text"
                   required
-                  placeholder="Task title (e.g. Verify voter ID for age confirmation)"
+                  placeholder={t("asha.taskTitle")}
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-700 focus:outline-hidden"
                 />
                 <input
                   type="text"
-                  placeholder="Additional notes / instructions"
+                  placeholder={t("asha.taskDetailsPlaceholder")}
                   value={newTaskDesc}
                   onChange={(e) => setNewTaskDesc(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-700 focus:outline-hidden"
@@ -399,7 +400,7 @@ export function CaseJourneySection({
                     onClick={() => setShowAddTask(false)}
                     className="text-xs"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -408,7 +409,7 @@ export function CaseJourneySection({
                     disabled={isTaskSubmitting || !newTaskTitle.trim()}
                     className="text-xs bg-teal-800 hover:bg-teal-900 text-white"
                   >
-                    {isTaskSubmitting ? t("common.submitting") : "Save Task"}
+                    {isTaskSubmitting ? t("common.submitting") : t("asha.saveTask")}
                   </Button>
                 </div>
               </form>
@@ -479,7 +480,7 @@ export function CaseJourneySection({
               </div>
             ) : (
               <p className="text-xs text-slate-400 text-center py-6">
-                No active tasks listed for this case.
+                {t("asha.allTasksUpToDate")}
               </p>
             )}
           </div>

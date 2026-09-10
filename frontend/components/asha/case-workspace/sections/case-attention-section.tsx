@@ -23,7 +23,7 @@ export function CaseAttentionSection({ caseDetail }: CaseAttentionSectionProps) 
               <span>{t("asha.attentionRequired")} ({guidance.gaps.length})</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Proactive system intelligence identifying missed government health entitlements.
+              {t("asha.attentionDesc")}
             </p>
           </div>
         </div>
@@ -127,7 +127,7 @@ export function CaseAttentionSection({ caseDetail }: CaseAttentionSectionProps) 
                     <div className="pt-2 border-t border-slate-200/60 flex items-center gap-1.5 text-slate-600 font-medium text-[11px]">
                       <UserCheck className="w-3.5 h-3.5 text-teal-700" />
                       <span>
-                        Target: {targetMember.fullName} ({targetMember.relationship}, {targetMember.age}y)
+                        {t("asha.beneficiaryFocus")}: {targetMember.fullName} ({targetMember.relationship}, {t("citizen.ageYears", { age: targetMember.age })})
                       </span>
                     </div>
                   )}

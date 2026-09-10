@@ -7,6 +7,7 @@ import { HouseholdNfcStatusResponse } from "@shared/types/nfc";
 import { AshaAssistanceRequest } from "@shared/types/assistance";
 import { useTranslation } from "@/i18n/i18n-context";
 import { Button } from "@/components/ui/button";
+import { getLocalizedStatus, getLocalizedPriority } from "./formatters";
 import {
   ArrowLeft,
   Bot,
@@ -138,13 +139,7 @@ export function CaseWorkspaceHeader({
                   aria-hidden="true"
                 />
                 <span>
-                  {caseData.priority === "URGENT"
-                    ? t("forms.priorityUrgent")
-                    : caseData.priority === "HIGH"
-                    ? t("forms.priorityHigh")
-                    : caseData.priority === "LOW"
-                    ? t("forms.priorityLow")
-                    : t("forms.priorityNormal")}
+                  {getLocalizedPriority(caseData.priority, t)}
                 </span>
               </span>
 
@@ -154,7 +149,7 @@ export function CaseWorkspaceHeader({
                   caseData.status
                 )}`}
               >
-                {caseData.status.replace(/_/g, " ")}
+                {getLocalizedStatus(caseData.status, t)}
               </span>
             </div>
 
@@ -171,7 +166,7 @@ export function CaseWorkspaceHeader({
               <span className="flex items-center gap-1">
                 <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
                 <span>
-                  {members.length} {members.length === 1 ? "Member" : "Members"}
+                  {members.length} {t("common.members")}
                 </span>
               </span>
 
@@ -197,7 +192,7 @@ export function CaseWorkspaceHeader({
               size="sm"
               onClick={onOpenVoiceCall}
               className="text-xs font-bold border-teal-200 text-teal-900 bg-teal-50/50 hover:bg-teal-100/70 cursor-pointer shadow-2xs"
-              title="Initiate doorstep voice reminder call"
+              title={t("citizen.voiceCallBtn")}
             >
               <PhoneCall className="w-3.5 h-3.5 text-teal-700" aria-hidden="true" />
               <span>{t("citizen.voiceCallBtn")}</span>
@@ -210,13 +205,13 @@ export function CaseWorkspaceHeader({
               size="sm"
               onClick={onOpenNfc}
               className="text-xs font-bold border-teal-300 text-teal-900 hover:bg-teal-50 cursor-pointer shadow-2xs"
-              title={caseNfcStatus?.hasActiveNfc ? "Manage household NFC card" : "Register household NFC card"}
+              title={caseNfcStatus?.hasActiveNfc ? t("nfc.manageCard") : t("nfc.registerCard")}
             >
               <Radio className="w-3.5 h-3.5 text-teal-700" aria-hidden="true" />
               <span>
                 {caseNfcStatus?.hasActiveNfc
                   ? `NFC (v${caseNfcStatus.record?.version || 1})`
-                  : "Register NFC"}
+                  : t("nfc.registerCard")}
               </span>
             </Button>
 
@@ -239,7 +234,7 @@ export function CaseWorkspaceHeader({
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label htmlFor="case-status-select" className="font-semibold text-slate-600">
-                {t("forms.relationship")}:
+                {t("common.status")}:
               </label>
               <select
                 id="case-status-select"
@@ -248,18 +243,20 @@ export function CaseWorkspaceHeader({
                 onChange={(e) => onStatusChange(e.target.value as CaseStatus)}
                 className="py-1 px-2.5 rounded-lg border border-slate-300 bg-white font-medium text-slate-800 text-xs focus:ring-2 focus:ring-teal-700 focus:outline-hidden cursor-pointer"
               >
-                <option value="NEW">New</option>
-                <option value="ACTIVE">{t("common.active")}</option>
-                <option value="NEEDS_ATTENTION">{t("status.action_required")}</option>
-                <option value="FOLLOW_UP">{t("navigation.followUps")}</option>
+                <option value="NEW">{t("status.new")}</option>
+                <option value="OPEN">{t("status.open")}</option>
+                <option value="ACTIVE">{t("status.active")}</option>
+                <option value="IN_PROGRESS">{t("status.in_progress")}</option>
+                <option value="NEEDS_ATTENTION">{t("status.needs_attention")}</option>
+                <option value="FOLLOW_UP">{t("status.follow_up")}</option>
                 <option value="RESOLVED">{t("status.resolved")}</option>
-                <option value="CLOSED">{t("status.completed")}</option>
+                <option value="CLOSED">{t("status.closed")}</option>
               </select>
             </div>
 
             <div className="flex items-center gap-2">
               <label htmlFor="case-priority-select" className="font-semibold text-slate-600">
-                {t("status.urgent")}:
+                {t("common.priority")}:
               </label>
               <select
                 id="case-priority-select"
@@ -279,10 +276,10 @@ export function CaseWorkspaceHeader({
           <div className="text-[11px] text-slate-500 font-medium">
             {caseData.lastContactAt ? (
               <span>
-                Last contact: {new Date(caseData.lastContactAt).toLocaleDateString()}
+                {t("asha.lastContact")}: {new Date(caseData.lastContactAt).toLocaleDateString()}
               </span>
             ) : (
-              <span>Created {new Date(caseData.createdAt).toLocaleDateString()}</span>
+              <span>{t("asha.createdOn")}: {new Date(caseData.createdAt).toLocaleDateString()}</span>
             )}
           </div>
         </div>

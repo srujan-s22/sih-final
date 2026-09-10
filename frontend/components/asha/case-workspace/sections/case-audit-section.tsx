@@ -23,7 +23,7 @@ export function CaseAuditSection({ caseDetail }: CaseAuditSectionProps) {
               <span>{t("admin.auditTrail")} ({activities.length})</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Immutable audit history of case modifications, state changes, and automated triggers.
+              {t("asha.offlineAuditDesc")}
             </p>
           </div>
         </div>
@@ -31,7 +31,7 @@ export function CaseAuditSection({ caseDetail }: CaseAuditSectionProps) {
         <div className="space-y-2.5">
           {activities.length === 0 ? (
             <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-400">
-              <p className="font-semibold text-slate-600">No activity recorded for this case yet.</p>
+              <p className="font-semibold text-slate-600">{t("asha.noActivitiesLogged")}</p>
             </div>
           ) : (
             activities.map((a) => (

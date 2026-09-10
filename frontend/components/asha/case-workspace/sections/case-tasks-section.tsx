@@ -78,7 +78,7 @@ export function CaseTasksSection({
               <span>{t("asha.dueFollowUps")} ({followUps.length})</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Scheduled doorstep visits, outreach calls, and compliance checks.
+              {t("asha.scheduledVisitsDesc")}
             </p>
           </div>
 
@@ -90,7 +90,7 @@ export function CaseTasksSection({
             className="text-xs font-semibold self-start sm:self-auto cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
-            <span>Schedule Follow-up</span>
+            <span>{t("asha.scheduleFollowUp")}</span>
           </Button>
         </div>
 
@@ -100,11 +100,11 @@ export function CaseTasksSection({
             onSubmit={handleFormSubmit}
             className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs"
           >
-            <h5 className="font-bold text-slate-900">Schedule Field Follow-up Visit</h5>
+            <h5 className="font-bold text-slate-900">{t("asha.scheduleFieldVisit")}</h5>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                  Scheduled Due Date *
+                  {t("asha.scheduledDueDate")} *
                 </label>
                 <input
                   type="date"
@@ -116,12 +116,12 @@ export function CaseTasksSection({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                  Visit Reason / Objective *
+                  {t("asha.visitReasonObjective")} *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Check PM-JAY e-Card generation status"
+                  placeholder={t("asha.visitReasonPlaceholder")}
                   value={followUpReason}
                   onChange={(e) => setFollowUpReason(e.target.value)}
                   className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-teal-700 focus:outline-hidden"
@@ -197,10 +197,10 @@ export function CaseTasksSection({
                           {isCompleted
                             ? t("status.completed")
                             : isCancelled
-                            ? "Cancelled"
+                            ? t("status.cancelled")
                             : isOverdue
-                            ? "Overdue"
-                            : "Scheduled"}
+                            ? t("status.overdue")
+                            : t("status.scheduled")}
                         </span>
                       </div>
                       <p className="text-slate-500 text-[11px] flex items-center gap-1.5">
@@ -226,14 +226,14 @@ export function CaseTasksSection({
                           className="text-[11px] py-1 px-2.5 border-teal-200 text-teal-800 hover:bg-teal-50"
                         >
                           <PhoneCall className="w-3 h-3 mr-1" />
-                          <span>Call</span>
+                          <span>{t("citizen.voiceCallBtn")}</span>
                         </Button>
 
                         {completingId === f.id ? (
                           <div className="flex items-center gap-1.5">
                             <input
                               type="text"
-                              placeholder="Outcome notes"
+                              placeholder={t("asha.outcomeNotes")}
                               value={outcomeText}
                               onChange={(e) => setOutcomeText(e.target.value)}
                               className="p-1 px-2 text-xs border border-slate-300 rounded bg-white"
@@ -245,7 +245,7 @@ export function CaseTasksSection({
                               onClick={() => handleQuickComplete(f.id)}
                               className="text-[11px] py-1 px-2 bg-emerald-700 hover:bg-emerald-800 text-white"
                             >
-                              Confirm
+                              {t("common.confirm")}
                             </Button>
                             <button
                               type="button"
@@ -264,7 +264,7 @@ export function CaseTasksSection({
                             className="text-[11px] py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1 cursor-pointer"
                           >
                             <Check className="w-3 h-3" />
-                            <span>{t("status.completed")}</span>
+                            <span>{t("asha.markCompleted")}</span>
                           </Button>
                         )}
                       </div>

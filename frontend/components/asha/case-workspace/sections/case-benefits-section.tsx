@@ -23,7 +23,7 @@ export function CaseBenefitsSection({ caseDetail }: CaseBenefitsSectionProps) {
               <span>{t("citizen.healthBenefits")} ({eligibilityResults?.length || 0})</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Government healthcare schemes evaluated for this family.
+              {t("asha.benefitsDesc")}
             </p>
           </div>
         </div>
@@ -65,7 +65,7 @@ export function CaseBenefitsSection({ caseDetail }: CaseBenefitsSectionProps) {
                   {r.matchedRules && r.matchedRules.length > 0 && (
                     <div className="pt-2 border-t border-slate-200/60 space-y-1">
                       <span className="text-[10px] uppercase font-bold text-slate-400">
-                        Eligibility Criteria Met
+                        {t("asha.criteriaMet")}
                       </span>
                       <ul className="space-y-1 text-[11px] text-slate-600">
                         {r.matchedRules.map((rule) => (

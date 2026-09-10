@@ -5,7 +5,6 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTranslation } from "@/i18n/i18n-context";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
-import { LanguageSelector } from "@/components/i18n/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -2240,10 +2239,10 @@ export default function AdminPage() {
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-teal-700" />
-                      <span>ASHA Leave &amp; Temporary Reassignment</span>
+                      <span>{t("leave.adminTitle")}</span>
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500">
-                      Review leave requests, assign temporary household coverage with concurrency protection, and monitor automatic lazy restoration.
+                      {t("leave.adminDesc")}
                     </p>
                   </div>
 
@@ -2257,7 +2256,7 @@ export default function AdminPage() {
                       title="Run lazy restoration evaluation for expired leaves"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isRestoring ? "animate-spin text-teal-600" : "text-teal-700"}`} />
-                      <span>{isRestoring ? "Checking Expiries..." : "Check & Restore Expired Leaves"}</span>
+                      <span>{isRestoring ? t("leave.checkingExpiries") : t("leave.checkAndRestore")}</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -2283,7 +2282,7 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2.5">
                       <ArrowRightLeft className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
-                        <p className="font-bold text-teal-950">Restoration Evaluation Report</p>
+                        <p className="font-bold text-teal-950">{t("leave.restorationReport")}</p>
                         <p className="text-teal-800 leading-relaxed">{restoreBanner}</p>
                       </div>
                     </div>
@@ -2300,51 +2299,51 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between text-slate-500">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Pending Review</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t("leave.pendingReview")}</span>
                       <Clock className="w-4 h-4 text-amber-500" />
                     </div>
                     <div className="text-2xl font-bold text-slate-900 flex items-baseline gap-2">
                       <span>{pendingLeavesCount}</span>
                       {pendingLeavesCount > 0 && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                          Action Required
+                          {t("leave.actionRequired")}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400">Awaiting admin review &amp; replacement</p>
+                    <p className="text-[11px] text-slate-400">{t("leave.awaitingAdminReview")}</p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between text-slate-500">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Active Coverage</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t("leave.activeCoverage")}</span>
                       <Users className="w-4 h-4 text-teal-600" />
                     </div>
                     <div className="text-2xl font-bold text-teal-900">
                       {activeLeavesCount}
                     </div>
-                    <p className="text-[11px] text-slate-400">Leaves currently underway</p>
+                    <p className="text-[11px] text-slate-400">{t("leave.leavesUnderway")}</p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between text-slate-500">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Reassigned Cases</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t("leave.reassignedCases")}</span>
                       <ArrowRightLeft className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="text-2xl font-bold text-blue-900">
                       {totalReassignedCasesCount}
                     </div>
-                    <p className="text-[11px] text-slate-400">Households under temporary care</p>
+                    <p className="text-[11px] text-slate-400">{t("leave.householdsUnderTempCare")}</p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between text-slate-500">
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Completed / Restored</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wider">{t("leave.completedRestored")}</span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div className="text-2xl font-bold text-emerald-900">
                       {completedLeavesCount}
                     </div>
-                    <p className="text-[11px] text-slate-400">Assignments restored to original ASHA</p>
+                    <p className="text-[11px] text-slate-400">{t("leave.assignmentsRestoredDesc")}</p>
                   </div>
                 </div>
 

@@ -40,7 +40,7 @@ export function CaseNotesSection({ caseDetail, onAddNote }: CaseNotesSectionProp
               <span>{t("forms.notes")} ({notes.length})</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Field observations, household verification logs, and follow-up records.
+              {t("asha.fieldNotesDesc")}
             </p>
           </div>
         </div>
@@ -50,7 +50,7 @@ export function CaseNotesSection({ caseDetail, onAddNote }: CaseNotesSectionProp
           <textarea
             rows={3}
             required
-            placeholder="Add a field note (e.g. Visited household today. Verified maternal ANC checkup card, informed about JSY institutional delivery benefit...)"
+            placeholder={t("forms.notesPlaceholder")}
             value={newNoteContent}
             onChange={(e) => setNewNoteContent(e.target.value)}
             className="w-full text-xs p-3.5 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-teal-700 focus:outline-hidden"
@@ -63,7 +63,7 @@ export function CaseNotesSection({ caseDetail, onAddNote }: CaseNotesSectionProp
               disabled={isSubmitting || !newNoteContent.trim()}
               className="text-xs bg-teal-800 hover:bg-teal-900 text-white cursor-pointer py-1.5 px-4"
             >
-              {isSubmitting ? t("common.submitting") : t("common.confirm")}
+              {isSubmitting ? t("common.submitting") : t("common.save")}
             </Button>
           </div>
         </form>
@@ -73,8 +73,8 @@ export function CaseNotesSection({ caseDetail, onAddNote }: CaseNotesSectionProp
           {notes.length === 0 ? (
             <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-400 space-y-1">
               <MessageSquare className="w-6 h-6 text-slate-300 mx-auto mb-1" />
-              <p className="font-semibold text-slate-600">No field notes recorded yet.</p>
-              <p>Add notes above to maintain a clinical audit record of field visits.</p>
+              <p className="font-semibold text-slate-600">{t("asha.noFieldNotes")}</p>
+              <p>{t("asha.addNotesHint")}</p>
             </div>
           ) : (
             notes.map((n) => (
