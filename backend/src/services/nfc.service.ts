@@ -555,14 +555,12 @@ export class NfcService {
     const householdCase = householdCases.length > 0 ? householdCases[0] : null;
 
     const resolvedSchemeIds = new Set<string>();
-    let isAnyCaseResolved = false;
 
     for (const c of householdCases) {
       if (c.resolvedSchemes) {
         c.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
       }
       if (["RESOLVED", "CLOSED"].includes(c.status)) {
-        isAnyCaseResolved = true;
         if (c.schemeId) {
           resolvedSchemeIds.add(c.schemeId);
         }
@@ -585,9 +583,7 @@ export class NfcService {
 
     // Map eligibility results to safe public summaries
     const schemes: NfcPublicSchemeSummary[] = eligibilityResults.map((res) => {
-      const isResolved =
-        resolvedSchemeIds.has(res.schemeId) ||
-        (isAnyCaseResolved && res.status !== "NOT_ELIGIBLE");
+      const isResolved = resolvedSchemeIds.has(res.schemeId);
 
       let status: NfcPublicSchemeSummary["eligibilityStatus"];
       if (isResolved) {

@@ -64,13 +64,6 @@ export const eligibilityRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        if (isAnyCaseResolved) {
-          for (const res of evaluation.results) {
-            if (res.status !== "NOT_ELIGIBLE") {
-              resolvedSchemeIds.add(res.schemeId);
-            }
-          }
-        }
 
         return reply.status(HTTP_STATUS.OK).send({
           success: true,

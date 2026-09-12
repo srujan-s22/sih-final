@@ -551,11 +551,10 @@ export default function CitizenPage() {
   // Helper to determine if a scheme is resolved by ASHA
   const isSchemeResolved = useCallback((schemeId: string) => {
     if (resolvedSchemeIds.includes(schemeId)) return true;
-    if (caseStatus === "RESOLVED" || caseStatus === "CLOSED") return true;
     return assistanceRequests.some(
       (r) => r.schemeId === schemeId && (r.status === "RESOLVED" || r.status === "CLOSED")
     );
-  }, [resolvedSchemeIds, caseStatus, assistanceRequests]);
+  }, [resolvedSchemeIds, assistanceRequests]);
 
   const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
   const gapsCount = guidance?.gaps?.length || 0;

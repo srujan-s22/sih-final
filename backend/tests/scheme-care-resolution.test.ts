@@ -318,4 +318,61 @@ describe("SwasthyaSetu — Scheme Care Work Resolution & Public Reflection", () 
     expect(nfcPmjay).toBeDefined();
     expect(nfcPmjay.eligibilityStatus).toBe("RESOLVED_ELIGIBLE");
   });
+
+  it("7. Resolving a case or scheme for ab-pmjay does NOT mark other qualifying schemes as RESOLVED_ELIGIBLE", async () => {
+    // Add pregnant member Devi to household so household also qualifies for JSY
+    const now = new Date().toISOString();
+    await app.householdRepository.createMember(householdId, {
+      id: "mem_devi_pregnant",
+      householdId,
+      fullName: "Devi Patil",
+      age: 28,
+      gender: "female",
+      relationship: "Daughter-in-law",
+      maternalStatus: "pregnant",
+      disabilityStatus: false,
+      chronicConditions: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Mark ab-pmjay resolved via PATCH case
+    const updateRes = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/asha/cases/${caseId}`,
+      headers: { authorization: `Bearer ${ashaAssignedToken}` },
+      payload: { status: "RESOLVED" },
+    });
+    expect(updateRes.statusCode).toBe(HTTP_STATUS.OK);
+
+    // Verify NFC public endpoint
+    const nfcRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/nfc/resolve",
+      payload: { householdId, token: nfcToken },
+    });
+    expect(nfcRes.statusCode).toBe(HTTP_STATUS.OK);
+    const nfcBody = JSON.parse(nfcRes.payload);
+
+    const pmjay = nfcBody.data.schemes.find((s: any) => s.schemeId === "ab-pmjay");
+    expect(pmjay).toBeDefined();
+    expect(pmjay.eligibilityStatus).toBe("RESOLVED_ELIGIBLE");
+
+    // Other qualifying schemes must remain in unresolved status, NOT RESOLVED_ELIGIBLE
+    const otherSchemes = nfcBody.data.schemes.filter((s: any) => s.schemeId !== "ab-pmjay");
+    expect(otherSchemes.length).toBeGreaterThan(0);
+    for (const other of otherSchemes) {
+      expect(other.eligibilityStatus).not.toBe("RESOLVED_ELIGIBLE");
+    }
+
+    // Citizen eligibility endpoint must also strictly isolate resolvedSchemeIds
+    const eligRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/eligibility/me",
+      headers: { authorization: `Bearer ${citizenToken}` },
+    });
+    expect(eligRes.statusCode).toBe(HTTP_STATUS.OK);
+    const eligBody = JSON.parse(eligRes.payload);
+    expect(eligBody.data.resolvedSchemeIds).toEqual(["ab-pmjay"]);
+  });
 });
