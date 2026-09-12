@@ -333,4 +333,27 @@ export class VoiceResponseFormatter {
     }
     return "I'm sorry, I didn't quite understand that. I can assist you with government health scheme details, family eligibility, assistance requests, and ASHA worker follow-ups. You can say 'Check Ayushman eligibility' or 'Check application status'.";
   }
+
+  public static getTimeoutReprompt(lang?: string): string {
+    const l = toVoiceLanguage(lang);
+    if (l === "kn-IN") {
+      return "ನೀವು ನನ್ನನ್ನು ಕೇಳುತ್ತಿದ್ದೀರಾ? ನೀವು ಯಾವುದೇ ಸರ್ಕಾರಿ ಆರೋಗ್ಯ ಯೋಜನೆಯ ಬಗ್ಗೆ ಕೇಳಬಹುದು.";
+    }
+    if (l === "hi-IN") {
+      return "क्या आप मुझे सुन पा रहे हैं? आप किसी भी सरकारी स्वास्थ्य योजना के बारे में पूछ सकते हैं।";
+    }
+    return "Are you there? You can ask me about any government health scheme.";
+  }
+
+  public static getTimeoutGoodbye(lang?: string): string {
+    const l = toVoiceLanguage(lang);
+    if (l === "kn-IN") {
+      return "ಯಾವುದೇ ಪ್ರತಿಕ್ರಿಯೆ ಬಂದಿಲ್ಲ. ಹೆಚ್ಚಿನ ಸಹಾಯಕ್ಕಾಗಿ ನೀವು ನಂತರ ಕರೆ ಮಾಡಬಹುದು. ಧನ್ಯವಾದಗಳು!";
+    }
+    if (l === "hi-IN") {
+      return "कोई उत्तर नहीं मिला। अधिक सहायता के लिए आप बाद में फिर से कॉल कर सकते हैं। धन्यवाद!";
+    }
+    return "We did not receive any response. Please call back anytime for health scheme assistance. Goodbye!";
+  }
 }
+

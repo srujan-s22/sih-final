@@ -32,10 +32,11 @@ import {
 import { env } from "../../config/env.js";
 
 // VAD & Buffering Constants
-const SILENCE_ENERGY_THRESHOLD = 300; // RMS threshold for voice activity on 16-bit PCM
+const SILENCE_ENERGY_THRESHOLD = 400; // RMS threshold for voice activity on 16-bit PCM (elevated to ignore telephony line hiss)
 const SILENCE_CHUNKS_THRESHOLD = 45; // ~900ms of consecutive silence after speech (20ms frames)
 const MIN_SPEECH_CHUNKS = 12; // Minimum ~240ms of accumulated speech before triggering STT
 const MAX_TURN_CHUNKS = 350; // Maximum ~7 seconds of accumulated audio per speech turn
+const NO_SPEECH_TIMEOUT_MS = 7000; // 7 seconds wait time for caller to start speaking before reprompting
 export const FRAME_CHUNK_SIZE_MULAW = 160; // 20ms of 8kHz 8-bit μ-law audio
 export const FRAME_CHUNK_SIZE_PCM = 320; // 20ms of 8kHz 16-bit linear PCM audio
 
@@ -57,6 +58,13 @@ export interface StreamSessionContext {
   turnTotalChunks: number;
   isProcessingTurn: boolean;
   isPlayingGreeting: boolean;
+  isPlayingOutbound?: boolean;
+  currentMarkName?: string | null;
+  playbackFallbackTimer?: NodeJS.Timeout | null;
+  noSpeechTimer?: NodeJS.Timeout | null;
+  timeoutCount?: number;
+  consecutiveFallbacks?: number;
+  isWaitingForCaller?: boolean;
   initialGreetingSent: boolean;
   isStopped: boolean;
 }
@@ -141,6 +149,13 @@ export class ExotelStreamGatewayService {
       turnTotalChunks: 0,
       isProcessingTurn: false,
       isPlayingGreeting: false,
+      isPlayingOutbound: false,
+      currentMarkName: null,
+      playbackFallbackTimer: null,
+      noSpeechTimer: null,
+      timeoutCount: 0,
+      consecutiveFallbacks: 0,
+      isWaitingForCaller: false,
       initialGreetingSent: false,
       isStopped: false,
     };
@@ -242,7 +257,7 @@ export class ExotelStreamGatewayService {
         break;
 
       case "mark":
-        // Mark acknowledged
+        this.handleMarkEvent(socket, context, event);
         break;
 
       default:
@@ -398,12 +413,182 @@ export class ExotelStreamGatewayService {
   /**
    * Handles Exotel 'media' event: accumulates chunks & performs turn detection
    */
+  /**
+   * Handles Exotel 'mark' event: physical playback of outbound audio frames has completed on caller device
+   */
+  public handleMarkEvent(
+    socket: WebSocket,
+    context: StreamSessionContext,
+    event: any
+  ): void {
+    if (context.isStopped) return;
+    const markName = event.mark?.name || event.name || event.markName;
+    console.log("📍 [ExotelStreamGateway] Playback mark event received from Exotel", {
+      streamSid: context.streamSid,
+      markName,
+      expectedMark: context.currentMarkName,
+    });
+
+    // If mark name doesn't match current active mark, ignore stale marks
+    if (context.currentMarkName && markName && markName !== context.currentMarkName) {
+      return;
+    }
+
+    this.onPlaybackFinished(socket, context, `mark:${markName || "acknowledged"}`);
+  }
+
+  /**
+   * Called when outbound audio playback finishes (via Exotel mark event or fallback duration timer).
+   * Unmutes microphone audio, flushes echo buffers, logs waiting state, and starts caller silence timer.
+   */
+  public onPlaybackFinished(
+    socket: WebSocket,
+    context: StreamSessionContext,
+    reason: string
+  ): void {
+    if (context.isStopped) return;
+    if (!context.isPlayingOutbound && !context.isPlayingGreeting) {
+      return;
+    }
+
+    context.isPlayingOutbound = false;
+    context.isPlayingGreeting = false;
+    context.currentMarkName = null;
+
+    if (context.playbackFallbackTimer) {
+      clearTimeout(context.playbackFallbackTimer);
+      context.playbackFallbackTimer = null;
+    }
+
+    // Flush any acoustic echo/bleed-through accumulated during outbound playback
+    context.audioBufferChunks = [];
+    context.turnSilenceChunks = 0;
+    context.turnTotalChunks = 0;
+    context.isWaitingForCaller = true;
+
+    // Requirement 8: Logging for waiting for caller
+    console.log(`⏳ [ExotelStreamGateway] Assistant playback complete (${reason}). WAITING for caller to speak...`, {
+      streamSid: context.streamSid,
+      turnCount: context.turnCount,
+      language: context.language,
+    });
+
+    // Start caller response timeout timer
+    this.startNoSpeechTimer(socket, context);
+  }
+
+  /**
+   * Starts a timer waiting for the caller to speak.
+   */
+  public startNoSpeechTimer(socket: WebSocket, context: StreamSessionContext): void {
+    if (context.isStopped || context.isPlayingOutbound || context.isProcessingTurn) {
+      return;
+    }
+
+    if (context.noSpeechTimer) {
+      clearTimeout(context.noSpeechTimer);
+      context.noSpeechTimer = null;
+    }
+
+    const timer = setTimeout(async () => {
+      await this.handleNoSpeechTimeout(socket, context);
+    }, NO_SPEECH_TIMEOUT_MS);
+
+    if (timer.unref) timer.unref();
+    context.noSpeechTimer = timer;
+  }
+
+  /**
+   * Handles silence timeout when caller does not speak.
+   * Requirement 3:
+   * - On first timeout: reprompt ONCE with a short message.
+   * - On second timeout: end call with goodbye, do not enter infinite retry loop.
+   */
+  public async handleNoSpeechTimeout(
+    socket: WebSocket,
+    context: StreamSessionContext
+  ): Promise<void> {
+    if (context.isStopped || context.isPlayingOutbound || context.isProcessingTurn) {
+      return;
+    }
+
+    const currentTimeout = context.timeoutCount ?? 0;
+
+    // Requirement 8: Logging for timeout/no-speech
+    console.log("⏰ [ExotelStreamGateway] Timeout/no-speech detected", {
+      streamSid: context.streamSid,
+      timeoutCount: currentTimeout,
+      turnCount: context.turnCount,
+      language: context.language,
+    });
+
+    if (currentTimeout === 0) {
+      // First timeout: reprompt ONCE with short friendly message
+      context.timeoutCount = 1;
+      const repromptText = VoiceResponseFormatter.getTimeoutReprompt(context.language);
+
+      // Requirement 8: Logging for prompt sent
+      console.log("🗣️ [ExotelStreamGateway] Prompt sent (timeout reprompt)", {
+        streamSid: context.streamSid,
+        promptPreview: repromptText.slice(0, 80),
+        language: context.language,
+      });
+
+      await this.synthesizeAndStreamResponse(
+        socket,
+        context,
+        repromptText,
+        `timeout_reprompt_${context.turnCount}`
+      );
+    } else {
+      // Second timeout: do NOT enter infinite retry loop; say goodbye and terminate
+      console.log("🛑 [ExotelStreamGateway] Consecutive timeout - sending goodbye and ending call", {
+        streamSid: context.streamSid,
+        timeoutCount: currentTimeout,
+        language: context.language,
+      });
+
+      const goodbyeText = VoiceResponseFormatter.getTimeoutGoodbye(context.language);
+
+      // Requirement 8: Logging for prompt sent
+      console.log("🗣️ [ExotelStreamGateway] Prompt sent (timeout goodbye)", {
+        streamSid: context.streamSid,
+        promptPreview: goodbyeText.slice(0, 80),
+        language: context.language,
+      });
+
+      await this.synthesizeAndStreamResponse(
+        socket,
+        context,
+        goodbyeText,
+        "timeout_goodbye"
+      );
+
+      // Gracefully terminate call after goodbye audio finishes playing
+      setTimeout(() => {
+        this.cleanupStreamContext(context);
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close(1000, "No speech received after reprompt");
+        }
+      }, 2500);
+    }
+  }
+
+  /**
+   * Handles Exotel 'media' event: accumulates chunks & performs turn detection
+   */
   private async handleMediaEvent(
     socket: WebSocket,
     context: StreamSessionContext,
     event: any
   ): Promise<void> {
-    if (context.isProcessingTurn || context.isPlayingGreeting || context.isStopped) {
+    // If assistant is currently speaking or processing, drop incoming audio to prevent self-echo feedback loop
+    if (
+      context.isStopped ||
+      context.isProcessingTurn ||
+      context.isPlayingOutbound ||
+      context.isPlayingGreeting
+    ) {
       return;
     }
 
@@ -429,7 +614,22 @@ export class ExotelStreamGatewayService {
     const energy = calculatePcmRms(pcmBuffer);
 
     if (energy > SILENCE_ENERGY_THRESHOLD) {
-      // Caller is speaking
+      // Caller has started speaking! Immediately cancel the no-speech silence timer
+      if (context.noSpeechTimer) {
+        clearTimeout(context.noSpeechTimer);
+        context.noSpeechTimer = null;
+      }
+
+      // Requirement 8: Logging for caller audio received (logged on first speech frame of turn)
+      if (context.audioBufferChunks.length === 0) {
+        console.log("🎙️ [ExotelStreamGateway] Caller audio received", {
+          streamSid: context.streamSid,
+          turnCount: context.turnCount,
+          energy: Math.round(energy),
+        });
+      }
+
+      context.isWaitingForCaller = false;
       context.audioBufferChunks.push(chunkBuffer);
       context.turnSilenceChunks = 0;
       context.turnTotalChunks += 1;
@@ -452,7 +652,10 @@ export class ExotelStreamGatewayService {
     }
 
     // Turn Boundary 2: Maximum duration reached for current turn
-    if (context.turnTotalChunks >= MAX_TURN_CHUNKS && context.audioBufferChunks.length >= MIN_SPEECH_CHUNKS) {
+    if (
+      context.turnTotalChunks >= MAX_TURN_CHUNKS &&
+      context.audioBufferChunks.length >= MIN_SPEECH_CHUNKS
+    ) {
       await this.processSpeechTurn(socket, context);
     }
   }
@@ -466,15 +669,30 @@ export class ExotelStreamGatewayService {
     }
 
     context.isProcessingTurn = true;
+    if (context.noSpeechTimer) {
+      clearTimeout(context.noSpeechTimer);
+      context.noSpeechTimer = null;
+    }
+
     const audioChunks = [...context.audioBufferChunks];
     context.audioBufferChunks = [];
     context.turnSilenceChunks = 0;
     context.turnTotalChunks = 0;
 
     try {
-      // 1. Check max turn cost control
-      context.turnCount += 1;
-      if (context.turnCount > context.maxTurns) {
+      // Requirement 7: Verify Sarvam STT is not being called with an empty audio buffer
+      const fullTelephonyBuffer = Buffer.concat(audioChunks);
+      if (fullTelephonyBuffer.length === 0) {
+        console.log("🔇 [ExotelStreamGateway] Empty audio buffer, skipping STT and resuming waiting for caller");
+        context.isProcessingTurn = false;
+        this.startNoSpeechTimer(socket, context);
+        return;
+      }
+
+      // Check max turn cost control
+      context.turnCount = (context.turnCount || 0) + 1;
+      const maxTurns = context.maxTurns || 10;
+      if (context.turnCount > maxTurns) {
         console.log("🛑 [ExotelStreamGateway] Max turns reached, sending farewell", {
           streamSid: context.streamSid,
           turnCount: context.turnCount,
@@ -483,8 +701,7 @@ export class ExotelStreamGatewayService {
         return;
       }
 
-      // 2. Synthesize WAV from accumulated telephony chunks
-      const fullTelephonyBuffer = Buffer.concat(audioChunks);
+      // Synthesize WAV from accumulated telephony chunks
       const sampleRate = context.mediaFormat.sampleRate || 8000;
       const wavBuffer = context.mediaFormat.encoding.includes("mulaw")
         ? mulawToWav(fullTelephonyBuffer, sampleRate)
@@ -499,13 +716,23 @@ export class ExotelStreamGatewayService {
         language: context.language,
       });
 
-      // 3. Speech-to-Text via Sarvam saaras:v3
+      // Speech-to-Text via Sarvam saaras:v3
       const sttResult = await this.sarvamService.speechToText(wavBase64, context.language, "wav");
       const transcript = sttResult?.transcript?.trim() || "";
 
+      // Requirement 8: Logging for STT result
+      console.log("📝 [ExotelStreamGateway] STT result", {
+        streamSid: context.streamSid,
+        hasTranscript: Boolean(transcript),
+        transcriptLength: transcript.length,
+        language: context.language,
+      });
+
+      // Requirement 2 & 4: If STT returned empty or whitespace, do NOT treat as UNKNOWN or say "Sorry, I didn't understand"
       if (!transcript || transcript.length === 0) {
         console.log("🔇 [ExotelStreamGateway] STT returned empty transcript (background noise), resuming listening");
         context.isProcessingTurn = false;
+        this.startNoSpeechTimer(socket, context);
         return;
       }
 
@@ -514,7 +741,10 @@ export class ExotelStreamGatewayService {
         transcript,
       });
 
-      // 4. Process Turn via VoiceGatewayService & deterministic VoiceActionService
+      // Caller spoke actual words -> reset silence timeout count
+      context.timeoutCount = 0;
+
+      // Safe session recovery if needed
       if (!context.sessionId || context.sessionId === "unbound") {
         try {
           let recSession = context.callSid
@@ -540,9 +770,32 @@ export class ExotelStreamGatewayService {
         languageCode: context.language,
       });
 
-      const responseText =
+      // Requirement 8: Logging for detected intent
+      console.log("🧠 [ExotelStreamGateway] Detected intent", {
+        streamSid: context.streamSid,
+        intent: turnResponse?.detectedIntent,
+        turnCount: context.turnCount,
+      });
+
+      // Prevent infinite fallback loop on repeated UNKNOWN
+      if (turnResponse?.detectedIntent === "UNKNOWN") {
+        context.consecutiveFallbacks = (context.consecutiveFallbacks || 0) + 1;
+        console.log(`⚠️ [ExotelStreamGateway] Consecutive fallback count: ${context.consecutiveFallbacks}`);
+      } else {
+        context.consecutiveFallbacks = 0;
+      }
+
+      let responseText =
         turnResponse?.textResponse ||
-        "I am here to assist you with government health schemes. How can I help you?";
+        VoiceResponseFormatter.getDefaultFallbackPrompt(context.language);
+
+      // If caller has encountered 3 consecutive UNKNOWNs, avoid infinite fallback loop and conclude gracefully
+      if ((context.consecutiveFallbacks || 0) >= 3) {
+        responseText = VoiceResponseFormatter.getEndCall(context.language);
+        if (turnResponse) {
+          turnResponse.shouldEndCall = true;
+        }
+      }
 
       console.log("🤖 [ExotelStreamGateway] Healthcare Assistant Response:", {
         streamSid: context.streamSid,
@@ -550,61 +803,23 @@ export class ExotelStreamGatewayService {
         replyPreview: responseText.slice(0, 100) + (responseText.length > 100 ? "..." : ""),
       });
 
-      // 5. Text-to-Speech Synthesis via Sarvam bulbul:v3
-      console.log("🔊 [ExotelStreamGateway] Sarvam TTS", {
+      // Requirement 8: Logging for prompt sent / response sent
+      console.log("🗣️ [ExotelStreamGateway] Prompt sent (turn response)", {
         streamSid: context.streamSid,
-        language: context.language,
+        replyPreview: responseText.slice(0, 80),
+        intent: turnResponse?.detectedIntent,
+        turnCount: context.turnCount,
       });
-      const ttsResult = await this.sarvamService.textToSpeech(responseText, context.language);
-      const ttsAudioBase64 = ttsResult?.audios?.[0];
 
-      // 6. Stream audio frames back to Exotel WebSocket
-      if (ttsAudioBase64 && socket.readyState === WebSocket.OPEN && context.streamSid) {
-        const rawTtsBuffer = Buffer.from(ttsAudioBase64, "base64");
-        const { pcmBuffer } = extractPcmFromWav(rawTtsBuffer);
+      // Stream audio frames back to Exotel WebSocket
+      await this.synthesizeAndStreamResponse(
+        socket,
+        context,
+        responseText,
+        `turn_${context.turnCount}`
+      );
 
-        const outboundAudio = context.mediaFormat.encoding.includes("mulaw")
-          ? linear16ToMulaw(pcmBuffer)
-          : pcmBuffer;
-
-        const chunkSize = context.mediaFormat.encoding.includes("mulaw")
-          ? FRAME_CHUNK_SIZE_MULAW
-          : FRAME_CHUNK_SIZE_PCM;
-
-        const outboundFrames = chunkAudioBuffer(outboundAudio, chunkSize);
-
-        console.log("🔊 [ExotelStreamGateway] Streaming audio frames to Exotel", {
-          streamSid: context.streamSid,
-          frameCount: outboundFrames.length,
-          chunkSize,
-        });
-
-        for (const frame of outboundFrames) {
-          if (socket.readyState !== WebSocket.OPEN || context.isStopped) break;
-          const mediaMessage: ExotelStreamOutboundMediaMessage = {
-            event: "media",
-            streamSid: context.streamSid,
-            media: {
-              payload: frame.toString("base64"),
-            },
-          };
-          socket.send(JSON.stringify(mediaMessage));
-        }
-
-        // Send Mark message to signal turn playback completion
-        if (socket.readyState === WebSocket.OPEN) {
-          const markMessage: ExotelStreamOutboundMarkMessage = {
-            event: "mark",
-            streamSid: context.streamSid,
-            mark: {
-              name: `turn_${context.turnCount}`,
-            },
-          };
-          socket.send(JSON.stringify(markMessage));
-        }
-      }
-
-      // 7. Check if intent dictated end-of-call
+      // Check if intent dictated end-of-call
       if (turnResponse?.shouldEndCall) {
         setTimeout(() => {
           this.cleanupStreamContext(context);
@@ -629,7 +844,7 @@ export class ExotelStreamGatewayService {
     socket: WebSocket,
     context: StreamSessionContext
   ): Promise<void> {
-    if (context.isStopped || !context.streamSid) {
+    if (context.isStopped || !context.streamSid || context.initialGreetingSent) {
       return;
     }
 
@@ -639,6 +854,7 @@ export class ExotelStreamGatewayService {
     try {
       const greetingText = VoiceResponseFormatter.getGreeting(context.language);
 
+      // Requirement 8: Logging for prompt sent
       console.log("🗣️ [ExotelStreamGateway] Initial Voicebot greeting", {
         streamSid: context.streamSid,
         sessionId: context.sessionId,
@@ -646,66 +862,127 @@ export class ExotelStreamGatewayService {
         greetingPreview: greetingText.slice(0, 80) + (greetingText.length > 80 ? "..." : ""),
       });
 
-      console.log("🔊 [ExotelStreamGateway] Sarvam TTS", {
+      console.log("🗣️ [ExotelStreamGateway] Prompt sent (initial greeting)", {
         streamSid: context.streamSid,
         language: context.language,
       });
 
-      const ttsResult = await this.sarvamService.textToSpeech(greetingText, context.language);
-      const ttsAudioBase64 = ttsResult?.audios?.[0];
-
-      if (ttsAudioBase64 && socket.readyState === WebSocket.OPEN && context.streamSid) {
-        const rawTtsBuffer = Buffer.from(ttsAudioBase64, "base64");
-        const { pcmBuffer } = extractPcmFromWav(rawTtsBuffer);
-
-        const outboundAudio = context.mediaFormat.encoding.includes("mulaw")
-          ? linear16ToMulaw(pcmBuffer)
-          : pcmBuffer;
-
-        const chunkSize = context.mediaFormat.encoding.includes("mulaw")
-          ? FRAME_CHUNK_SIZE_MULAW
-          : FRAME_CHUNK_SIZE_PCM;
-
-        const outboundFrames = chunkAudioBuffer(outboundAudio, chunkSize);
-
-        console.log("🔊 [ExotelStreamGateway] Streaming initial greeting frames to Exotel", {
-          streamSid: context.streamSid,
-          frameCount: outboundFrames.length,
-          chunkSize,
-          language: context.language,
-        });
-
-        for (const frame of outboundFrames) {
-          if (socket.readyState !== WebSocket.OPEN || context.isStopped) break;
-          const mediaMessage: ExotelStreamOutboundMediaMessage = {
-            event: "media",
-            streamSid: context.streamSid,
-            media: {
-              payload: frame.toString("base64"),
-            },
-          };
-          socket.send(JSON.stringify(mediaMessage));
-        }
-
-        if (socket.readyState === WebSocket.OPEN) {
-          const markMessage: ExotelStreamOutboundMarkMessage = {
-            event: "mark",
-            streamSid: context.streamSid,
-            mark: {
-              name: "initial_greeting",
-            },
-          };
-          socket.send(JSON.stringify(markMessage));
-        }
-      }
+      await this.synthesizeAndStreamResponse(
+        socket,
+        context,
+        greetingText,
+        "initial_greeting"
+      );
     } catch (err: any) {
       console.error("⚠️ [ExotelStreamGateway] Error generating initial Voicebot greeting:", err.message);
-    } finally {
-      // Discard any audio accumulated during greeting transmission so echo is not treated as caller speech
-      context.audioBufferChunks = [];
-      context.turnSilenceChunks = 0;
-      context.turnTotalChunks = 0;
-      context.isPlayingGreeting = false;
+      this.onPlaybackFinished(socket, context, "greeting_error_fallback");
+    }
+  }
+
+  /**
+   * Synthesizes text to speech via Sarvam bulbul:v3 and streams 20ms frames to Exotel over WebSocket.
+   * Sets isPlayingOutbound to suppress incoming echo during playback, dispatches mark event,
+   * and arms a fallback duration timer.
+   */
+  public async synthesizeAndStreamResponse(
+    socket: WebSocket,
+    context: StreamSessionContext,
+    text: string,
+    markName: string
+  ): Promise<void> {
+    if (context.isStopped || !context.streamSid || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    context.isPlayingOutbound = true;
+    context.currentMarkName = markName;
+
+    // Clear any active timers while new response is synthesized and queued
+    if (context.playbackFallbackTimer) {
+      clearTimeout(context.playbackFallbackTimer);
+      context.playbackFallbackTimer = null;
+    }
+    if (context.noSpeechTimer) {
+      clearTimeout(context.noSpeechTimer);
+      context.noSpeechTimer = null;
+    }
+
+    try {
+      console.log("🔊 [ExotelStreamGateway] Sarvam TTS", {
+        streamSid: context.streamSid,
+        language: context.language,
+        markName,
+      });
+
+      const ttsResult = await this.sarvamService.textToSpeech(text, context.language);
+      const ttsAudioBase64 = ttsResult?.audios?.[0];
+
+      if (!ttsAudioBase64 || socket.readyState !== WebSocket.OPEN) {
+        // If TTS produced no audio frames (mock or unconfigured), immediately finish playback
+        this.onPlaybackFinished(socket, context, "no_audio_frames");
+        return;
+      }
+
+      const rawTtsBuffer = Buffer.from(ttsAudioBase64, "base64");
+      const { pcmBuffer } = extractPcmFromWav(rawTtsBuffer);
+
+      const outboundAudio = context.mediaFormat.encoding.includes("mulaw")
+        ? linear16ToMulaw(pcmBuffer)
+        : pcmBuffer;
+
+      const chunkSize = context.mediaFormat.encoding.includes("mulaw")
+        ? FRAME_CHUNK_SIZE_MULAW
+        : FRAME_CHUNK_SIZE_PCM;
+
+      const outboundFrames = chunkAudioBuffer(outboundAudio, chunkSize);
+
+      // Requirement 8: Logging for response sent
+      console.log("🔊 [ExotelStreamGateway] Streaming audio frames to Exotel", {
+        streamSid: context.streamSid,
+        frameCount: outboundFrames.length,
+        chunkSize,
+        markName,
+        language: context.language,
+      });
+
+      for (const frame of outboundFrames) {
+        if (socket.readyState !== WebSocket.OPEN || context.isStopped) break;
+        const mediaMessage: ExotelStreamOutboundMediaMessage = {
+          event: "media",
+          streamSid: context.streamSid,
+          media: {
+            payload: frame.toString("base64"),
+          },
+        };
+        socket.send(JSON.stringify(mediaMessage));
+      }
+
+      // Send Mark message to signal turn playback completion
+      if (socket.readyState === WebSocket.OPEN) {
+        const markMessage: ExotelStreamOutboundMarkMessage = {
+          event: "mark",
+          streamSid: context.streamSid,
+          mark: {
+            name: markName,
+          },
+        };
+        socket.send(JSON.stringify(markMessage));
+      }
+
+      // Calculate physical playback duration (20ms per audio frame)
+      const playbackDurationMs = outboundFrames.length * 20;
+
+      // Set fallback timer: for real speech audio (>100ms) wait full duration to mute echo; for tiny mock frames (<=100ms) use 15ms
+      const fallbackMs = playbackDurationMs > 100 ? playbackDurationMs : 15;
+      const timer = setTimeout(() => {
+        this.onPlaybackFinished(socket, context, `timer_fallback_${markName}`);
+      }, fallbackMs);
+
+      if (timer.unref) timer.unref();
+      context.playbackFallbackTimer = timer;
+    } catch (err: any) {
+      console.error("⚠️ [ExotelStreamGateway] Error during response synthesis/streaming:", err.message);
+      this.onPlaybackFinished(socket, context, "stream_error_fallback");
     }
   }
 
@@ -715,25 +992,12 @@ export class ExotelStreamGatewayService {
   private async handleMaxTurnsReached(socket: WebSocket, context: StreamSessionContext): Promise<void> {
     const farewell = VoiceResponseFormatter.getMaxTurnsPrompt(context.language);
     try {
-      const ttsResult = await this.sarvamService.textToSpeech(farewell, context.language);
-      const ttsAudio = ttsResult?.audios?.[0];
-      if (ttsAudio && socket.readyState === WebSocket.OPEN && context.streamSid) {
-        const { pcmBuffer } = extractPcmFromWav(Buffer.from(ttsAudio, "base64"));
-        const outbound = context.mediaFormat.encoding.includes("mulaw")
-          ? linear16ToMulaw(pcmBuffer)
-          : pcmBuffer;
-        const frames = chunkAudioBuffer(outbound, FRAME_CHUNK_SIZE_MULAW);
-        for (const frame of frames) {
-          if (socket.readyState !== WebSocket.OPEN) break;
-          socket.send(
-            JSON.stringify({
-              event: "media",
-              streamSid: context.streamSid,
-              media: { payload: frame.toString("base64") },
-            })
-          );
-        }
-      }
+      await this.synthesizeAndStreamResponse(
+        socket,
+        context,
+        farewell,
+        "max_turns_farewell"
+      );
     } catch {
       // Non-blocking
     } finally {
@@ -742,7 +1006,7 @@ export class ExotelStreamGatewayService {
         if (socket.readyState === WebSocket.OPEN) {
           socket.close(1000, "Max turns reached");
         }
-      }, 2000);
+      }, 2500);
     }
   }
 
@@ -783,6 +1047,14 @@ export class ExotelStreamGatewayService {
     if (context.durationTimer) {
       clearTimeout(context.durationTimer);
       context.durationTimer = null;
+    }
+    if (context.playbackFallbackTimer) {
+      clearTimeout(context.playbackFallbackTimer);
+      context.playbackFallbackTimer = null;
+    }
+    if (context.noSpeechTimer) {
+      clearTimeout(context.noSpeechTimer);
+      context.noSpeechTimer = null;
     }
     context.audioBufferChunks = [];
 

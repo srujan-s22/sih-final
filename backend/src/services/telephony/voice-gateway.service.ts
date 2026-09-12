@@ -295,6 +295,32 @@ export class VoiceGatewayService {
       }
     }
 
+    // If caller provided no speech / empty transcript, reprompt cleanly without saying "I didn't understand"
+    if (!transcript || transcript.trim().length === 0) {
+      const repromptText = VoiceResponseFormatter.getTimeoutReprompt(session.language);
+      let audioBase64: string | null = null;
+      if (this.sarvamService.isConfigured()) {
+        try {
+          const tts = await this.sarvamService.textToSpeech(repromptText, session.language);
+          if (tts.audios && tts.audios.length > 0) {
+            audioBase64 = tts.audios[0];
+          }
+        } catch {
+          audioBase64 = null;
+        }
+      }
+      return {
+        sessionId,
+        status: session.status,
+        verificationStatus: session.verificationStatus,
+        textResponse: repromptText,
+        audioBase64,
+        detectedIntent: "UNKNOWN",
+        shouldEndCall: false,
+        language: session.language,
+      };
+    }
+
     // Step 2: Extract Intent & Entities with multi-turn context
     const nluResult = this.sarvamService.understandIntent(
       transcript,
