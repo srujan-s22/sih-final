@@ -87,6 +87,8 @@ describe("SwasthyaSetu — Scheme Care Work Resolution & Public Reflection", () 
       age: 71,
       gender: "male",
       relationship: "Grandfather",
+      disabilityStatus: false,
+      chronicConditions: [],
       createdAt: now,
       updatedAt: now,
     });
