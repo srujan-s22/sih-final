@@ -353,18 +353,32 @@ function NfcResolverContent() {
   // Helper for eligibility status badge
   const getStatusBadge = (status: NfcPublicSchemeSummary["eligibilityStatus"]) => {
     switch (status) {
-      case "ELIGIBLE":
+      case "RESOLVED_ELIGIBLE":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-            <span>{t("nfc.statusEligible")}</span>
+            <span>{t("nfc.statusResolvedEligible")}</span>
+          </span>
+        );
+      case "ELIGIBLE":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span>{t("nfc.statusEligibleActionRequired")}</span>
           </span>
         );
       case "ACTION_REQUIRED":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
             <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-            <span>{t("nfc.statusActionRequired")}</span>
+            <span>{t("nfc.statusEligibleActionRequired")}</span>
+          </span>
+        );
+      case "NOT_ELIGIBLE":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+            <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>{t("nfc.statusNotEligible")}</span>
           </span>
         );
       default:
@@ -751,7 +765,13 @@ function NfcResolverContent() {
                     return (
                       <article
                         key={scheme.schemeId}
-                        className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 transition-shadow hover:shadow-xs"
+                        className={`rounded-xl border p-4 sm:p-5 shadow-2xs space-y-3 transition-shadow hover:shadow-xs ${
+                          scheme.eligibilityStatus === "RESOLVED_ELIGIBLE"
+                            ? "bg-white border-emerald-200"
+                            : scheme.eligibilityStatus === "NOT_ELIGIBLE"
+                            ? "bg-white border-slate-200"
+                            : "bg-white border-amber-200/80"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="text-base font-bold text-slate-900 leading-snug">

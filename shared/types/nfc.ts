@@ -77,7 +77,7 @@ export interface NfcPublicSchemeSummary {
   name: string;
   benefit: string;
   nextSteps: string;
-  eligibilityStatus: "ELIGIBLE" | "ACTION_REQUIRED" | "CHECK_REQUIRED";
+  eligibilityStatus: "ELIGIBLE" | "ACTION_REQUIRED" | "CHECK_REQUIRED" | "RESOLVED_ELIGIBLE" | "NOT_ELIGIBLE";
 }
 
 /**

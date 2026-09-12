@@ -9,6 +9,8 @@ export interface CitizenEligibilityResponse {
   members: Member[];
   results: EligibilityResult[];
   count: number;
+  caseStatus?: string | null;
+  resolvedSchemeIds?: string[];
 }
 
 export const eligibilityService = {

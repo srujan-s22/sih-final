@@ -15,6 +15,7 @@ import {
   InboundAutomationWebhookInputSchema,
   AssignCaseInputSchema,
   InitiateSchemeAssistanceInputSchema,
+  ResolveSchemeInputSchema,
 } from "../../../shared/schemas/case.schema.js";
 import { CreateHouseholdSchema } from "../../../shared/schemas/household.schema.js";
 import { CaseServiceError } from "../services/case.service.js";
@@ -109,6 +110,51 @@ export const caseRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(HTTP_STATUS.CREATED).send({
           success: true,
           data: result,
+        });
+      } catch (err) {
+        return handleCaseError(err, reply);
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/asha/cases/:caseId/resolve-scheme
+   * Resolves or unresolves a specific healthcare scheme for a household case
+   */
+  fastify.post(
+    "/v1/asha/cases/:caseId/resolve-scheme",
+    { preHandler: [requireAuth, requireConsent] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { caseId } = request.params as { caseId: string };
+        const userProfile = request.userProfile;
+        if (!userProfile || (userProfile.role !== "ASHA" && userProfile.role !== "ADMIN")) {
+          return reply.status(HTTP_STATUS.FORBIDDEN).send({
+            success: false,
+            code: "FORBIDDEN_ROLE",
+            message: "Only ASHA workers and Administrators can resolve schemes for a household.",
+          });
+        }
+
+        const parseResult = ResolveSchemeInputSchema.safeParse(request.body);
+        if (!parseResult.success) {
+          return reply.status(HTTP_STATUS.BAD_REQUEST).send({
+            success: false,
+            code: "VALIDATION_ERROR",
+            message: parseResult.error.errors[0]?.message || "Invalid resolve scheme payload.",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const updatedCase = await fastify.caseService.resolveSchemeForCase(
+          caseId,
+          parseResult.data,
+          userProfile
+        );
+
+        return reply.status(HTTP_STATUS.OK).send({
+          success: true,
+          data: { case: updatedCase },
         });
       } catch (err) {
         return handleCaseError(err, reply);

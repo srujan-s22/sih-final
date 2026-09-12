@@ -117,6 +117,8 @@ export default function CitizenPage() {
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [eligibilityResults, setEligibilityResults] = useState<EligibilityResult[]>([]);
+  const [resolvedSchemeIds, setResolvedSchemeIds] = useState<string[]>([]);
+  const [caseStatus, setCaseStatus] = useState<string | null>(null);
   const [guidance, setGuidance] = useState<GuidanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -210,6 +212,12 @@ export default function CitizenPage() {
 
       if (eligRes.success && eligRes.data) {
         setEligibilityResults(eligRes.data.results || []);
+        if (eligRes.data.resolvedSchemeIds) {
+          setResolvedSchemeIds(eligRes.data.resolvedSchemeIds);
+        }
+        if (eligRes.data.caseStatus !== undefined) {
+          setCaseStatus(eligRes.data.caseStatus);
+        }
       }
       if (guideRes.success && guideRes.data) {
         setGuidance(guideRes.data);
@@ -539,6 +547,15 @@ export default function CitizenPage() {
       setAssistanceSubmitting(false);
     }
   };
+
+  // Helper to determine if a scheme is resolved by ASHA
+  const isSchemeResolved = useCallback((schemeId: string) => {
+    if (resolvedSchemeIds.includes(schemeId)) return true;
+    if (caseStatus === "RESOLVED" || caseStatus === "CLOSED") return true;
+    return assistanceRequests.some(
+      (r) => r.schemeId === schemeId && (r.status === "RESOLVED" || r.status === "CLOSED")
+    );
+  }, [resolvedSchemeIds, caseStatus, assistanceRequests]);
 
   const eligibleCount = eligibilityResults.filter((r) => r.status === "ELIGIBLE").length;
   const gapsCount = guidance?.gaps?.length || 0;
@@ -1077,10 +1094,18 @@ export default function CitizenPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {eligibilityResults.slice(0, 3).map((result) => {
                         const locScheme = getLocalizedScheme(result, language);
+                        const isResolved = isSchemeResolved(result.schemeId);
+                        const isNotEligible = result.status === "NOT_ELIGIBLE";
                         return (
                           <div
                             key={result.schemeId}
-                            className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between"
+                            className={`rounded-xl border bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between ${
+                              isResolved
+                                ? "border-emerald-200"
+                                : isNotEligible
+                                ? "border-slate-200"
+                                : "border-amber-200/80"
+                            }`}
                           >
                             <div className="space-y-2.5">
                               <div className="flex items-start justify-between gap-2">
@@ -1088,19 +1113,26 @@ export default function CitizenPage() {
                                   {locScheme.name}
                                 </h4>
                                 <span
-                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 border ${
-                                    result.status === "ELIGIBLE"
+                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 border flex items-center gap-1 ${
+                                    isResolved
                                       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                      : result.status === "NEEDS_INFORMATION"
-                                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                                      : "bg-slate-50 text-slate-600 border-slate-200"
+                                      : isNotEligible
+                                      ? "bg-slate-50 text-slate-600 border-slate-200"
+                                      : "bg-amber-50 text-amber-800 border-amber-200"
                                   }`}
                                 >
-                                  {result.status === "ELIGIBLE"
-                                    ? t("status.eligible")
-                                    : result.status === "NEEDS_INFORMATION"
-                                    ? t("status.action_required")
-                                    : t("status.declined")}
+                                  {isResolved ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                                      <span>{t("status.resolved_eligible")}</span>
+                                    </>
+                                  ) : isNotEligible ? (
+                                    t("status.not_eligible")
+                                  ) : result.status === "ELIGIBLE" ? (
+                                    t("status.eligible_action_required")
+                                  ) : (
+                                    t("status.action_required")
+                                  )}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
@@ -2185,19 +2217,23 @@ export default function CitizenPage() {
                   <div className="space-y-4">
                     {eligibilityResults.map((result) => {
                       const isExpanded = expandedSchemeId === result.schemeId;
+                      const isResolved = isSchemeResolved(result.schemeId);
                       const isEligible = result.status === "ELIGIBLE";
                       const isNeedsInfo = result.status === "NEEDS_INFORMATION";
+                      const isNotEligible = result.status === "NOT_ELIGIBLE";
                       const locScheme = getLocalizedScheme(result, language);
 
                       return (
                         <div
                           key={result.schemeId}
                           className={`rounded-xl border transition-all ${
-                            isEligible
+                            isResolved
                               ? "border-emerald-200 bg-white shadow-2xs"
+                              : isNotEligible
+                              ? "border-slate-200 bg-white"
                               : isNeedsInfo
                               ? "border-amber-200 bg-white shadow-2xs"
-                              : "border-slate-200 bg-white"
+                              : "border-amber-200/80 bg-white shadow-2xs"
                           }`}
                         >
                           {/* Scheme Card Header */}
@@ -2210,11 +2246,11 @@ export default function CitizenPage() {
                             <div className="flex items-start gap-3">
                               <div
                                 className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                                  isEligible
+                                  isResolved
                                     ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
-                                    : isNeedsInfo
-                                    ? "bg-amber-50 border border-amber-200 text-amber-700"
-                                    : "bg-slate-50 border border-slate-200 text-slate-600"
+                                    : isNotEligible
+                                    ? "bg-slate-50 border border-slate-200 text-slate-600"
+                                    : "bg-amber-50 border border-amber-200 text-amber-700"
                                 }`}
                               >
                                 <ShieldCheck className="w-5 h-5" />
@@ -2234,19 +2270,26 @@ export default function CitizenPage() {
 
                             <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                               <span
-                                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
-                                  isEligible
+                                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                                  isResolved
                                     ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                    : isNeedsInfo
-                                    ? "bg-amber-50 text-amber-800 border-amber-200"
-                                    : "bg-slate-50 text-slate-600 border-slate-200"
+                                    : isNotEligible
+                                    ? "bg-slate-50 text-slate-600 border-slate-200"
+                                    : "bg-amber-50 text-amber-800 border-amber-200"
                                 }`}
                               >
-                                {isEligible
-                                  ? t("status.eligible")
-                                  : isNeedsInfo
-                                  ? t("status.action_required")
-                                  : t("status.declined")}
+                                {isResolved ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                    <span>{t("status.resolved_eligible")}</span>
+                                  </>
+                                ) : isNotEligible ? (
+                                  t("status.not_eligible")
+                                ) : isEligible ? (
+                                  t("status.eligible_action_required")
+                                ) : (
+                                  t("status.action_required")
+                                )}
                               </span>
 
                               <button
@@ -2272,7 +2315,7 @@ export default function CitizenPage() {
                                   {t("citizen.healthBenefits")}
                                 </span>
                                 <p className="text-slate-600 leading-relaxed">
-                                  {isEligible
+                                  {isEligible || isResolved
                                     ? result.matchedRules.map((r) => getLocalizedRuleExplanation(r.explanation, language)).filter(Boolean).join(". ") ||
                                       t("citizen.whyEligibleDefault")
                                     : isNeedsInfo
@@ -2287,7 +2330,7 @@ export default function CitizenPage() {
                               </div>
 
                               {/* Beneficiary Tag */}
-                              {isEligible && (
+                              {(isEligible || isResolved) && (
                                 <div className="rounded-lg bg-emerald-50/70 p-3 border border-emerald-200 flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2">
                                     <UserCheck className="w-4 h-4 text-emerald-800 shrink-0" />
@@ -2312,13 +2355,13 @@ export default function CitizenPage() {
                                     </span>
                                   </div>
                                   <span className="text-[10px] uppercase font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded">
-                                    {t("status.verified")}
+                                    {isResolved ? t("status.resolved_eligible") : t("status.verified")}
                                   </span>
                                 </div>
                               )}
 
                               {/* Next Required Action */}
-                              {isEligible && (
+                              {isEligible && !isResolved && (
                                 <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-1">
                                   <span className="font-bold text-slate-800 block text-xs uppercase tracking-wide flex items-center gap-1.5">
                                     <ArrowRight className="w-3.5 h-3.5 text-teal-700" />
@@ -2345,7 +2388,24 @@ export default function CitizenPage() {
                                   {t("citizen.viewActionPlanBtn")} →
                                 </Button>
 
-                                {isEligible && (
+                                {isResolved ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                      <span>{t("status.resolved_eligible")}</span>
+                                    </span>
+                                    {connectionStatus?.status === "ACTIVE" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setActiveTab("asha-connection")}
+                                        className="text-xs font-semibold border-emerald-200 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
+                                      >
+                                        {t("citizen.assistanceHistoryTitle")}
+                                      </Button>
+                                    )}
+                                  </div>
+                                ) : isEligible && (
                                   <>
                                     {connectionStatus?.status === "ACTIVE" ? (
                                       (() => {

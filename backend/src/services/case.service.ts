@@ -33,6 +33,7 @@ import {
   RescheduleCaseFollowUpInput,
   CancelCaseFollowUpInput,
   InboundAutomationWebhookInput,
+  ResolveSchemeInput,
 } from "../../../shared/schemas/case.schema.js";
 
 import { CaseRepository } from "../repositories/case.repository.js";
@@ -262,6 +263,14 @@ export class CaseService {
 
     const oldStatus = c.status;
     const oldPriority = c.priority;
+
+    if (updates.status === "RESOLVED" && !updates.resolvedSchemes) {
+      const resolvedSet = new Set(c.resolvedSchemes || []);
+      if (c.schemeId) {
+        resolvedSet.add(c.schemeId);
+      }
+      updates.resolvedSchemes = Array.from(resolvedSet);
+    }
 
     const updated = await this.caseRepo.updateCase(caseId, updates);
     if (!updated) {
@@ -1630,11 +1639,17 @@ export class CaseService {
       const nextStep = updatedJourneySteps[stepIndex]?.stepId || null;
       const isAllDone = completedTasksCount === totalTasksCount;
 
+      const resolvedSet = new Set(c.resolvedSchemes || []);
+      if (isAllDone && c.schemeId) {
+        resolvedSet.add(c.schemeId);
+      }
+
       await this.caseRepo.updateCase(caseId, {
         journeySteps: updatedJourneySteps,
         currentJourneyStep: nextStep,
         status: isAllDone ? "RESOLVED" : "IN_PROGRESS",
         nextFollowUpAt: isAllDone ? null : undefined,
+        resolvedSchemes: Array.from(resolvedSet),
       });
 
       // When case reaches complete resolution, mark any lingering intermediate follow-ups COMPLETED
@@ -2379,6 +2394,128 @@ export class CaseService {
       tasks,
       journeySteps: freshCase?.journeySteps || [],
     };
+  }
+
+  /**
+   * Resolves or unresolves a specific healthcare scheme for a household case.
+   * Directly accessible by ASHA workers opening household care work.
+   */
+  public async resolveSchemeForCase(
+    caseId: string,
+    input: ResolveSchemeInput,
+    userProfile: UserProfile
+  ): Promise<AshaCase> {
+    if (userProfile.role !== "ASHA" && userProfile.role !== "ADMIN") {
+      throw new CaseServiceError(
+        "Only ASHA workers and Administrators can resolve schemes for a household.",
+        HTTP_STATUS.FORBIDDEN,
+        "FORBIDDEN_ROLE"
+      );
+    }
+
+    const c = await this.caseRepo.getCaseById(caseId);
+    if (!c) {
+      throw new CaseServiceError("Case not found.", HTTP_STATUS.NOT_FOUND, "CASE_NOT_FOUND");
+    }
+
+    this.authorizeCaseAccess(c, userProfile);
+
+    const schemeId = input.schemeId.trim();
+    if (!schemeId) {
+      throw new CaseServiceError("Scheme ID is required.", HTTP_STATUS.BAD_REQUEST, "INVALID_SCHEME_ID");
+    }
+
+    const isResolved = input.resolved !== false;
+    const resolvedSet = new Set(c.resolvedSchemes || []);
+
+    if (isResolved) {
+      resolvedSet.add(schemeId);
+    } else {
+      resolvedSet.delete(schemeId);
+    }
+
+    const updatedResolvedSchemes = Array.from(resolvedSet);
+    const updates: Partial<AshaCase> = {
+      resolvedSchemes: updatedResolvedSchemes,
+    };
+
+    // If resolving the active scheme on the case, or if resolving any scheme while case is active
+    if (isResolved && c.schemeId === schemeId) {
+      updates.status = "RESOLVED";
+      updates.currentJourneyStep = "CASE_RESOLVED";
+    } else if (!isResolved && c.schemeId === schemeId && c.status === "RESOLVED") {
+      updates.status = "IN_PROGRESS";
+    }
+
+    const updatedCase = await this.caseRepo.updateCase(caseId, updates);
+    if (!updatedCase) {
+      throw new CaseServiceError("Failed to update case scheme status.", HTTP_STATUS.INTERNAL_SERVER_ERROR, "UPDATE_FAILED");
+    }
+
+    const now = new Date().toISOString();
+
+    // Synchronize matching AshaAssistanceRequest if present
+    if (this.assistanceRepo) {
+      try {
+        const requests = await this.assistanceRepo.listRequestsByHouseholdId(c.householdId);
+        const matchingRequests = requests.filter(
+          (r) => r.schemeId === schemeId && !["DECLINED", "CLOSED"].includes(r.status)
+        );
+        for (const req of matchingRequests) {
+          if (isResolved && req.status !== "RESOLVED") {
+            await this.assistanceRepo.updateRequestStatus(
+              req.id,
+              "RESOLVED",
+              input.notes || "Scheme marked as resolved and eligible by ASHA worker."
+            );
+          } else if (!isResolved && req.status === "RESOLVED") {
+            await this.assistanceRepo.updateRequestStatus(
+              req.id,
+              "IN_PROGRESS",
+              input.notes || "Scheme reopened by ASHA worker."
+            );
+          }
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    // Record immutable audit activity
+    await this.caseRepo.createActivity(caseId, {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      caseId,
+      actorUid: userProfile.uid,
+      actorRole: userProfile.role,
+      actorName: userProfile.displayName || "ASHA Worker",
+      type: "CASE_RESOLVED",
+      description: isResolved
+        ? `ASHA worker marked scheme '${schemeId}' as Resolved & Eligible for this household.`
+        : `ASHA worker reopened scheme '${schemeId}' for this household.`,
+      metadata: {
+        schemeId,
+        resolved: isResolved,
+        notes: input.notes,
+      },
+      timestamp: now,
+    });
+
+    if (this.automationService && isResolved) {
+      this.automationService.emitDomainEvent("CASE_RESOLVED", {
+        caseId,
+        householdId: c.householdId,
+        assignedAshaUid: c.assignedAshaUid,
+        schemeId,
+        beneficiaryMemberId: c.beneficiaryMemberId,
+        beneficiaryName: c.beneficiaryName,
+        payload: {
+          resolvedAt: now,
+          schemeId,
+        },
+      }).catch(() => {});
+    }
+
+    return updatedCase;
   }
 }
 

@@ -91,6 +91,21 @@ export class CaseServiceClient {
   }
 
   /**
+   * Resolves or unresolves a specific healthcare scheme for a household case
+   */
+  public async resolveScheme(
+    caseId: string,
+    schemeId: string,
+    resolved: boolean = true,
+    notes?: string
+  ): Promise<ApiResult<{ case: AshaCase }>> {
+    return apiClient.post<{ case: AshaCase }>(
+      `/api/v1/asha/cases/${encodeURIComponent(caseId)}/resolve-scheme`,
+      { schemeId, resolved, notes }
+    );
+  }
+
+  /**
    * Adds a timestamped note to a case
    */
   public async addNote(

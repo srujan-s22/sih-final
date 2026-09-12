@@ -109,6 +109,7 @@ export interface AshaCase {
   assistanceRequestId?: string | null;
   currentJourneyStep?: string | null;
   journeySteps?: SchemeJourneyStep[];
+  resolvedSchemes?: string[];
   detectedGapsCount: number;
   eligibleSchemesCount: number;
   lastContactAt: string | null;
@@ -328,5 +329,11 @@ export interface InitiateSchemeAssistanceResponse {
   case: AshaCase;
   tasks: CaseTask[];
   journeySteps: SchemeJourneyStep[];
+}
+
+export interface ResolveSchemeInput {
+  schemeId: string;
+  resolved?: boolean;
+  notes?: string | null;
 }
 

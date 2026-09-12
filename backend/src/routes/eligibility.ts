@@ -33,6 +33,17 @@ export const eligibilityRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
+        const householdCase = await fastify.caseRepository.getCaseByHouseholdId(evaluation.household.id);
+        const resolvedSchemeIds = new Set<string>();
+        if (householdCase) {
+          if (householdCase.resolvedSchemes) {
+            householdCase.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
+          }
+          if (["RESOLVED", "CLOSED"].includes(householdCase.status) && householdCase.schemeId) {
+            resolvedSchemeIds.add(householdCase.schemeId);
+          }
+        }
+
         return reply.status(HTTP_STATUS.OK).send({
           success: true,
           data: {
@@ -41,6 +52,8 @@ export const eligibilityRoutes: FastifyPluginAsync = async (fastify) => {
             members: evaluation.members,
             results: evaluation.results,
             count: evaluation.results.length,
+            caseStatus: householdCase?.status || null,
+            resolvedSchemeIds: Array.from(resolvedSchemeIds),
           },
           correlation_id: correlationId,
           timestamp: new Date().toISOString(),

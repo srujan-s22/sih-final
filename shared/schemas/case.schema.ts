@@ -40,6 +40,7 @@ export const UpdateCaseInputSchema = z.object({
   beneficiaryName: z.string().optional().nullable(),
   currentJourneyStep: z.string().optional().nullable(),
   lastContactAt: z.string().datetime().optional().nullable(),
+  resolvedSchemes: z.array(z.string()).optional(),
 });
 
 export const CreateCaseTaskInputSchema = z.object({
@@ -133,6 +134,12 @@ export const InitiateSchemeAssistanceInputSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+export const ResolveSchemeInputSchema = z.object({
+  schemeId: z.string().min(1, "Scheme ID is required").trim(),
+  resolved: z.boolean().default(true),
+  notes: z.string().max(1000).optional().nullable(),
+});
+
 export type UpdateCaseInput = z.infer<typeof UpdateCaseInputSchema>;
 export type CreateCaseTaskInput = z.input<typeof CreateCaseTaskInputSchema>;
 export type UpdateCaseTaskInput = z.infer<typeof UpdateCaseTaskInputSchema>;
@@ -146,4 +153,5 @@ export type CancelCaseFollowUpInput = z.infer<typeof CancelCaseFollowUpInputSche
 export type InboundAutomationWebhookInput = z.infer<typeof InboundAutomationWebhookInputSchema>;
 export type AssignCaseInput = z.infer<typeof AssignCaseInputSchema>;
 export type InitiateSchemeAssistanceInput = z.infer<typeof InitiateSchemeAssistanceInputSchema>;
+export type ResolveSchemeInput = z.infer<typeof ResolveSchemeInputSchema>;
 

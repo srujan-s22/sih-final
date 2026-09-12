@@ -535,24 +535,7 @@ export class NfcService {
       members
     );
 
-    // 5. Map eligibility results to safe public summaries
-    const schemes: NfcPublicSchemeSummary[] = eligibilityResults.map((res) => ({
-      schemeId: res.schemeId,
-      name: res.schemeName,
-      benefit: res.benefitSummary,
-      nextSteps:
-        res.nextActions && res.nextActions.length > 0
-          ? res.nextActions[0].description
-          : "Consult your local ASHA worker or nearest Primary Health Center for enrollment assistance.",
-      eligibilityStatus:
-        res.status === "ELIGIBLE"
-          ? "ELIGIBLE"
-          : res.status === "NEEDS_INFORMATION"
-          ? "CHECK_REQUIRED"
-          : "ACTION_REQUIRED",
-    }));
-
-    // 6. Resolve safe public ASHA worker directory information
+    // 5. Check leave restoration and fetch case care resolution status for household
     if (this.leaveService) {
       try {
         await this.leaveService.evaluateAndRestoreExpiredLeaves();
@@ -561,8 +544,53 @@ export class NfcService {
       }
     }
 
-    let ashaInfo: NfcPublicAshaInfo | null = null;
     const householdCase = await this.caseRepo.getCaseByHouseholdId(household.id);
+    const resolvedSchemeIds = new Set<string>();
+    if (householdCase) {
+      if (householdCase.resolvedSchemes) {
+        householdCase.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
+      }
+      if (["RESOLVED", "CLOSED"].includes(householdCase.status) && householdCase.schemeId) {
+        resolvedSchemeIds.add(householdCase.schemeId);
+      }
+    }
+
+    // Map eligibility results to safe public summaries
+    const schemes: NfcPublicSchemeSummary[] = eligibilityResults.map((res) => {
+      let status: NfcPublicSchemeSummary["eligibilityStatus"];
+      if (
+        resolvedSchemeIds.has(res.schemeId) ||
+        (householdCase &&
+          ["RESOLVED", "CLOSED"].includes(householdCase.status) &&
+          (!householdCase.schemeId || householdCase.schemeId === res.schemeId))
+      ) {
+        status = "RESOLVED_ELIGIBLE";
+      } else if (res.status === "ELIGIBLE") {
+        status = "ELIGIBLE";
+      } else if (res.status === "NOT_ELIGIBLE") {
+        status = "NOT_ELIGIBLE";
+      } else if (res.status === "NEEDS_INFORMATION") {
+        status = "CHECK_REQUIRED";
+      } else {
+        status = "ACTION_REQUIRED";
+      }
+
+      return {
+        schemeId: res.schemeId,
+        name: res.schemeName,
+        benefit: res.benefitSummary,
+        nextSteps:
+          status === "RESOLVED_ELIGIBLE"
+            ? "Your ASHA worker has verified and resolved enrollment for this scheme."
+            : res.nextActions && res.nextActions.length > 0
+            ? res.nextActions[0].description
+            : "Consult your local ASHA worker or nearest Primary Health Center for enrollment assistance.",
+        eligibilityStatus: status,
+      };
+    });
+
+    // 6. Resolve safe public ASHA worker directory information
+    let ashaInfo: NfcPublicAshaInfo | null = null;
     if (householdCase) {
       const activeAshaUid =
         householdCase.temporaryAssignment?.status === "ACTIVE"

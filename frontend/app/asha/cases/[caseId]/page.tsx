@@ -296,6 +296,18 @@ export default function AshaCaseWorkspacePage({
     }
   };
 
+  // Resolve / Reopen Scheme Directly from Care Work
+  const handleResolveScheme = async (schemeId: string, resolved: boolean = true) => {
+    try {
+      const res = await caseService.resolveScheme(caseId, schemeId, resolved);
+      if (res.success) {
+        await loadCaseDetail();
+      }
+    } catch {
+      // Quiet fail
+    }
+  };
+
   // Open Outbound Telephony Modal
   const handleOpenVoiceCallModal = (followUp?: CaseFollowUp) => {
     const name =
@@ -496,7 +508,10 @@ export default function AshaCaseWorkspacePage({
                   )}
 
                   {activeSection === "benefits" && (
-                    <CaseBenefitsSection caseDetail={caseDetail} />
+                    <CaseBenefitsSection
+                      caseDetail={caseDetail}
+                      onResolveScheme={handleResolveScheme}
+                    />
                   )}
 
                   {activeSection === "tasks" && (
