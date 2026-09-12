@@ -23,6 +23,12 @@ import { GuidanceResponse } from "@shared/types/guidance";
 import { householdService } from "@/services/household-service";
 import { eligibilityService } from "@/services/eligibility-service";
 import { guidanceService } from "@/services/guidance-service";
+import {
+  getLocalizedScheme,
+  getLocalizedActionPlanItem,
+  getLocalizedRuleExplanation,
+  getLocalizedAssistanceDefaultMessage,
+} from "@/lib/i18n/citizen-localization";
 import { connectionService } from "@/services/connection-service";
 import { assistanceService } from "@/services/assistance-service";
 import {
@@ -104,7 +110,7 @@ const ASSISTANCE_CATEGORIES: Array<{ value: AssistanceCategory; label: string }>
 
 export default function CitizenPage() {
   const { userProfile, isLoading: authLoading, isAuthenticated } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("overview");
 
   // Data states
@@ -489,12 +495,7 @@ export default function CitizenPage() {
     }
 
     const selectedMember = members.find((m) => m.id === matchedMemberId);
-    let defaultMsg = "";
-    if (schemeId && selectedMember) {
-      defaultMsg = `Requesting doorstep assistance for ${schemeName || schemeId} enrollment and document verification for ${selectedMember.fullName} (Age ${selectedMember.age}, ${selectedMember.relationship || "Member"}).`;
-    } else if (schemeId) {
-      defaultMsg = `Requesting doorstep assistance for ${schemeName || schemeId} enrollment for our household.`;
-    }
+    const defaultMsg = getLocalizedAssistanceDefaultMessage(schemeId, schemeName, selectedMember, language);
 
     setAssistanceForm({
       category,
@@ -1074,71 +1075,75 @@ export default function CitizenPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {eligibilityResults.slice(0, 3).map((result) => (
-                        <div
-                          key={result.schemeId}
-                          className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between"
-                        >
-                          <div className="space-y-2.5">
-                            <div className="flex items-start justify-between gap-2">
-                              <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                                {result.schemeName}
-                              </h4>
-                              <span
-                                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 border ${
-                                  result.status === "ELIGIBLE"
-                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      {eligibilityResults.slice(0, 3).map((result) => {
+                        const locScheme = getLocalizedScheme(result, language);
+                        return (
+                          <div
+                            key={result.schemeId}
+                            className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between"
+                          >
+                            <div className="space-y-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                  {locScheme.name}
+                                </h4>
+                                <span
+                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 border ${
+                                    result.status === "ELIGIBLE"
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                      : result.status === "NEEDS_INFORMATION"
+                                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                                      : "bg-slate-50 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  {result.status === "ELIGIBLE"
+                                    ? t("status.eligible")
                                     : result.status === "NEEDS_INFORMATION"
-                                    ? "bg-amber-50 text-amber-800 border-amber-200"
-                                    : "bg-slate-50 text-slate-600 border-slate-200"
-                                }`}
-                              >
-                                {result.status === "ELIGIBLE"
-                                  ? t("status.eligible")
-                                  : result.status === "NEEDS_INFORMATION"
-                                  ? t("status.action_required")
-                                  : t("status.declined")}
-                              </span>
+                                    ? t("status.action_required")
+                                    : t("status.declined")}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                                {locScheme.benefit}
+                              </p>
                             </div>
-                            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                              {result.benefitSummary || "Official government healthcare coverage and benefits."}
-                            </p>
-                          </div>
 
-                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setExpandedSchemeId(result.schemeId);
-                                setActiveTab("support");
-                              }}
-                              className="text-xs font-semibold text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
-                            >
-                              {t("common.viewDetails")} →
-                            </button>
-                            {connectionStatus?.status === "ACTIVE" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleOpenAssistanceModal(
-                                    "SCHEME_ENROLLMENT",
-                                    result.schemeId,
-                                    result.schemeName
-                                  )
-                                }
-                                className="text-xs border-teal-200 text-teal-800 hover:bg-teal-50 font-medium py-1 px-2.5 cursor-pointer"
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExpandedSchemeId(result.schemeId);
+                                  setActiveTab("support");
+                                }}
+                                className="text-xs font-semibold text-teal-700 hover:text-teal-900 transition-colors cursor-pointer"
                               >
-                                {t("citizen.requestAssistanceBtn")}
-                              </Button>
-                            )}
+                                {t("common.viewDetails")} →
+                              </button>
+                              {connectionStatus?.status === "ACTIVE" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleOpenAssistanceModal(
+                                      "SCHEME_ENROLLMENT",
+                                      result.schemeId,
+                                      result.schemeName
+                                    )
+                                  }
+                                  className="text-xs border-teal-200 text-teal-800 hover:bg-teal-50 font-medium py-1 px-2.5 cursor-pointer"
+                                >
+                                  {t("citizen.requestAssistanceBtn")}
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </section>
 
+                {/* -------------------------------------------------------- */}
                 {/* -------------------------------------------------------- */}
                 {/* SECTION 4: YOUR NEXT STEP */}
                 {/* -------------------------------------------------------- */}
@@ -1160,10 +1165,10 @@ export default function CitizenPage() {
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-slate-900">
-                            Set up your household profile
+                            {t("citizen.noHouseholdActionTitle")}
                           </h4>
                           <p className="text-xs text-slate-600 mt-0.5">
-                            Add your ration card and location so our system can check government healthcare schemes for you.
+                            {t("citizen.noHouseholdActionDesc")}
                           </p>
                         </div>
                       </div>
@@ -1176,52 +1181,57 @@ export default function CitizenPage() {
                         }}
                         className="text-xs font-semibold shrink-0"
                       >
-                        Set Up Household
+                        {t("citizen.noHouseholdActionBtn")}
                       </Button>
                     </div>
                   ) : guidance?.actionPlan && guidance.actionPlan.length > 0 ? (
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex items-start gap-3.5">
-                          <div className="w-9 h-9 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                            <Clock3 className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 block">
-                              Priority Action
-                            </span>
-                            <h4 className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
-                              {guidance.actionPlan[0].title}
-                            </h4>
-                            <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed max-w-3xl">
-                              {guidance.actionPlan[0].description}
-                            </p>
-                          </div>
-                        </div>
+                    (() => {
+                      const priorityAction = getLocalizedActionPlanItem(guidance.actionPlan[0], language);
+                      return (
+                        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                            <div className="flex items-start gap-3.5">
+                              <div className="w-9 h-9 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                                <Clock3 className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 block">
+                                  {t("citizen.priorityAction")}
+                                </span>
+                                <h4 className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+                                  {priorityAction.title}
+                                </h4>
+                                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed max-w-3xl">
+                                  {priorityAction.description}
+                                </p>
+                              </div>
+                            </div>
 
-                        <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-start">
-                          {connectionStatus?.status === "ACTIVE" && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
-                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              <span>{t("citizen.requestAssistanceBtn")}</span>
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setActiveTab("actions")}
-                            className="text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                          >
-                            {t("citizen.viewActionPlanBtn")} ({guidance.actionPlan.length})
-                          </Button>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-start">
+                              {connectionStatus?.status === "ACTIVE" && (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
+                                  className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>{t("citizen.requestAssistanceBtn")}</span>
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setActiveTab("actions")}
+                                className="text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                              >
+                                {t("citizen.viewActionPlanBtn")} ({guidance.actionPlan.length})
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      );
+                    })()
                   ) : (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3.5">
@@ -2162,13 +2172,13 @@ export default function CitizenPage() {
                   </div>
                 ) : isEvaluating ? (
                   <div className="py-12">
-                    <LoadingState message="Evaluating applicable healthcare schemes..." />
+                    <LoadingState message={t("citizen.loadingSchemes")} />
                   </div>
                 ) : eligibilityResults.length === 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs sm:text-sm text-slate-500 space-y-2">
-                    <p className="font-semibold text-slate-800">No matching benefits found yet</p>
+                    <p className="font-semibold text-slate-800">{t("citizen.noMatchingBenefitsTitle")}</p>
                     <p className="max-w-sm mx-auto">
-                      Based on current records, no matching schemes were found. Your local ASHA worker can help check additional state programs.
+                      {t("citizen.noMatchingBenefitsDesc")}
                     </p>
                   </div>
                 ) : (
@@ -2177,6 +2187,7 @@ export default function CitizenPage() {
                       const isExpanded = expandedSchemeId === result.schemeId;
                       const isEligible = result.status === "ELIGIBLE";
                       const isNeedsInfo = result.status === "NEEDS_INFORMATION";
+                      const locScheme = getLocalizedScheme(result, language);
 
                       return (
                         <div
@@ -2212,11 +2223,11 @@ export default function CitizenPage() {
                               <div className="space-y-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                                    {result.schemeName}
+                                    {locScheme.name}
                                   </h3>
                                 </div>
                                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                                  {result.benefitSummary || "Official government healthcare coverage."}
+                                  {locScheme.benefit}
                                 </p>
                               </div>
                             </div>
@@ -2262,16 +2273,16 @@ export default function CitizenPage() {
                                 </span>
                                 <p className="text-slate-600 leading-relaxed">
                                   {isEligible
-                                    ? result.matchedRules.map((r) => r.explanation).filter(Boolean).join(". ") ||
-                                      "Your household meets the verified age and categorical criteria for this scheme."
+                                    ? result.matchedRules.map((r) => getLocalizedRuleExplanation(r.explanation, language)).filter(Boolean).join(". ") ||
+                                      t("citizen.whyEligibleDefault")
                                     : isNeedsInfo
                                     ? result.missingRequirements
-                                        .map((m) => m.description || m.field)
+                                        .map((m) => getLocalizedRuleExplanation(m.description || m.field, language))
                                         .filter(Boolean)
                                         .join(". ") ||
-                                      "A few additional household details are required to complete this evaluation."
-                                    : result.failedRules.map((r) => r.explanation).filter(Boolean).join(". ") ||
-                                      "Your household details do not currently match the specific criteria for this scheme."}
+                                      t("citizen.whyNeedsInfoDefault")
+                                    : result.failedRules.map((r) => getLocalizedRuleExplanation(r.explanation, language)).filter(Boolean).join(". ") ||
+                                      t("citizen.whyNotEligibleDefault")}
                                 </p>
                               </div>
 
@@ -2285,8 +2296,8 @@ export default function CitizenPage() {
                                         ? (() => {
                                             const senior = members.find((m) => m.age >= 70);
                                             return senior
-                                              ? `${t("forms.relGrandparent")}: ${senior.fullName} (${t("citizen.ageYears", { age: senior.age })})`
-                                              : "Senior Citizen (70+) Entitlement";
+                                              ? `${t("forms.relGrandparent")}: ${senior.fullName} (${t("citizen.ageYears", { age: senior.age })}) — ${t("citizen.entitlementSenior")}`
+                                              : t("citizen.entitlementSenior");
                                           })()
                                         : result.schemeId === "jsy"
                                         ? (() => {
@@ -2294,8 +2305,8 @@ export default function CitizenPage() {
                                               (m) => m.gender === "female" && (m.maternalStatus === "pregnant" || (m.age >= 18 && m.age <= 45))
                                             );
                                             return mom
-                                              ? `${t("citizen.pregnantLabel")}: ${mom.fullName} (${t("citizen.ageYears", { age: mom.age })})`
-                                              : "Maternal Care Entitlement";
+                                              ? `${t("citizen.pregnantLabel")}: ${mom.fullName} (${t("citizen.ageYears", { age: mom.age })}) — ${t("citizen.entitlementMaternal")}`
+                                              : t("citizen.entitlementMaternal");
                                           })()
                                         : t("citizen.coverageVerified")}
                                     </span>
@@ -2315,10 +2326,10 @@ export default function CitizenPage() {
                                   </span>
                                   <p className="text-slate-600 text-xs leading-relaxed">
                                     {result.schemeId === "ab-pmjay"
-                                      ? "Complete Aadhaar-based e-KYC and official PM-JAY registration at your nearest CSC kiosk or through your ASHA worker."
+                                      ? t("citizen.actionPmjayNext")
                                       : result.schemeId === "jsy"
-                                      ? "Ensure Mother and Child Protection (MCP) card registration at your local Anganwadi/PHC and schedule your ANC checkup."
-                                      : "Review required documents and initiate scheme registration."}
+                                      ? t("citizen.actionJsyNext")
+                                      : t("citizen.actionDefaultNext")}
                                   </p>
                                 </div>
                               )}
@@ -2488,65 +2499,69 @@ export default function CitizenPage() {
                 ) : (
                   <div className="space-y-6">
                     {/* Priority Step 1 (CURRENT ACTION) */}
-                    {guidance.actionPlan.length > 0 && (
-                      <div className="rounded-xl border-2 border-teal-600 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                            {t("status.urgent")}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500">
-                            Step 1 of {guidance.actionPlan.length}
-                          </span>
-                        </div>
+                    {guidance.actionPlan.length > 0 && (() => {
+                      const priorityAction = getLocalizedActionPlanItem(guidance.actionPlan[0], language);
+                      return (
+                        <div className="rounded-xl border-2 border-teal-600 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                              {t("status.urgent")}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-500">
+                              {t("citizen.stepOf", { current: 1, total: guidance.actionPlan.length })}
+                            </span>
+                          </div>
 
-                        <div className="space-y-2">
-                          <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                            {guidance.actionPlan[0].title}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                            {guidance.actionPlan[0].description}
-                          </p>
-                          {guidance.actionPlan[0].reason && (
-                            <p className="text-xs text-teal-900 font-medium pt-1">
-                              Why this matters: {guidance.actionPlan[0].reason}
+                          <div className="space-y-2">
+                            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                              {priorityAction.title}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                              {priorityAction.description}
                             </p>
-                          )}
-                        </div>
+                            {priorityAction.reason && (
+                              <p className="text-xs text-teal-900 font-medium pt-1">
+                                {t("citizen.whyThisMatters")} {priorityAction.reason}
+                              </p>
+                            )}
+                          </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                          {connectionStatus?.status === "ACTIVE" ? (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
-                              className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              <span>Request ASHA Assistance</span>
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setActiveTab("asha-connection")}
-                              className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50"
-                            >
-                              Connect with ASHA for Help →
-                            </Button>
-                          )}
+                          <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                            {connectionStatus?.status === "ACTIVE" ? (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleOpenAssistanceModal("DOCUMENT_HELP")}
+                                className="text-xs font-semibold bg-teal-800 hover:bg-teal-900 text-white flex items-center gap-1.5"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>{t("citizen.requestAssistanceBtn")}</span>
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setActiveTab("asha-connection")}
+                                className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50"
+                              >
+                                {t("citizen.connectAshaForHelp")}
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Upcoming Steps */}
                     {guidance.actionPlan.length > 1 && (
                       <div className="space-y-3">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          Upcoming Steps ({guidance.actionPlan.length - 1})
+                          {t("citizen.upcomingSteps", { count: guidance.actionPlan.length - 1 })}
                         </h4>
                         <div className="space-y-3">
                           {guidance.actionPlan.slice(1).map((action, index) => {
                             const stepNumber = index + 2;
+                            const locAction = getLocalizedActionPlanItem(action, language);
 
                             return (
                               <div
@@ -2560,11 +2575,16 @@ export default function CitizenPage() {
                                     </div>
                                     <div>
                                       <h5 className="text-sm font-bold text-slate-900">
-                                        {action.title}
+                                        {locAction.title}
                                       </h5>
                                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                                        {action.description}
+                                        {locAction.description}
                                       </p>
+                                      {locAction.reason && (
+                                        <p className="text-xs text-teal-800/80 font-medium pt-0.5">
+                                          {locAction.reason}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
