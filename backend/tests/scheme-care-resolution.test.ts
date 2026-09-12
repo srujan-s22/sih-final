@@ -260,4 +260,62 @@ describe("SwasthyaSetu — Scheme Care Work Resolution & Public Reflection", () 
     const nfcPmjay = nfcBody.data.schemes.find((s: any) => s.schemeId === "ab-pmjay");
     expect(nfcPmjay.eligibilityStatus).toBe("ELIGIBLE");
   });
+
+  it("5. ASHA resolving an assistance request for a scheme updates NFC to RESOLVED_ELIGIBLE", async () => {
+    // Create an assistance request for PM-JAY
+    const now = new Date().toISOString();
+    await app.assistanceRepository.createRequest({
+      id: "req_test_pmjay_001",
+      householdId,
+      citizenUid,
+      headOfHouseholdName: "Suresh Patil",
+      district: "Bengaluru Rural",
+      state: "Karnataka",
+      ashaUid: ashaAssignedUid,
+      ashaServiceCode: "ASHA-KA-1111",
+      ashaName: "Sunita ASHA",
+      category: "SCHEME_ENROLLMENT",
+      schemeId: "ab-pmjay",
+      schemeName: "Ayushman Bharat",
+      message: "Please assist with PM-JAY enrollment.",
+      priority: "HIGH",
+      status: "RESOLVED",
+      responseNote: "Assistance delivered in field.",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const nfcRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/nfc/resolve",
+      payload: { householdId, token: nfcToken },
+    });
+    expect(nfcRes.statusCode).toBe(HTTP_STATUS.OK);
+    const nfcBody = JSON.parse(nfcRes.payload);
+    const nfcPmjay = nfcBody.data.schemes.find((s: any) => s.schemeId === "ab-pmjay");
+    expect(nfcPmjay).toBeDefined();
+    expect(nfcPmjay.eligibilityStatus).toBe("RESOLVED_ELIGIBLE");
+  });
+
+  it("6. ASHA resolving the case for the household updates NFC to RESOLVED_ELIGIBLE", async () => {
+    // Update case status to RESOLVED
+    const updateRes = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/asha/cases/${caseId}`,
+      headers: { authorization: `Bearer ${ashaAssignedToken}` },
+      payload: { status: "RESOLVED" },
+    });
+    expect(updateRes.statusCode).toBe(HTTP_STATUS.OK);
+
+    const nfcRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/nfc/resolve",
+      payload: { householdId, token: nfcToken },
+    });
+    expect(nfcRes.statusCode).toBe(HTTP_STATUS.OK);
+    const nfcBody = JSON.parse(nfcRes.payload);
+    const nfcPmjay = nfcBody.data.schemes.find((s: any) => s.schemeId === "ab-pmjay");
+    expect(nfcPmjay).toBeDefined();
+    expect(nfcPmjay.eligibilityStatus).toBe("RESOLVED_ELIGIBLE");
+  });
 });

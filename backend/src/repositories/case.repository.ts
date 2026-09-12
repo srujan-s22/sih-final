@@ -51,27 +51,36 @@ export class CaseRepository extends BaseFirestoreRepository<AshaCase> {
     return { id: doc.id, ...(doc.data() as Omit<AshaCase, "id">) };
   }
 
-  public async getCaseByHouseholdId(householdId: string): Promise<AshaCase | null> {
+  public async listCasesByHouseholdId(householdId: string): Promise<AshaCase[]> {
     if (this.isUnitTestMode()) {
+      const results: AshaCase[] = [];
       for (const c of this.memoryCases.values()) {
         if (c.householdId === householdId) {
-          return { ...c };
+          results.push({ ...c });
         }
       }
-      return null;
+      return results.sort(
+        (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+      );
     }
 
     const querySnapshot = await this.getCollection()
       .where("householdId", "==", householdId)
-      .limit(1)
       .get();
 
-    if (querySnapshot.empty) {
-      return null;
-    }
+    const cases = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<AshaCase, "id">),
+    }));
 
-    const doc = querySnapshot.docs[0];
-    return { id: doc.id, ...(doc.data() as Omit<AshaCase, "id">) };
+    return cases.sort(
+      (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+    );
+  }
+
+  public async getCaseByHouseholdId(householdId: string): Promise<AshaCase | null> {
+    const cases = await this.listCasesByHouseholdId(householdId);
+    return cases.length > 0 ? cases[0] : null;
   }
 
   public async listCasesByAsha(

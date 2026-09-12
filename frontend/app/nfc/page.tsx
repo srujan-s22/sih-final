@@ -734,9 +734,21 @@ function NfcResolverContent() {
                     {t("nfc.schemesSubtitle")}
                   </p>
                 </div>
-                <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
-                  {t("nfc.schemesAvailable", { count: data.schemes.length })}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                    {t("nfc.schemesAvailable", { count: data.schemes.length })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resolveCredential}
+                    disabled={loading}
+                    title="Refresh schemes"
+                    aria-label="Refresh schemes"
+                    className="p-1 rounded-full text-slate-400 hover:text-teal-800 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-teal-700" : ""}`} />
+                  </button>
+                </div>
               </div>
 
               {/* STATE D: ZERO ELIGIBLE SCHEMES */}

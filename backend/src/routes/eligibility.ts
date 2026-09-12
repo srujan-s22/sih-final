@@ -33,14 +33,42 @@ export const eligibilityRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        const householdCase = await fastify.caseRepository.getCaseByHouseholdId(evaluation.household.id);
+        const householdCases = await fastify.caseRepository.listCasesByHouseholdId(evaluation.household.id);
+        const householdCase = householdCases.length > 0 ? householdCases[0] : null;
+
         const resolvedSchemeIds = new Set<string>();
-        if (householdCase) {
-          if (householdCase.resolvedSchemes) {
-            householdCase.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
+        let isAnyCaseResolved = false;
+
+        for (const c of householdCases) {
+          if (c.resolvedSchemes) {
+            c.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
           }
-          if (["RESOLVED", "CLOSED"].includes(householdCase.status) && householdCase.schemeId) {
-            resolvedSchemeIds.add(householdCase.schemeId);
+          if (["RESOLVED", "CLOSED"].includes(c.status)) {
+            isAnyCaseResolved = true;
+            if (c.schemeId) {
+              resolvedSchemeIds.add(c.schemeId);
+            }
+          }
+        }
+
+        if (fastify.assistanceRepository) {
+          try {
+            const requests = await fastify.assistanceRepository.listRequestsByHouseholdId(evaluation.household.id);
+            for (const req of requests) {
+              if (["RESOLVED", "CLOSED"].includes(req.status) && req.schemeId) {
+                resolvedSchemeIds.add(req.schemeId);
+              }
+            }
+          } catch {
+            // Non-blocking
+          }
+        }
+
+        if (isAnyCaseResolved) {
+          for (const res of evaluation.results) {
+            if (res.status !== "NOT_ELIGIBLE") {
+              resolvedSchemeIds.add(res.schemeId);
+            }
           }
         }
 
@@ -52,7 +80,7 @@ export const eligibilityRoutes: FastifyPluginAsync = async (fastify) => {
             members: evaluation.members,
             results: evaluation.results,
             count: evaluation.results.length,
-            caseStatus: householdCase?.status || null,
+            caseStatus: isAnyCaseResolved ? "RESOLVED" : householdCase?.status || null,
             resolvedSchemeIds: Array.from(resolvedSchemeIds),
           },
           correlation_id: correlationId,

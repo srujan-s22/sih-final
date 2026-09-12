@@ -27,7 +27,7 @@ export class NfcServiceClient {
         token,
         ...(version !== undefined ? { version } : {}),
       },
-      { signal }
+      { signal, cache: "no-store" }
     );
   }
   /**

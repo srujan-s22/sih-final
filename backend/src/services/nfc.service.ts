@@ -15,6 +15,7 @@ import { NfcRepository } from "../repositories/nfc.repository.js";
 import { HouseholdRepository } from "../repositories/household.repository.js";
 import { CaseRepository } from "../repositories/case.repository.js";
 import { UserRepository } from "../repositories/user.repository.js";
+import { AssistanceRepository } from "../repositories/assistance.repository.js";
 import { EligibilityService } from "./eligibility/eligibility.service.js";
 import { hashSecret, verifySecretHash } from "../utils/secret-hash.js";
 import { HTTP_STATUS } from "../config/constants.js";
@@ -43,6 +44,7 @@ export class NfcService {
   private readonly ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
   private leaveService?: { evaluateAndRestoreExpiredLeaves: () => Promise<any> };
+  private assistanceRepo?: AssistanceRepository;
 
   constructor(
     private nfcRepo: NfcRepository,
@@ -51,6 +53,10 @@ export class NfcService {
     private userRepo: UserRepository,
     private eligibilityService: EligibilityService
   ) {}
+
+  public setAssistanceRepository(repo: AssistanceRepository): void {
+    this.assistanceRepo = repo;
+  }
 
   /**
    * Optional setter for LeaveService to allow lazy evaluation and automatic restoration
@@ -544,26 +550,47 @@ export class NfcService {
       }
     }
 
-    const householdCase = await this.caseRepo.getCaseByHouseholdId(household.id);
+    // Retrieve all cases for this household to ensure complete resolution history
+    const householdCases = await this.caseRepo.listCasesByHouseholdId(household.id);
+    const householdCase = householdCases.length > 0 ? householdCases[0] : null;
+
     const resolvedSchemeIds = new Set<string>();
-    if (householdCase) {
-      if (householdCase.resolvedSchemes) {
-        householdCase.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
+    let isAnyCaseResolved = false;
+
+    for (const c of householdCases) {
+      if (c.resolvedSchemes) {
+        c.resolvedSchemes.forEach((s) => resolvedSchemeIds.add(s));
       }
-      if (["RESOLVED", "CLOSED"].includes(householdCase.status) && householdCase.schemeId) {
-        resolvedSchemeIds.add(householdCase.schemeId);
+      if (["RESOLVED", "CLOSED"].includes(c.status)) {
+        isAnyCaseResolved = true;
+        if (c.schemeId) {
+          resolvedSchemeIds.add(c.schemeId);
+        }
+      }
+    }
+
+    // Check assistance requests for household resolution
+    if (this.assistanceRepo) {
+      try {
+        const requests = await this.assistanceRepo.listRequestsByHouseholdId(household.id);
+        for (const req of requests) {
+          if (["RESOLVED", "CLOSED"].includes(req.status) && req.schemeId) {
+            resolvedSchemeIds.add(req.schemeId);
+          }
+        }
+      } catch {
+        // Safe degrade
       }
     }
 
     // Map eligibility results to safe public summaries
     const schemes: NfcPublicSchemeSummary[] = eligibilityResults.map((res) => {
-      let status: NfcPublicSchemeSummary["eligibilityStatus"];
-      if (
+      const isResolved =
         resolvedSchemeIds.has(res.schemeId) ||
-        (householdCase &&
-          ["RESOLVED", "CLOSED"].includes(householdCase.status) &&
-          (!householdCase.schemeId || householdCase.schemeId === res.schemeId))
-      ) {
+        (isAnyCaseResolved && res.status !== "NOT_ELIGIBLE");
+
+      let status: NfcPublicSchemeSummary["eligibilityStatus"];
+      if (isResolved) {
         status = "RESOLVED_ELIGIBLE";
       } else if (res.status === "ELIGIBLE") {
         status = "ELIGIBLE";

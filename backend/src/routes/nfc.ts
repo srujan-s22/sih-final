@@ -72,12 +72,17 @@ export const nfcRoutes: FastifyPluginAsync = async (fastify) => {
           clientIp
         );
 
-        return reply.status(HTTP_STATUS.OK).send({
-          success: true,
-          data: result,
-          correlation_id: correlationId,
-          timestamp: new Date().toISOString(),
-        });
+        return reply
+          .header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+          .header("Pragma", "no-cache")
+          .header("Expires", "0")
+          .status(HTTP_STATUS.OK)
+          .send({
+            success: true,
+            data: result,
+            correlation_id: correlationId,
+            timestamp: new Date().toISOString(),
+          });
       } catch (err) {
         return handleNfcError(err, reply, correlationId);
       }
